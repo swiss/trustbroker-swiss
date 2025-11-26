@@ -1,0 +1,45 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+<div class="profileContent">
+	<div class="title-container">
+		<h2 id="profileHeader">{{ "trustbroker.profile.title" | translate }}</h2>
+		<div>
+			<div id="selectionText">
+				<p [innerHTML]="'trustbroker.profile.subtitle' | translate | safeMarkup"></p>
+			</div>
+		</div>
+
+		<ul class="profiles">
+			@for (profile of profiles; track profile.id) {
+				<li>
+					<button (click)="onClick(profile.id)" [attr.aria-labelledby]="`${profile.name}-title`">
+						<span>{{ profile.unit }}</span>
+						<span class="name" [attr.id]="`${profile.name}-title`">{{ profile.name }}</span>
+						<span>{{ "trustbroker.profile.applications" | translate }}:</span>
+						<ul>
+							@let applications = profile.applications.split(",").sort();
+							@for (application of applications.slice(0, APPLICATIONS_PER_PROFILE); track application) {
+								<li>{{ application }}</li>
+							}
+							@if (applications.length > APPLICATIONS_PER_PROFILE) {
+								<li>{{ "trustbroker.profile.additional-applications" | translate: { count: applications.length - APPLICATIONS_PER_PROFILE } }}</li>
+							}
+						</ul>
+					</button>
+				</li>
+			}
+		</ul>
+	</div>
+</div>

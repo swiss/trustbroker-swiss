@@ -1,0 +1,202 @@
+= Configuration
+
+This section provides insights into the various configurations and their purpose.
+All configuration files maintained in a git branch, XTB is started with, are pulled within one minute by a scheduled job.
+To speed up experimenting or engineering configurations, run the ``reconfig.sh`` script on the side.
+
+So the configuration workflow is as follows:
+
+- Run XTB with a ``GIT_URL`` pointing to your GitOps repository (``CONFIG_BRANCH=master`` is default).
+- Engineer your configuration and push them (the usual git add, commit, push workflow applies).
+- Wait until the console shows the reconfiguration or speed it up using the ``reconfig.sh`` script mentioned at the end.
+- Test your changes.
+
+
+== Global Settings
+
+XTB is a spring-boot microservice running with a builtin application.yml for defaults and a spring.profiles.active=DEMO activated application.yml from the GitOps repository overriding or completing these defaults.
+
+The following annotated demo file shows insights:
+
+[source,yaml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/config/application.yml[]
+----
+
+== Claims Provider Definitions
+
+This configuration defines the identification and visual aspects of CPs shown on the HRD screen.
+HRD (home realm discovery) provides the means for a user to select from multiple CPs one, where an onboarding was done and an account is available.
+
+The HRD screen is not shown, when only one CPs is federated.
+The definition is necessary anyway.
+The DEMO setup uses the SAML mock in 2 instances.
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/ClaimsProviderDefinition.xml[]
+----
+
+== Single Sign On Groups
+
+SSO groups provide a means to join multiple relying parties into a single login group during a period defined by the group.
+A login with the same CP is then not required anymore.
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupSSOGroups.xml[]
+----
+
+== Claims Party Setup
+
+The SetupCP.xml defines the technical association with an CP.
+It's id must match the one in the ``ClaimsProviderDefinition.xml``.
+A trust anchor is required because SAML responses from an CP must be signed.
+Assertion signing is optional but recommended.
+The incoming assertion attributes are declared to also document the expected input from the CP.
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-1.xml[]
+----
+
+== Relying Party Profile
+
+Profiles provide a mechanism to declare a template for multiple relying parties using the same protocols, claims definitions and mapping procedures.
+
+The content of a ReylingParty declared in here needs to be correctly ordered according to the configuration schema (see
+``ReylingParty.java`` or the XSD files in the docker image).
+
+The order reflects the processing model (see architecture) so reading a ProfileRP or SetupRP top down reflects which elements are used when processing the federation:
+
+- Input validation (issuer/client IDs, signatures using truststore, security policies affecting request processing)
+- Handling protocols (Saml, Oidc sections)
+- Applying XTB features (like SSO)
+- Dispatching towards CPs using ClaimsProviderMappings
+- On response from CP apply CP AttributesSelection filtering
+- Invoke IDM service applying list of configured IDMQuery (not shown in OSS yet)
+- On response to RP apply UserDetailsSelection (IDM source), PropertiesSelection (computed by scripts) and ClaimsSelection (towards OIDC) filtering
+- Scripts affect the overall processing and are last
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/ProfileRP_DemoDefaults.xml[]
+----
+
+== Relying Party Setup
+
+The ``SetupRP.xml`` defines the federation with the SAML service provider or OIDC application client based on the ``ProfileRP.xml`` it refers to.
+
+The profile is optional but recommended to reduce bad copy&paste habits and maintain site policies within few profiles.
+The merging is done at startup or when a git configuration change is detected.
+Broken configurations are ignored for resilience.
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupRP_SAML-Demo.xml[]
+----
+
+== Qoa Setup
+
+XTB can do Qoa (acr) checking and enforcement mapping authentication context classes on CP and RP side.
+
+The Qoa model is configured in 3 areas:
+- A global model can be defined in the trustbroker.config.qoa section so the SetupRP/SetupCP Qoa sections do not need to define the order number (specifying which ACClass is stronger than another).
+- SetupRP defines defaults an RP requires (assuming default comparison type exact).
+This list is used when the RP does not send any requirements or it's used to validate incoming requirements.
+- SetupCP defines what the federated IdP supports and is used for outbound mapping (using the internal order numbers) and also to validate, what the CP returns.
+
+RP Qoa example (validating/mapping inbound acr value and mapping back outbound values):
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupRP_QOA-Demo.xml[]
+----
+
+CP Qoa example (mapping inbound acr values and validating/mapping outbound values):
+
+[source,xml]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-2.xml[]
+----
+
+== PKI Setup
+
+=== OIDC
+
+OIDC uses automatically generated keys that are rotated (per default) weekly.
+
+Clients not checking the JWKS endpoint:
+
+- when the kid claim in the header does not match the local key set.
+- periodically but at least once a week
+
+might run into JWT signature verification problems.
+Key rotation settings need to be tuned in this case in the global configuration (see above).
+It's recommended to fix the client instead.
+
+XTB fetches and caches OIDC CP metadata on start-up and updates it periodically or when a key is referenced that is not cached.
+
+=== SAML
+
+XTB supports various keystore formats, but we recommend the first 2:
+
+- ``keystore.pem``: OpenSSL PEM formatted certificate along with the private RSA key, protected by the PKI_PASSPHRASE from the runtime environment (K8S secret, CO vault)
+- ``truststore.pem``: The same but no private key in their.
+This one instead might contain multiple trusted certificates (e.g. when the peer is in the process of replacing its signer)
+- ``keystore.p12``: PKCS12 keystores with or without private keys.
+- ``keystore.jks``: Java keystores are fast but not recommended, use one of the other formats.
+
+Tools to work with keystores:
+
+- openssl
+- keytool (mainly to read JKS and transfer private keys into PKCS12 files for openssl handling)
+
+Please check the installation documentation for signer generation.
+
+== Groovy Scripts
+
+Setup and profile configurations can refer to groovy scripts to customize federation data and flow.
+Check the scripting section for insights.
+
+== UI Setup
+
+XTB has a small frontend for various purposes, mainly HRD (see above) and error display.
+
+The following can be customized:
+
+- config: The global settings contain a few UI influencing settings (e.g. the site specific language cookie, if the browser language shall be overruled)
+- translations: Texts for languages ``de``, ``fr``, ``en`` and ``it``.
+- images: The tile images used on the HRD screen and declared in the ClaimsProviderDefinition.xml (see above)
+- assets: The theme resources to provide a corporate identity (icons, style, logo)
+
+Text handling:
+
+- Text keys can be found in ``trustbroker-frontend/src`` (look for the ng translate items).
+- Texts are maintained in texts.json for convenience and can be exchanged as texts.csv for translation services.
+- The ``text2json.py`` script checks the maintained master file and generates the derived ``de/fr/en/it.json`` translations.
+
+
+=== Theme Customizing
+
+See ``xtb-gitops-demo`` for assets and check the CSS to see if the styling of the interactive parts of XTB (usually HRD and error screen) fits your needs.
+
+== Reconfiguration Process
+
+On first time use the repository is cloned into the ``configCache``.
+
+XTB from then on checks the GitOps repository for changes and if commits are detected:
+
+- git pull the changes in ``configCache``
+- copy the selected stage profile into configuration/new
+- validate the configuration
+- if ok activate the configuration by swapping latest configuration into the previous one and the new one takes its place.
+
+This allows to diff latest against previous to see what changed.
+Changes are also ``INFO`` logged in the console.
+
+During development the following script speeds up the re-configuration process:
+
+----
+include::../../../../xtb-gitops-demo/reconfig.sh[]
+----

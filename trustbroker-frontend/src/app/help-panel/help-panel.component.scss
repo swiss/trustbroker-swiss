@@ -1,0 +1,69 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "src/styles/variables";
+@use "src/styles/spacing";
+
+app-help-panel {
+
+  .helperSidebarHeadCard {
+    display: flex;
+    padding: .75rem 1.25rem;
+    background-color: #333;
+    color: #fff;
+  }
+
+  .helperSidebarTitle {
+    color: #fff;
+  }
+
+  .mat-expansion-panel-body {
+    padding: 1.25rem !important;
+  }
+
+  mat-panel-title {
+    color: #343a40 !important;
+  }
+
+  mat-expansion-panel-header {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+
+  .mat-expansion-panel {
+    border-radius: 0;
+  }
+
+  .mat-expansion-panel-header:focus {
+	background: variables.$focus-dropdown-background-color !important;
+  }
+
+  .app-helper-sidebar-close-button {
+	  min-width: auto;
+	  line-height: inherit;
+
+	  .ob-icon-wrapper {
+		  filter: invert(100%);
+	  }
+
+	  &:hover, &:focus {
+		  background-color: variables.$focus-background-color;
+
+		  .ob-icon-wrapper {
+			  filter: none;
+		  }
+	  }
+  }
+
+}

@@ -1,0 +1,130 @@
+plugins {
+	id 'java-library'
+	id 'jacoco'
+}
+
+configurations {
+	jaxb
+}
+
+dependencies {
+	api project("${rootProject.top}:trustbroker-service")
+	api 'jakarta.xml.bind:jakarta.xml.bind-api'
+	jaxb(
+			'org.glassfish.jaxb:jaxb-xjc',
+			'org.glassfish.jaxb:jaxb-runtime'
+	)
+}
+
+def packageName = 'swiss.trustbroker.xmlconfig'
+def packageDirectory = packageName.replace(".", "/")
+def serviceBuildDir = project("${rootProject.top}:trustbroker-service").layout.buildDirectory.get()
+def serviceSchemaDir = file("${serviceBuildDir}/resources/main")
+def patchedJaxbSources = file("build/generated/patched")
+def buildSchemaDir = file("build/generated/schema")
+def jaxbTargetDir = file("build/generated/jaxb")
+def xjcClass = 'com.sun.tools.xjc.XJCTask'
+def xjbSourceDir = file("src/main/resources")
+def xjbPatchedDir = file("build/generated/xjb")
+
+def schemaClasses = [
+		'RelyingParty',
+		'RelyingPartySetup',
+		'ClaimsProviderSetup',
+		'ClaimsProviderDefinitions',
+		'SsoGroupSetup'
+]
+
+sourceSets {
+	main {
+		java {
+			srcDirs = [patchedJaxbSources]
+		}
+	}
+}
+
+task patchGeneratedClasses(type: Copy) {
+	from("${jaxbTargetDir}")
+	into("${patchedJaxbSources}")
+	doLast {
+		ant.replaceregexp(match: 'public class', replace: '@lombok.Data\n@lombok.Builder\n@lombok.NoArgsConstructor\n' +
+				'@lombok.AllArgsConstructor\npublic class', flags: 'g', byline: true) {
+			fileset(dir: "${patchedJaxbSources}", includes: "**/*.java", excludes: "**/ObjectFactory.java")
+		}
+		logger.info("patched xjc generated sources in: ${patchedJaxbSources}")
+	}
+}
+
+compileJava.dependsOn patchGeneratedClasses
+
+task patchXjb(type: Copy) {
+	from("${xjbSourceDir}")
+	into("${xjbPatchedDir}")
+	doLast {
+		ant.replaceregexp(match: 'schemaLocation="', replace: 'schemaLocation="../schema/',
+				flags: 'g', byline: true) {
+			fileset(dir: "${xjbPatchedDir}", includes: "*.xjb")
+		}
+		logger.info("patched xjb generated sources in: ${xjbPatchedDir}")
+	}
+}
+
+task copyGeneratedXsdClasses(type: Copy) {
+	from(serviceSchemaDir) {
+		include "**/*.xsd"
+	}
+	into(buildSchemaDir)
+	doLast {
+		logger.info("Copied xsd from ${serviceSchemaDir} to ${buildSchemaDir}")
+	}
+}
+
+copyGeneratedXsdClasses.dependsOn ":trustbroker-service:processResources"
+compileJava.dependsOn patchXjb
+compileJava.dependsOn copyGeneratedXsdClasses
+
+// xjc warns that namespace http://java.sun.com/xml/ns/jaxb should be https://jakarta.ee/xml/ns/jaxb
+// (fails even with version=3.0)
+schemaClasses.each { name ->
+	def schemaFile = file("${buildSchemaDir}/${name}.xsd")
+	def xjbSourceFile = "${xjbSourceDir}/${name}.xjb"
+	def xjbPatchedFile = "${xjbPatchedDir}/${name}.xjb"
+	def destFile = "${jaxbTargetDir}/${packageDirectory}/${name}.java"
+
+	task "jaxb${name}"(dependsOn: [copyGeneratedXsdClasses, patchXjb]) {
+		System.setProperty('javax.xml.accessExternalSchema', 'all')
+		inputs.files(schemaFile, xjbPatchedFile, xjbSourceFile)
+		outputs.file(destFile)
+		doFirst {
+			logger.info("xjc: java -cp ${configurations.jaxb.asPath} ${xjcClass} schema: ${schemaFile}")
+		}
+		doLast {
+			jaxbTargetDir.mkdirs()
+			ant.taskdef(
+					name: 'xjc',
+					classname: xjcClass,
+					classpath: configurations.jaxb.asPath
+			)
+			ant.jaxbTargetDir = jaxbTargetDir
+			ant.xjc(
+					destdir: jaxbTargetDir,
+					package: packageName,
+					binding: xjbPatchedFile,
+					schema: schemaFile,
+					extension: true
+			)
+			logger.info("xjc: generated: ${destFile} in package ${packageName}")
+		}
+
+	}
+
+	patchGeneratedClasses.dependsOn "jaxb${name}"
+
+}
+
+jar.from(buildSchemaDir) {
+	include('*.xsd')
+}
+jar.from(jaxbTargetDir) {
+	include('**')
+}

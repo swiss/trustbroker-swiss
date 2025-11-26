@@ -1,0 +1,50 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#greyCard {
+	color: white;
+	height: 100%;
+	opacity: 80%;
+	background-color: #454545;
+	position: absolute;
+	width: 100%;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: default;
+	/* Will not work on some old browsers */
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
+}
+
+#greyCardTitle {
+	color: rgba(255, 255, 255, 1);
+	font-size: 18px;
+	font-weight: 700;
+	font-style: normal;
+	letter-spacing: 0.2px;
+	text-align: center;
+}
+
+#greyCardSubtitle {
+	color: rgba(255, 255, 255, 0.87);
+	font-size: 14px;
+	font-weight: 400;
+	font-style: normal;
+	letter-spacing: 0.25px;
+	text-align: center;
+	line-height: 20px;
+}

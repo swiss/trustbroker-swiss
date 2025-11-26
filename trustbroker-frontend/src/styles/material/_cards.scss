@@ -1,0 +1,110 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+
+// Global card styles
+// These styles are based on the current styleguide and have the following implications:
+// - there are 4 card sizes with fixed width and this should be used always
+// - small cards are not used as a single element for page layout and they should not have any responsive behavior
+// and they are the only ones having images
+// - medium and large cards are always used as single element on a page and they are horizontally centered
+// - extra large cards are always used a a single element on a page and they have a spacing value from the left
+// side of the screen: $extra-large-card-left-spacing
+// - responsive behavior (other than small cards): in case the screen width goes below the width of a card (or the card with plus
+// the fix spacing in case of extra large) the card will transform into the next smaller card. In case the width goes below the
+// medium card width the card becomes full-width
+@import "mixins";
+@import "../spacing";
+
+@mixin card($width, $padding, $subtitle-bottom-spacing, $content-bottom-spacing, $footer-top-spacing) {
+	padding: $padding;
+	width: $width;
+}
+
+@mixin card-image($card-horizontal-padding, $card-top-padding, $image-bottom-padding) {
+	img[mat-card-image] {
+		width: calc(100% + 2 * #{$card-horizontal-padding});
+		margin: -1 * $card-top-padding -1 * $card-horizontal-padding $image-bottom-padding;
+		border-bottom: $divider-border;
+		min-width: 100%;
+		max-width: 100%;
+	}
+}
+
+@mixin full-width-card {
+	width: 100%;
+	box-shadow: none !important;
+}
+
+@mixin medium-card {
+
+	margin-left: auto;
+	margin-right: auto;
+
+	@include card($medium-card-width, $spacer-3 $medium-card-padding $spacer-2, $spacer-2, $spacer-3, $spacer-4);
+
+	@media(max-width: $medium-card-width) {
+		@include full-width-card()
+	}
+
+}
+
+@mixin large-card {
+
+	@include card($large-card-width, $spacer-4 $spacer-6 $spacer-3, $spacer-3, $spacer-4, $spacer-4);
+
+	margin-left: auto;
+	margin-right: auto;
+
+	@media (max-width: $large-card-width) {
+		@include medium-card();
+	}
+}
+
+mat-card {
+
+	&.small {
+		@include card($small-card-width, $spacer-3 $spacer-2 $spacer-2, $spacer-2, $spacer-4, $spacer-4);
+		@include card-image($spacer-2, $spacer-3, $spacer-3);
+
+		@media(max-width: $small-card-width) {
+			width: auto;
+			margin-left: $spacer-2;
+			margin-right: $spacer-2;
+
+			img[mat-card-image] {
+				object-fit: none;
+			}
+		}
+	}
+
+	&.medium {
+		@include medium-card();
+	}
+
+	&.large {
+		@include large-card();
+	}
+
+	&.extra-large {
+		@include card($extra-large-card-width, $spacer-4 $spacer-6 $spacer-3, $spacer-3, $spacer-4, $spacer-4);
+
+		@media (max-width: $extra-large-card-width + $extra-large-card-left-spacing) {
+			@include large-card();
+		}
+	}
+
+	word-break: break-word;
+}

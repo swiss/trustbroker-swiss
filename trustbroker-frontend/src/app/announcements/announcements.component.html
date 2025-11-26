@@ -1,0 +1,31 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+@if (showAnnouncements) {
+	<div class="announcementsContainer">
+		<div class="title-container">
+			<h2>{{ "trustbroker.announcements.title" | translate }}</h2>
+		</div>
+		<div id="announcementsBody" class="medium-emphasis mb-2">
+			@for (announcement of announcements; track announcement) {
+				<app-announcement [announcement]="announcement" [theme]="theme" />
+			}
+			@if (appAccessible) {
+				<button id="continueButton" mat-flat-button color="primary" (click)="continueToApp()" type="submit" class="{{ theme.name }} button-text">
+					<span>{{ "trustbroker.announcements.button" | translate }}</span>
+				</button>
+			}
+		</div>
+	</div>
+}

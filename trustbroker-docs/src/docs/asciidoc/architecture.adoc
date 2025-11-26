@@ -1,0 +1,157 @@
+= Architecture
+
+XTB is a federation service providing these capabilities:
+
+- routing authentication requests between relying parties (in short RP, also known as service provider / SP) and claims providers (CP also known as identity provider / IDP) allowing a user to select the home realm or computationally doing home realm discovery (HRD) via scripting
+- mapping claims/attributes between CP and RP (like authentication context classes, SAML attributes and OIDC claims)
+- backing logins with a single-sign-on session store to prevent logins for participating RPs when Quality of Authentication (QoA) is sufficient provided by the same CP
+- auditing login events as a central party
+- supporting GitOps having a tracked, versioned and reviewable configuration repository
+
+The supported protocols are:
+
+- SAML 2.0 on RP and CP side (SAML POST and redirect binding, artifact binding having higher integration effort and more complex operational impact can be used too)
+- OIDC 1.0 on RP side focussing on the best practice sub-set (authorization code flow with PKCE for frontend and with client authentication for backends)
+
+Actors and components explained:
+
+[cols="1,10"]
+|===
+|Component | Purpose
+
+|User-Agent
+|The client is usually a browser in case of front-channel controlled authentication or otherwise a OIDC adapter running either
+in the browser using JavaScript or in a backend.
+
+|Relying Party Service
+|Handles the interaction with the application side based on ``SetupRP.xml`` definitions.
+
+|Claims Provider Service
+|Handles the interaction with the CPs based on ``SetupCP.xml`` definitions.
+
+|Authentication Service
+|Handles the federation between RP and CP service.
+
+|OIDC Service
+|Handles RP-initiated OIDC authorization code flow based on the
+https://docs.spring.io/spring-authorization-server/reference/overview.html#feature-list[Spring Authorization Server]
+To separate SAML and OIDC implementation sub-systems, the OIDC service is federated via SAML.
+
+|Authorization Code Flow Service
+|Handles OIDC authorization code flow towards OIDC CPs.
+
+|HRD Controller
+|Handles the interaction with the user when selecting a CP form the HRD selection screen.
+
+|Script Service
+|Allows to hook groovy scripts to manipulate the federation data and flow. See processing model for supported hooks and the
+configuration section for a few examples.
+
+|SSO Service
+|Allows multiple RP's to share a session on the XTB. The SSO mechanism is based on cookies and device tracking and can be
+overridden via SAML AuthnRequest (forceAuthn) and OIDC authorize request (prompt=login). Minimal LoA requirements should be
+applied using this service.
+
+
+|===
+
+== Processing Model
+
+The federation is executed as follows:
+
+[plantuml,"sequence-diagram",svg]
+.Sequence diagram: Federation processing
+----
+
+participant "Browser" as Client
+participant "Relying\nParty\n(RP)" as RP
+
+box "XTB" #EEEEEE
+participant "Trustbroker (XTB)\nFederation\nServer" as XTB
+control "SSO\nService" as SSO
+control "HRD\nController" as HRD
+control "Claims\nProvider\nService" as CPS
+control "SAML Assertion\nConsumer\nService" as ACS
+control "SAML Relying\nParty\nService" as RPS
+control "Script\nService" as Script
+control "OIDC\nService" as OIDC
+control "OIDC\nAuthentication\nCode Flow Service" as ACFS
+end box
+
+database "Session\nStore" as Store
+
+participant "IDM\nService" as IDM
+
+participant "SAML\nClaims\nProvider\n(CP)" as SCP
+
+participant "OIDC\nClaims\nProvider\n(CP)" as OCP
+
+Client -> RP : Initiate federated login
+
+activate XTB
+
+alt#Gold #D8E4D8 OIDC Client Interchange
+Client  -> OIDC: /.well-known/openid-configuration (optional)
+Client  -> OIDC: /authorize (before login)
+end
+
+Client -> XTB : POST RP-AuthnRequest
+
+XTB -> XTB : Check RP-AuthnRequest
+alt#Gold #EEDDEE SSO Case
+XTB -> SSO : Ckeck if SSO
+XTB -> Client : Detect Device SSO Context
+Client -> XTB : Device SSO Context
+XTB -> Store : Fetch State by SSO
+XTB -> SSO : Check Device SSO
+else #DDEEEE No SSO SAML CP Case
+XTB -> HRD : Discover HomeRealm (HRD)
+HRD -> Script : Handle RPRequest\n(BeforeHrd)
+XTB -> CPS : Create CP-AuthnRequest
+XTB -> Store : Save State (Relay,SSO)
+XTB -> Client : SAML CP-AuthnRequest
+Client -> SCP : POST CP-AuthnRequest
+Client -> SCP : Authenticate user
+Client -> XTB : POST CP-Response
+else #EEEEDD No SSO OIDC CP Case
+XTB -> HRD : Discover HomeRealm (HRD)
+HRD -> Script : Handle RPRequest\n(BeforeHrd)
+XTB -> ACFS : Create Authorization Code Flow Request
+XTB -> Store : Save State (Relay,SSO)
+ACFS -> OCP : Request OIDC metadata (backchannel)
+XTB -> Client : OIDC Authorization Code Flow Request
+Client -> OCP : GET Authorization Code Flow Request
+Client -> OCP : Authenticate user
+Client -> XTB : POST Authorization Code Flow Response
+XTB -> ACFS : Handle Authorization Code Flow Response
+ACFS -> OCP : Request tokens (backchannel)
+end
+
+XTB -> ACS : Check CP-Response
+XTB -> RPS : Create RP-Response
+RPS -> Store : Fetch State by Relay
+RPS -> Script : Handle CP specials\n(BeforeIdm)
+RPS -> RPS : Apply CP attribute selection
+RPS -> Script : Handle RP specials\n(BeforeIdm)
+RPS -> IDM : Fetch IDM attrs
+RPS -> Store : Save State (SSO)
+RPS -> Script : Handle RP specials\n(AfterIdm)
+RPS -> RPS : Apply RP attribute selection
+RPS -> Script : Attribute post-processing\n(OnResponse)
+RPS -> RPS : Sign RP-Response
+RPS -> XTB : RP-Response
+XTB -> Client : RP-Response
+
+alt#Gold #D8E4D8 OIDC Client Interchange (frontend variant)
+Client  -> OIDC: /authorize (after login)
+Client  -> OIDC: /jwks (signature keys)
+Client  -> OIDC: /token (private/public authorization_code flow)
+OIDC -> Script : Claims post-processing\n(OnToken)
+Client  -> Client : token/access_token (private: refresh_token)
+end
+
+deactivate XTB
+{start} <-> {end} : some time
+
+Client -> RP : Access application (SAML or OIDC tokens)
+----

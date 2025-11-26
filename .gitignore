@@ -1,0 +1,12 @@
+# Gradle
+.gradle
+build
+out
+
+# IDEs
+.idea
+.iml
+
+# external repo required for ascidoc generation
+xtb-gitops-demo
+

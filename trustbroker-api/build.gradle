@@ -1,0 +1,46 @@
+plugins {
+	id 'java-library'
+	id 'jacoco'
+}
+
+dependencies {
+
+	// SAML
+	api 'org.opensaml:opensaml-saml-api'
+	implementation 'org.opensaml:opensaml-core-impl'
+	implementation 'org.opensaml:opensaml-core-api'
+	implementation 'org.opensaml:opensaml-saml-impl'
+
+	// OIDC (compile-time constant references only so far)
+	compileOnly 'org.springframework.security:spring-security-oauth2-core'
+
+	// optional optrace component
+	compileOnly 'org.aspectj:aspectjweaver'
+
+	// apache tool stack (propagate as part of our commons api)
+	api 'org.apache.commons:commons-lang3'
+	api 'org.apache.commons:commons-text'
+	api 'org.apache.httpcomponents.client5:httpclient5'
+	api 'commons-beanutils:commons-beanutils'
+	api 'commons-io:commons-io'
+
+	// gateway direct dependency for token analysis only
+	// https://central.sonatype.com/artifact/com.nimbusds/nimbus-jose-jwt/9.24.4/versions
+	api 'com.nimbusds:nimbus-jose-jwt'
+
+	// base services
+	implementation 'org.eclipse.jgit:org.eclipse.jgit'
+
+	// PKI handling (advanced)
+	implementation 'org.bouncycastle:bcpkix-jdk18on'
+
+	// logging (not so clean to depend on impl but we use that everywhere)
+	implementation 'ch.qos.logback:logback-classic'
+
+	// servlet api (would be nice to not have the whole tomcat)
+	implementation "org.apache.tomcat.embed:tomcat-embed-core"
+
+	// spring-test baseline
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework:spring-web'
+}

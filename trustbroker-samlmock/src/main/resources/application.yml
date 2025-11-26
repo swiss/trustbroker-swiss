@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: trustbroker-samlmock
+  cloud:
+    config:
+      enabled: false
+  thymeleaf:
+    cache: false
+    check-template: true
+    check-template-location: true
+    enabled: true
+    prefix: classpath:/templates/
+
+server:
+  port: 7070
+  max-http-request-header-size: 64KB
+
+# /actuator customization
+management:
+  server:
+    port: 7071
+
+trustbroker:
+  samlmock:
+    # data
+    mockDataDirectory: ${TRUSTBROKER_HOME}/configCache/trustbroker-samlmock/${SPRING_PROFILES_ACTIVE}
+    keystoreDirectory: ${TRUSTBROKER_HOME}/configuration/latest/keystore/
+    cacheMockFiles: false # re-load files on access
+
+    # RP (as we sign and do not have access to some RPs private key, use 'trust ourselves')
+    assertionConsumerServiceUrl: http://localhost:7070/authn/consumer
+    idpServiceUrl: http://localhost:7070/auth/saml2/idp/samples
+    artifactResolutionServiceUrl: http://localhost:7070/authn/arp
+    artifactResolutionIssuer: urn:trustbroker.swiss:idp:SAML-MOCK-1
+    artifactResolutionIssuerIsRp: false
+    spSignerKeystore: token-signer/keystore.pem
+    spSignerPassword: ${PKI_PASSPHRASE}
+
+    # XTB
+    tbApplicationUrl: http://localhost:4200
+    consumerUrl: ${trustbroker.samlmock.tbApplicationUrl}/api/v1/saml
+    metadataUrl: ${trustbroker.samlmock.tbApplicationUrl}/api/v1/metadata
+    arpUrl: ${trustbroker.samlmock.tbApplicationUrl}/api/v1/saml/arp
+    testRpIssuer: urn:trustbroker.swiss:sp:DEMO-RP-1
+    testCpIssuer: urn:trustbroker.swiss:idp:SAML-MOCK-1
+    validReturnUrls:
+      - ${tbApplicationUrl}
+
+    #  (as we sign and do not have access to CP private key, use 'trust ourselves')
+    idpSignerKeystore: token-signer/keystore.pem
+    idpSignerPassword: ${PKI_PASSPHRASE}
+    skinnyAssertionNamespaces: a,no-type
+
+    dataEncryptionAlgorithm: http://www.w3.org/2001/04/xmlenc#aes128-cbc
+    keyEncryptionAlgorithm: http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p
+    keyPlacement: PEER
+    emitSki: false
+    encryptionKeystore: token-signer/keystore.pem
+    encryptionPassword: ${PKI_PASSPHRASE}
+    useOriginalAcr: false
+    keepSampleUrlsforCpInitiated: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p --- [%t] %-40.40logger{39} : %m%n%wEx"
+  level:
+    root: INFO
+    org.springframework.boot.autoconfigure.logging: INFO
+    swiss.trustbroker.samlmock: INFO

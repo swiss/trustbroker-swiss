@@ -1,0 +1,68 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+
+@if (theme$ | async; as theme) {
+	<div class="main">
+		<h2 class="sr-only">{{ "trustbroker.hrd.main.title" | translate }}</h2>
+		<p class="sr-only" [innerHTML]="'trustbroker.hrd.main.subtitle' | translate | safeMarkup"></p>
+
+		@for (banner of idpObjects().banners; track banner) {
+			<app-hrd-cards-banner [config]="banner" [theme]="theme" />
+		}
+
+		<section class="cards">
+			<h3 class="sr-only">{{ "trustbroker.hrd.cards.title" | translate }}</h3>
+			@for (idpObjects of idpObjects().tiles | bucketizeIdpObjects: 1; track idpObjects; let bucketIndex = $index) {
+				<div class="card-section" [ngClass]="{ 'expandable-to-half-size': bucketIndex < 2 }">
+					@for (idpObject of idpObjects; track idpObject.urn) {
+						<div class="idp-card-container">
+							<button class="idp-card {{ theme.name }} small" (click)="onCardClick(idpObject)" [disabled]="idpObject.disabled">
+								<img src="{{ baseUrl }}hrd/assets/images/{{ theme.name }}/{{ idpObject.image }}" alt="" />
+								<div
+									[id]="idpObject.title"
+									[innerHTML]="'trustbroker.hrd.cards.' + idpObject.name + '.title' | translate: { Default: idpObject.title } | safeMarkup"
+								></div>
+							</button>
+
+							@if (idpObject.disabled) {
+								<button
+									[id]="'disabledIdp_' + idpObject.name"
+									#overlayDiv
+									class="disabled-overlay"
+									aria-expanded="false"
+									(click)="onOpenDialog(idpObject, overlayDiv, $event)"
+									(keyup)="onOpenDialog(idpObject, overlayDiv, $event)"
+								>
+									<img class="{{ theme.name }} help-icon" src="{{ baseUrl }}hrd/assets/images/{{ theme.name }}/help.svg" alt="" />
+									<p
+										class="title"
+										[innerHTML]="'trustbroker.hrd.cards.' + idpObject.name + '.title' | translate: { Default: idpObject.title } | safeMarkup"
+									></p>
+									<p>{{ "trustbroker.hrd.cards." + idpObject.disabled | translate }}</p>
+								</button>
+							}
+						</div>
+					}
+				</div>
+			}
+		</section>
+	</div>
+}
+
+<ng-template #disabledDialogContent let-data>
+	<div id="disabledDialogContent" class="ob-alert ob-alert-warning disabledDialogContent" [attr.aria-labelledby]="data.labeledById">
+		<p>{{ "trustbroker.hrd.cards." + data.disabled + ".info" | translate: { name: data.title } }}</p>
+	</div>
+</ng-template>

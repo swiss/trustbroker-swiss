@@ -1,0 +1,27 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+// all we need from the huge oblique-icons.scss
+// the actual image contents for the app- classes are replaced with the images from the theme
+
+.ob-icon::before {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+}
+
+.ob-cancel::before {
+	content: url("data:image/svg+xml;base64,PHN2ZyBpZD0iY2FuY2VsIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBvbHlnb24gcG9pbnRzPSIxOS42MjYgNS40NzMgMTguNTY2IDQuNDEyIDEyLjAwNiAxMC45NzIgNS40NDYgNC40MTIgNC4zODYgNS40NzMgMTAuOTQ2IDEyLjAzMyA0LjQxOSAxOC41NiA1LjQ3OSAxOS42MiAxMi4wMDYgMTMuMDkzIDE4LjUyNyAxOS42MTQgMTkuNTg4IDE4LjU1NCAxMy4wNjcgMTIuMDMzIDE5LjYyNiA1LjQ3MyIgZmlsbD0iY3VycmVudENvbG9yIi8+PC9zdmc+");
+}

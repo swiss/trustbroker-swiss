@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ClaimsProviderDefinitions>
+	<ClaimsProvider name='BROKER' id='urn:test:BROKER' img='TestLogin.png' button='Button_TestLogin.svg'/>
+	<ClaimsProvider name='TestPrivate' id='urn:test:TESTCP' img='TestLogin.png' button='Button_TestLogin.svg'/>
+	<ClaimsProvider name='Enterprise' id='urn:test:ENTERPRISE' img='EnterpriseLogin.png' button='Button_EnterpriseLogin.svg'/>
+	<ClaimsProvider name='Kerberos' id='urn:test:KERBEROS' img='Logo.png' button='Button_Kerberos.svg'/>
+</ClaimsProviderDefinitions>

@@ -1,0 +1,50 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<div class="title">
+	@if (translatedTitle$ | async; as title) {
+		<h3 class="title">{{ title }}</h3>
+	}
+
+	@if (translatedSubtitle$ | async; as subtitle) {
+		<p class="subtitle">{{ subtitle }}</p>
+	}
+
+	@if (config().secondaryImages?.length) {
+		<div class="images">
+			@for (image of config().secondaryImages; track image) {
+				<img src="{{ baseUrl }}hrd/assets/images/{{ theme().name }}/{{ image }}" class="secondary-image" alt="" />
+			}
+		</div>
+	}
+
+	@if (paragraphs$ | async; as paragraphs) {
+		@if (showParagraphsExpanded()) {
+			@for (paragraph of paragraphs; track paragraph) {
+				<p [innerHTML]="paragraph | safeMarkup" class="paragraph"></p>
+			}
+			@if (config().collapseParagraphs) {
+				<button class="link-button" (click)="expandParagraphs(false)">{{ "trustbroker.hrd.cards.banner.showLess.text" | translate }}</button>
+			}
+		} @else {
+			<button class="link-button" (click)="expandParagraphs(true)">{{ "trustbroker.hrd.cards.banner.readMore.text" | translate }}</button>
+		}
+	}
+</div>
+@if (config().mainImage) {
+	<div class="main-image-container">
+		<img src="{{ baseUrl }}hrd/assets/images/{{ theme().name }}/{{ config().mainImage }}" class="main-image" alt="" />
+	</div>
+}

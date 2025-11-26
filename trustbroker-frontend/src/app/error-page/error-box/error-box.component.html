@@ -1,0 +1,107 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+<div class="{{ theme.name }} errorBoxContainer">
+	<div class="errorBoxTitleContainer">
+		<h2>
+			@if (titleKey | hasTranslation | async) {
+				{{ titleKey | translate }}
+			} @else {
+				{{ "trustbroker.error.main.title.default" | translate }}
+			}
+		</h2>
+	</div>
+	<div>
+		@if (textKey | hasTranslation | async) {
+			<p class="mb-2 strong" [innerHTML]="textKey | translate | safeMarkup"></p>
+		} @else {
+			<p class="mb-2 strong" [innerHTML]="'trustbroker.error.main.text.default' | translate | safeMarkup"></p>
+		}
+		@if (!supportInfo && infoKey | hasTranslation | async) {
+			<p [innerHTML]="infoKey | translate | safeMarkup"></p>
+		}
+		@if (additionalInfoTitleKey | hasTranslation | async) {
+			<p class="mb-2 strong" [innerHTML]="additionalInfoTitleKey | translate | safeMarkup"></p>
+		}
+		@if (additionalInfoTextKey | hasTranslation | async) {
+			<p [innerHTML]="additionalInfoTextKey | translate | safeMarkup"></p>
+		}
+		@if (supportInfo && supportInfoData) {
+			<div class="app-support">
+				@if (languageAppUrl) {
+					<div class="app-support-info">
+						<div [innerHTML]="'trustbroker.error.main.support.furtherinfo' | translate | safeMarkup"></div>
+						<div>
+							<a href="{{ languageAppUrl }}">{{ "trustbroker.error.main.support.documentation" | translate }}</a>
+						</div>
+					</div>
+				}
+				@if (supportInfoData.emailAddress || supportInfoData.phoneNumber) {
+					<div class="app-support-contact">
+						<div [innerHTML]="'trustbroker.error.main.support.servicedesk' | translate | safeMarkup"></div>
+						@if (supportInfoData.emailAddress) {
+							<div>
+								<div>{{ "trustbroker.error.main.support.emailladdress" | translate }}</div>
+								<div>
+									<a href="mailto:{{ supportInfoData.emailAddress }}">{{ supportInfoData.emailAddress }}</a>
+								</div>
+							</div>
+						}
+						@if (supportInfoData.phoneNumber) {
+							<div>
+								<div [innerHTML]="'trustbroker.error.main.support.phonennumber' | translate | safeMarkup"></div>
+								<div>
+									<a href="tel:{{ supportInfoData.phoneNumber }}">{{ supportInfoData.phoneNumber }}</a>
+								</div>
+							</div>
+						}
+					</div>
+				}
+				<div class="app-support-contact">
+					@if (supportInfoText | hasTranslation | async) {
+						<p class="medium-emphasis" [innerHTML]="supportInfoText | translate | safeMarkup"></p>
+					}
+					@if (supportContactText | hasTranslation | async) {
+						<p class="medium-emphasis">
+							<span [innerHTML]="supportContactText | translate | safeMarkup"></span>
+							<a href="{{ supportContactUrl | translate }}" target="_blank">{{ "trustbroker.error.main.support.documentation" | translate }}</a>
+						</p>
+					}
+				</div>
+			</div>
+		}
+		@if (reference) {
+			<div class="medium-emphasis errorReference">
+				<span [innerHTML]="referenceKey | translate | safeMarkup"></span><span>{{ reference }}</span>
+			</div>
+		}
+		<div class="button-container">
+			@if (continueButton) {
+				<button mat-flat-button obButton="primary" (click)="continueFlow()" type="submit" class="{{ theme.name }}">
+					<span>{{ "trustbroker.error.main.button.continue" | translate }}</span>
+				</button>
+			}
+			@if (reloginButton) {
+				<button mat-flat-button obButton="primary" (click)="relogin()" type="submit" class="{{ theme.name }}">
+					<span>{{ "trustbroker.error.main.button.relogin" | translate }}</span>
+				</button>
+			}
+			@if (linkButton && languageAppUrl) {
+				<button mat-flat-button obButton="primary" (click)="followLink()" type="submit" class="{{ theme.name }}">
+					<span>{{ "trustbroker.error.main.button.link" | translate }}</span>
+				</button>
+			}
+		</div>
+	</div>
+</div>

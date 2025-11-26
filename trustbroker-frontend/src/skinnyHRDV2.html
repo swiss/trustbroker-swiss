@@ -1,0 +1,47 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Trustbroker Light</title>
+		<base href="/app" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
+		<link rel="stylesheet" href="skinnyUIStyles.css" />
+		<script>
+			function jsEscape(str) {
+				return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/_+/g, " ");
+			}
+			function hrdSelect(cpUrl) {
+				window.location.href = cpUrl;
+			}
+			var queryString = window.location.href.split("?")[1];
+			var queryPrams = queryString.split("&");
+			var requestId = encodeURIComponent(queryPrams[0]);
+			var pageContent = queryPrams[1];
+			var versionInfo = queryPrams[2];
+			var uiElements = pageContent.split(";");
+			var cont = '<h1 class="skinnyH1">Logins</h1>';
+			cont += '<div class="skinnyContainer skinnyContainerList">';
+			for (var i = 0; i < uiElements.length; i++) {
+				var elements = uiElements[i].split(",");
+				var cpId = encodeURIComponent(elements[0]);
+				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?session=" + requestId;
+				var longTitle = jsEscape(decodeURI(elements[1]));
+				var shortTitle = encodeURIComponent(elements[2].toUpperCase());
+				cont += '<div class="skinnyCard skinnyCardList" onclick="hrdSelect(\'' + cpLocation + "')\">";
+				cont += '	<div class="skinnyButton skinnyButtonRed">';
+				cont += '		<span class="buttonText">' + shortTitle + "</span>";
+				cont += "	</div>";
+				cont += "	<div>";
+				cont += '		<h2 class="skinnyH2List">' + longTitle + "</h2>";
+				cont += "	</div>";
+				cont += "</div>";
+			}
+			cont += "</div>";
+			cont += '<div class="skinnyVersionInfo">';
+			cont += jsEscape(versionInfo);
+			cont += "</div>";
+			document.write(cont);
+		</script>
+	</head>
+</html>

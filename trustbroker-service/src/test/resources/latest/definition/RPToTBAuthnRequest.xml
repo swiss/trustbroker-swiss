@@ -1,0 +1,50 @@
+<saml2p:AuthnRequest xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+					 AssertionConsumerServiceURL="https://saml-test.localdomain"
+					 Destination="http://localhost:8080/api/v1/saml"
+					 ID="AuthnRequest_8EBC99AD54AD7EC4346E94A96333584EBA2D7E00"
+					 IssueInstant="2021-06-25T12:24:16.448Z"
+					 Version="2.0"
+>
+	<saml2:Issuer xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">urn:test:TESTRP</saml2:Issuer>
+	<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" />
+			<ds:Reference URI="#AuthnRequest_8EBC99AD54AD7EC4346E94A96333584EBA2D7E00">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" />
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+				</ds:Transforms>
+				<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+				<ds:DigestValue>A1RN2orqD99ECj9qawvY3BaGQ24=</ds:DigestValue>
+			</ds:Reference>
+		</ds:SignedInfo>
+		<ds:SignatureValue>d+E1R8gfOsvGRsV9OSB+wsrHnAC96rDRZUj+wzXxIviD4CMTlQTvfW0SQl9qo+IjkPohXNYaNNZR2ZVPcxk5tEkNXCzmk5xZ8NnGX5EXzQrK9nTLhVQe3TD37W2P9+1UyybWXLZGzb59cQiQDrFR4NrZ5d5ft7gp64vMgFaG1ItKj38nws+OXNqOFsyI9Un/w0Fsq6ebYYy2r+G5yptIruBfH/QvCUZjvPgvHzsUQOupnedUG5beu6mya5LzY9qNuFZc/+AKGQzv285wG5EjUO9geQfKD6eC2Nit/9S10KW8N11GJKWaRM0oHFlRgb9E8ZxenoGyIqA2mP0ZFz4hfw==</ds:SignatureValue>
+		<ds:KeyInfo>
+			<ds:X509Data>
+				<ds:X509Certificate>MIIDhTCCAm2gAwIBAgIJAM6fBoz0tUYpMA0GCSqGSIb3DQEBCwUAMFkxCzAJBgNV
+BAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0RlZmF1bHQg
+Q29tcGFueSBMdGQxFTATBgNVBAMMDFVuaXRUZXN0Q2VydDAeFw0yMTA1MTgxMTQ2
+MzlaFw0zMTA1MTYxMTQ2MzlaMFkxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZh
+dWx0IENpdHkxHDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFTATBgNVBAMM
+DFVuaXRUZXN0Q2VydDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANtd
+YLkmdrzvJkaHd8Cskxrf+VJYcVm/4RP0qbMAY1PCHYNlpewLWSXN4JK9hNyShH6l
+oc3NK/DtiP3/g5eVxNPsjdhcH2UmukqqvjuED2XDAT59vkvclr46Vel1JuhkTM/P
+jtNbvMfQvEmooV0Tvgfj5+Cc9hegb3qixTXMxDkriKB/MnkbfAuw23dQCWGCRT/g
+tjPSTX4kEdyS54ecUZXJBQKcwO55JcWPHzNqmr2EkhpbA8FrReqUgyNjFul4KMsY
+zGJQwujTWM8CIkO+YhQmBt0yYxYX44AxKMXRqsX43osNdndes81GcBEf27wKANuh
+uUeMQuUpqV3+HC7gGGcCAwEAAaNQME4wHQYDVR0OBBYEFNsWK1p6phc99tVghZX0
+i0FR16nqMB8GA1UdIwQYMBaAFNsWK1p6phc99tVghZX0i0FR16nqMAwGA1UdEwQF
+MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAClJlSSortK9NVwzttE5l/T7sE6tAHkK
+sHUDk3HrI2/6lTZdGFHqjpkL/P9Jdj12e7gagl92RSpQvvZvzwPPYFFgDjiyN32l
+uZZEE8a84bJeQQLClEBH4NNSlAMmLxMx3F72U6MjxcXOG7mfYh0a3neJMCxF/3zm
+3igSwyjPD9bTG57k9ZdZvvPeLF0MRbwfWA2d3Tp+no3x2bsAiQtpaI1GhrpTU6n/
+j8Nn3fd0qSRVnHb4YNvt9Ccg20ybftZmYyPbZ+PsKFYcFAzPErVDwDV7rP/g7csk
+lHitRkFkXvICUT/n3NIYzCa6v2eiB5x0nMXpwTNLjQoh6LmyDzZC+Es=</ds:X509Certificate>
+			</ds:X509Data>
+		</ds:KeyInfo>
+	</ds:Signature>
+	<saml2p:RequestedAuthnContext>
+		<saml2:AuthnContextClassRef xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+	</saml2p:RequestedAuthnContext>
+</saml2p:AuthnRequest>

@@ -1,0 +1,97 @@
+## Derivative work of original template from org.opensaml:opensaml-saml-impl:5.1.2:
+## saml2-post-binding.vm
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
+##
+## EXPERIMENTAL E2E OpenTelemetry tracing aware SAML GET/POST propagation.
+##
+## This SAML GET/POST handler code does not impelemnt a full HTTP and user-agent comkpliant handling.
+## To support SAML frontchannel communication with OpenTelemtry traceparent support, the following needs to be done:
+## - Redirects: Verify proper redirect handling.
+## - Response body: Handle content types properly before replacing the root document.
+## - Implement X-Content-Type-Options: nosniff and other security headers properly
+## - CP and RP peers: Implement/configure CORS protocol responding to 'OPTIONS Access-Control-Request-Headers: traceparent'.
+## This calls for a proper ajax library (e.g. jquery) but leads likely to problems with legacy clients (e.g. MSIE compat mode).
+## Benefit of this would be: A SAML federated login would be traceable across CP login and may be RP return.
+## A better implementation is to use an OpenTelemtry aware SPA library setting traceparent during login interception also on RP.
+##
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+    <head>
+        #parse ( "/templates/add-html-head-content.vm" )
+		<script>
+			function handleResponse(req) {
+              document.documentElement.innerHTML = req.response;
+            }
+
+            function sendSamlMessageWithTraceParent(method, url, traceparent, request, response, relaystate) {
+              var body = '';
+              if (request && request.length > 16) {
+                body = body + 'SAMLRequest=' + request.replaceAll(/\+/g, '-').replaceAll(/\//g, '_') + '&';
+              }
+              if (response && response.length > 16) {
+                body = body + 'SAMLResponse=' + response.replaceAll(/\+/g, '').replaceAll(/\//g, '_') + '&';
+              }
+              if (relaystate && relaystate.length > 16) {
+                body = body + 'RelayState=' + relaystate;
+              }
+              sendRequest(method, url, traceparent, body, handleResponse);
+            }
+
+            function sendRequest(method, url, traceparent, body, callback) {
+              var req = new XMLHttpRequest();
+              req.open(method, url, true);
+              req.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+              req.setRequestHeader('Accept', '*/*');
+              if (traceparent && traceparent.length > 16) {
+                req.setRequestHeader('traceparent', traceparent);
+              }
+              req.onload = function () {
+                var location = this.getResponseHeader('Location');
+                if (location && req.status > 300 && req.status < 309) {
+                  return sendRequest('GET', location, traceparent, callback);
+                }
+                if (req.status === 200) {
+					callback(req);
+                }
+              };
+              req.send(body);
+            }
+		</script>
+    </head>
+    <body>
+        <div>Redirecting ${traceparent}</div>
+        <script>
+            sendSamlMessageWithTraceParent(
+                '#if($XTBHttpMethod)${XTBHttpMethod}#{else}post#end',
+                '${action}',
+                '${traceparent}',
+                '${SAMLRequest}',
+                '${SAMLResponse}',
+                '${RelayState}')
+        </script>
+        <noscript>
+            <form name="saml.result" action="${action}" method="#if($XTBHttpMethod)${XTBHttpMethod}#{else}POST#end">
+                <div>
+                    #if($RelayState)<input type="hidden" name="RelayState" value="${RelayState}"/>#end
+                    #if($SAMLRequest)<input type="hidden" name="SAMLRequest" value="${SAMLRequest}"/>#end
+                    #if($SAMLResponse)<input type="hidden" name="SAMLResponse" value="${SAMLResponse}"/>#end
+                </div>
+                <div>
+                    <input type="submit" value="Continue"/>
+                </div>
+            </form>
+        </noscript>
+        #parse ( "/templates/add-html-body-content.vm")
+    </body>
+</html>

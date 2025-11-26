@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ClaimsProviderSetup>
+
+    <ClaimsParty id='urn:test:invalidcert' disableACUrl='true'>
+        <HomeName value='INVALID-CERT' />
+
+        <Certificates>
+            <SignerTruststore>
+                <CertPath>authSignerSELF_keystore.p12</CertPath>
+                <Alias>authSignerSELF</Alias>
+                <Password>wrong</Password>
+            </SignerTruststore>
+        </Certificates>
+        <Saml>
+            <Signature>
+                <SignatureMethodAlgorithm>http://www.w3.org/2000/09/xmldsig#rsa-sha1</SignatureMethodAlgorithm>
+            </Signature>
+        </Saml>
+        <!-- CP attributes to be propagated -->
+        <AttributesSelection>
+            <Definition name="authLevel" namespaceUri="http://trustbroker.swiss/claims/authLevel" />
+            <Definition name="clientExtId" namespaceUri="http://trustbroker.swiss/claims/issuedClientExtId" />
+            <Definition name="emailaddress" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress" />
+            <Definition name="givenname" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname" />
+            <Definition name="surname" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname" />
+        </AttributesSelection>
+    </ClaimsParty>
+
+</ClaimsProviderSetup>

@@ -1,0 +1,83 @@
+= API and Protocols
+
+XTB provides various endpoints for SAML and OIDC federation handling and has a small single page application for the parts that require user interaction.
+
+These features are provided based on:
+
+- XTB SAML implementation using
+https://shibboleth.atlassian.net/wiki/spaces/OSAML[OpenSAML]
+- XTB OIDC integration using a sub-set of the features of
+https://docs.spring.io/spring-authorization-server/reference/overview.html#feature-list[Spring Authorization Server]
+- XTB application using angular to provide the user interaction UI
+
+[cols="1,1,10"]
+|===
+|Path | Protocol | Purpose
+
+|``/api/v1/saml/metadata``
+|SAML
+|SAML metadata endpoint providing
+http://docs.oasis-open.org/security/saml/v2.0/saml-metadata-2.0-os.pdf[Metadata for the OASIS Security Assertion Markup Language (SAML) V2.0]
+
+|``/api/v1/saml``
+|SAML
+|SAML login/logout endpoint handling
+http://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0-cd-02.html#5.1.2.SP-Initiated%20SSO:%20%20Redirect/POST%20Bindings[SP-Initiated SSO: Redirect/POST Bindings]
+
+|``/api/v1/saml/arp``
+|SAML
+|SAML artifact binding resolution endpoint
+
+|``/.well-known/openid-configuration``
+|REST
+|OIDC meta data endpoint for https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig[Obtaining OpenID provider
+configuration information]
+
+|``/oauth2/authorize``
+|OIDC
+|JSON web token authorization code flow starting point defined by https://openid.net/specs/openid-connect-core-1_0
+.html#AuthorizationEndpoint[OpenID Connect Authorization Endpoint]
+
+|``/oauth2/token``
+|OIDC
+|JSON web token retrieval endpoint defined by https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint[OpenID Connect
+Token endpoint]. Used to retrieve tokens using authorization codes or refresh_token.
+
+|``/oauth2/jwks``
+|OIDC
+|JSON Web Key endpoint serving key sets (rotated weekly) required for token signature verification.
+See https://datatracker.ietf.org/doc/html/rfc7517[rfc7517] for details.
+
+|``/oauth2/introspect``
+|OIDC
+|Allows to to validate posted access token retrieving it's data payload.
+See https://datatracker.ietf.org/doc/html/rfc7662[rfc7662] for details.
+
+|``/oauth2/revoke``
+|OIDC
+|Discard tokens from the XTB token cache.
+See https://datatracker.ietf.org/doc/html/rfc7009[rfc7009] for details.
+
+|``/userinfo``
+|OIDC
+|Provides insights into the HTTP bearer token posted in the HTTP Authorization header or the access_token POST body.
+See https://openid.net/specs/openid-connect-core-1_0.html#UserInfo[OpenID COnnect UserInfo Endpoint].
+
+|``/logout``
+|OIDC
+|Allows user-agents to do a
+https://openid.net/specs/openid-connect-frontchannel-1_0.html[OpenID Connect Front-Channel Logout].
+
+|``/app``
+|Web
+|Single page applications for user interactions (home realm discovery and error handling mainly)
+
+|``/app/sso``
+|Web
+|SSO login status page for testing. Can be used to check and kill SSO own sessions.
+Limitations: OIDC session members are visible here too but only when SSO is used and terminating SSO session here does not
+invalidate OIDC tokens.
+
+|===
+
+

@@ -1,0 +1,184 @@
+= Docker Installation
+
+On a docker host XTB can be installed as a service mesh with docker-compose.
+Requirements:
+
+- Current distribution of a docker enabled Linux system
+- Docker version 24 or above
+- Alternatively: Podman version 4 or above (security restrictions apply)
+- Network access to download images from internet docker registries
+
+The setup will provide these endpoints:
+
+[cols="5,10,10"]
+|===
+| Container | Endpoints | Remarks
+
+| ``mariadb`` providing session and token storage.
+| mysql --protocol=tcp --host=localhost --port=3306 --user=root --password=secret
+| Investigate storage: show databases; use TBSS16; show tables; desc TB_AUTH_SESSION_CACHE;
+
+| ``gitea`` providing a gitops repository storage to play around with (optional, you can use your repo server).
+a| Endpoints of interest of the git repository server:
+
+* Health: http://localhost:3000/api/healthz
+* Console: http://localhost:3000
+* SSH access: ssh://git@localhost:222
+| Documentation: https://docs.gitea.com/
+
+| ``trustbroker-application`` providing the actual federation service.
+a| Endpoints of interest of XTB:
+
+* Health: http://localhost:8091/actuator/health
+* Application: http://localhost:8090/app/sso
+* OIDC config: http://localhost:8090/.well-known/openid-configuration
+* SAML config: http://localhost:8090/api/v1/metadata
+| Documentation: https://github.com/swiss/trustbroker.swiss
+
+| ``trustbroker-samlmock`` simulating a SAML RP and CP to play around with.
+| RP entry points: http://localhost:7070
+| Mock service simulating RP and CP messages based on the ``xtb-gitops-demo/trustbroker-samlmock data`` to play around with the setup.
+|===
+
+TLS engineering:
+
+- Server: Please refer to https://docs.spring.io/spring-boot/docs/current/reference/html/application-properties.html#application-properties.server.server.ssl.enabled
+- Server: Staying on http within a secure infrastructure you can do TLS on load-balancers or ingress controllers.
+- Clients: You can in general map a JKS into the containers ``/usr/lib/jvm/zulu17-ca/lib/security/cacerts``
+- SAM artifact resolution client: You can engineer ``keystore/outgoing-tls-trust/truststore.p12``, PKCS12 recommended.
+
+When switching to server TLS you can discard the
+
+You can find the scripts mentioned in this section in the ``trustbroker-install`` module on GitHub.
+
+== Install docker-compose (optional)
+
+If you do not have a docker infrastructure that supports the 'docker compose' command you can install it as follows:
+https://docs.docker.com/compose/install/standalone/[Install docker-compose] on your system:
+
+In short:
+
+[source,bash]
+----
+sudo bash
+curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o
+/usr/local/bin/docker-compose
+chmod 555 /usr/local/bin/docker-compose
+----
+
+== Default Setup
+
+The demo setup should run out of the box as follows:
+
+- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/docker/docker-compose.yml[docker-compose.yml]
+- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/env-vault.conf[env-vault.conf]
+- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/run.sh[run.sh]
+
+Run the setup:
+
+```
+bash run.sh
+```
+
+Access the setup via the mocked demo relying parties at http://localhost:7070.
+You can use the browser's development tools and the SAML-tracer plugin to observe the traffic.
+
+If the docker image pulling fails because of authorization issues, ask for access on the
+https://github.com/orgs/trustbroker-swiss/discussions/1[trustbroker.swiss discussion forum].
+
+== Customize Setup
+
+You might want to tweak the development setup:
+
+- Switch to another image version or distribution points
+- Set new secrets for state cache and keystores (p12/pem files).
+- Generate new SSH keys to access GitOps repository.
+- Use other external ports.
+- Remove Gitea because you have a remote repository already or use gitea actually so you can play with the configuration.
+
+Example vault (retained in CI or K8S vault for production setups) injected into ``docker-compose.yml`` via ENV:
+
+[source,bash]
+----
+include::../../../../trustbroker-install/docker/env-vault.conf[]
+----
+
+Example docker compose depending on the vault (see ${VAR} references) that you might want to tweak towards using external sessiondb and/or git repository server:
+
+[source,yaml]
+----
+include::../../../../trustbroker-install/docker/docker-compose.yml[]
+----
+
+== Re-Generate GitOps SSH Key
+
+To generate an own SSH setup, execute setup-ssh.sh:
+
+[source,bash]
+----
+include::../../../../trustbroker-install/docker/setup-ssh.sh[]
+----
+
+== Setup Gitea Server
+
+For trials, you can use the Gitea server as shown in the docker-compose setup, you need to switch from the github to the gitea URL for the xtb-gitops-demo repository..
+
+[source,bash]
+----
+sudo docker-compose up gitea
+----
+
+Setup manually:
+
+- Connect to http://localhost:3000/ and confirm the default server setup.
+- Register user ``trustbroker-swiss`` and login.
+- Add content of ``ssh/id_rsa.pub`` (and/or your own) to: User >> Settings >> SSH/PGP Keys >> Manage SSH Keys >> Add Key
+- Create a repository ``xtb-gitops-demo``.
+- Optional: For http access: User >> Settings >> Applications >> Manage Access Tokens >> Generate Token
+
+The resulting access token can be set along the ``GIT_URL`` as ``GIT_TOKEN`` or mapped to ``/etc/trustbroker/keys/git_token``.
+
+Note that access token or SSH key are only required, if the git repository is private (gitea default).
+You can make it public in the repository settings, in which case you do not need access keys.
+You then can add/edit/delete files in the web UI and read the repository without a login.
+
+Clone the public demo repository:
+
+[source,bash]
+----
+git clone -b main git@github.com/swiss/xtb-gitops-demo
+cd xtb-gitops-demo
+----
+
+Before doing so you might want to have your own new signer (see SetupRP/ProfileRP Certificates for use):
+
+[source,bash]
+----
+cd trustbroker-inventories/DEMO/keystore/token-signer
+./setup-signer.sh # my-subject my-passphrase
+git commit -m "Created XTB signer" ./
+----
+
+Import your initial trial repository:
+
+[source,bash]
+----
+git remote set-url origin ssh://git@localhost:222/trustbroker-swiss/xtb-gitops-demo.git
+git push -u origin main
+----
+
+Alternatively, use HTTP:
+
+[source,bash]
+----
+git remote set-url origin http://git@localhost:3000/trustbroker-swiss/xtb-gitops-demo.git
+git push
+----
+
+Run the services in the directory where you stored the tweaked ``docker-compose.yml`` and ``env-vault.conf`` using the following
+https://github.com/swiss/trustbroker-swiss/trustbroker-install/docker/run.sh[run.sh]:
+
+[source,bash]
+----
+include::../../../../trustbroker-install/docker/run.sh[]
+----

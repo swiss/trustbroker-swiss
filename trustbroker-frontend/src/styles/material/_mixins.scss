@@ -1,0 +1,38 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@import "../spacing";
+@import "../variables";
+
+@mixin responsive-vertical-buttons {
+	@media(max-width: $medium-card-width) {
+		display: flex;
+		flex-direction: column-reverse;
+
+		& > * {
+			flex-grow: 1;
+			padding-right: 0 !important;
+			padding-bottom: $button-bottom-spacing;
+		}
+
+		margin-bottom: -1 * $button-bottom-spacing !important;
+	}
+}
+
+@mixin buttons-spacing {
+	& > *:not(:last-child) {
+		padding-right: $spacer-2;
+	}
+}

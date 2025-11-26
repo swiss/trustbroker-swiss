@@ -1,0 +1,69 @@
+= Credits
+
+The following open source projects are used by XTB with big thanks:
+
+[cols="1,10,10"]
+|===
+|OSS Project | License | Remarks
+
+|Alpine linux
+|MIT
+|https://github.com/alpinelinux/docker-alpine/blob/master/LICENSE
+
+|Angular
+|MIT
+|https://github.com/angular/angular/blob/main/LICENSE
+
+|keycloak.js
+|Red Hat Apache-2.0
+|https://github.com/keycloak/keycloak/blob/main/js/libs/keycloak-js/src/keycloak.js.
+Migration use case only. We prefer you package this with your client ao we can remove it.
+
+|org.opensaml
+|GPL-2
+|https://github.com/pkp/shibboleth/blob/main/LICENSE
+
+|spring-authorization-server
+|Apache-2.0
+|https://github.com/spring-projects/spring-authorization-server/blob/main/LICENSE.txt
+
+|zulu-openjdk-alpine
+|GPL-2
+|https://docs.azul.com/core/tpls/january-2024/zulu17_tpl.html
+
+
+|org.apache.wss4j.wss4j-ws-security-common
+|Apache-2.0
+|https://ws.apache.org/wss4j/licenses.html
+
+|Eclipse JGit TM
+|Eclipse Distribution License - v 1.0
+|https://www.eclipse.org/jgit/
+
+|===
+
+_Derivative work_ is marked in the source as such, along with the original licenses.
+
+All the license details of the Alpine and Java assembly you can find in the SBOM below.
+
+== License
+
+XTB itself is licensed under
+https://github.com/swiss/trustbroker-swiss/blob/main/LICENSE.txt[GNU AFFERO GENERAL PUBLIC LICENSE Version 3].
+
+== Contributions
+
+Input and contributions to the XTB projects are considered according to:
+
+- https://github.com/swiss/trustbroker.swiss/blob/main/Code-of-Conduct.md[Code of Conduct]
+- https://github.com/swiss/trustbroker.swiss/blob/main/Contribution.md[Contribution]
+
+== Software Bill of Material
+
+Library licenses in detail (SBOM report from XRay used for vulnerability checking along Trivy and Sonar scans):
+
+[%header,format=csv]
+|===
+include::sbom/dependencies.csv[]
+|===
+

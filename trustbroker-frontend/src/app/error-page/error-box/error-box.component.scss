@@ -1,0 +1,75 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "src/styles/variables";
+@use "src/styles/spacing";
+@use "src/styles/material/_mixins";
+@use "src/styles/typography";
+
+.errorBoxContainer {
+	margin: 0 auto;
+
+	.app-support {
+		display: flex;
+		flex-direction: column;
+		gap: variables.$ob-spacing-default;
+
+		.app-support-contact {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+	}
+
+	.button-container {
+		margin-top: 1rem;
+		display: flex;
+		flex-direction: row-reverse;
+		gap: variables.$ob-spacing-default;
+	}
+
+	@media(max-width: variables.$small-page-size) {
+		.button-container {
+			flex-direction: column;
+			align-items: stretch;
+		}
+	}
+
+	@media(min-width: variables.$small-page-size) {
+		width: 80%;
+		padding-top: 1rem;
+
+		button {
+			margin: 0 0.5rem 0 0.5rem;
+		}
+
+		.errorBoxTitleContainer {
+			// longer text would not fit on one line
+			margin-top: 3rem;
+		}
+	}
+
+	@media(min-width: variables.$medium-page-size) {
+		width: 80%;
+	}
+
+	@media(min-width: variables.$large-page-size) {
+		width: 60%;
+	}
+}
+
+.errorReference {
+	margin-top: 2rem;
+}

@@ -1,0 +1,75 @@
+= Scripting
+
+XTB supports scripting within the federation processing for various purposes (see processing model in the architecture section).
+
+The scripting engine is https://groovy-lang.org/index.html[Groovy] based on the underlying Java libraries.
+
+This allows a wide range of manipulations so make sure that the code you are injecting via scripts meets security requirements, specifically:
+
+- Input validation on the values that are processed.
+- Manipulating identity (specifically ``CPRepsonse.nameId``) and authorization attributes (e.g. roles claims) as required.
+- Establish a review process via pull requests in your GitOps repository.
+
+
+== LOG
+
+The LOG object allows access to the logging facility using the SLF4J API.
+You can use error, warn, info, debug and trace methods with parameter binding:
+
+[source,groovy]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/DebugRpRequest.groovy[]
+----
+
+== RPRequest
+
+The ``RPRequest`` object is bound to computationally influence in-bound messages, specifically:
+
+- Deciding on home realm discovery (HRD) routing based on the HTTP or SAML/OIDC protocol (you can drop or retain CPs).
+- Handling authentication context class mappings towards claims providers (you can validate and map RPRequest.contextClasses on the way to the CP).
+
+Example:
+
+[source,java]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/HrdAutoSelectClaimsProvider.groovy[]
+----
+
+== HTTPRequest
+
+Along the ``RPRequest`` a groovy script has access to the HTTP request using the JSR340 API.
+
+== CPRepsonse
+
+The ``CPRepsonse`` object is bound to handle claims provider responses and manipulate the relying party responses during the phases documented in the Architecture.
+
+These members are of interest for mapping between CP and RP:
+
+- nameId: The subject name identifier passed as the authentication result from the CP, also represented internally as the NameId 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier' attribute.
+- nameIdFormat: Some relying parties care about the SAML name identifier format to assert a certain authentication quality.
+This allows to overrule what the CP has decided in case of integration problems.
+- contextClasses: Like on the ``RPRequest`` (requested authentication context class references, in short QoA) the CP should respond with one of the requested QoA.
+
+There are the following members to get and set claims:
+
+- attributes: They come from the CPs and are sent to RPs with an OriginalIssuer=CP-IssuerID
+- userDetails: XTB has an ``IdmQueryService`` abstraction.
+Claims from such user registries should use this to store claims.
+- properties: Groovy scripts computing derived claims should store them here so the ``SetupRP``/``ProfileRP`` configuration show the contract properly.
+- claims: These are the OIDC attributes used for OIDC token assembly
+
+The names correspond to the selection 'Definition' lists in the configuration and are associated as follows:
+
+- ``CPResponse`` holds the actual data based on the definition objects in the configuration
+- Definition are copies including the value list and are used to generate the SAML attribute or OIDC claim output
+
+The debug script shown at the beginning will expose all this data on ``TRACE`` level.
+
+Please be careful what you use.
+If not mentioned in this section, you might produce some unwanted results.
+
+[source,java]
+----
+include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/OidcAttachAddressClaim.groovy[]
+----
+

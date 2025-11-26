@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ClaimsProviderSetup>
+
+    <ClaimsParty id='invalid' disableACUrl='true'>
+    <ClaimsParty>
+
+</ClaimsProviderSetup>

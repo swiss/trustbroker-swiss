@@ -1,0 +1,102 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "@oblique/oblique/styles/scss/core/variables";
+@forward "@oblique/oblique/styles/scss/core/variables";
+@use "sass:map";
+
+// For Oblique see:
+// https://oblique.bit.admin.ch/
+// https://github.com/oblique-bit/oblique
+
+// scss variables
+$spacer-base: 8px;
+$spacer-1: $spacer-base;
+$spacer-2: 2 * $spacer-base;
+$spacer-3: 3 * $spacer-base;
+$spacer-4: 4 * $spacer-base;
+$spacer-5: 5 * $spacer-base;
+$spacer-6: 6 * $spacer-base;
+$spacer-7: 7 * $spacer-base;
+$spacer-8: 8 * $spacer-base;
+$spacer-9: 9 * $spacer-base;
+$spacer-10: 10 * $spacer-base;
+$spacer-11: 11 * $spacer-base;
+$spacer-12: 12 * $spacer-base;
+$spacer-16: 16 * $spacer-base;
+$spacer-24: 24 * $spacer-base;
+
+$button-bottom-spacing: $spacer-2;
+
+$small-card-width: 350px;
+$medium-card-width: 480px;
+$large-card-width: 700px;
+$extra-large-card-width: 950px;
+$medium-card-padding: $spacer-4;
+$small-page-size: map.get(variables.$ob-grid-breakpoints, "sm");
+$medium-page-size: map.get(variables.$ob-grid-breakpoints, "md");
+$large-page-size: map.get(variables.$ob-grid-breakpoints, "lg");
+$medium-page-height: 950px;
+// Oblique uses hardcoded values for footer height (which are equal to the bottom padding that the .application div has)
+// These are the portal version of those:
+$portal-footer-height: 29px;
+$portal-footer-height-collapsed: 86px;
+
+// For the proper responsive behavior extra large card should always be used on a screen with this left spacing
+// for now the assumption is that it will always be used like that
+$extra-large-card-left-spacing: $spacer-12;
+
+// check if Oblique/Material has a constant for this
+$divider-border: 1px solid rgba(0, 0, 0, 0.12);
+
+$font-weight-bold: 700;
+$font-weight-normal: 400;
+$font-weight-light: 100;
+
+$high-emphasis-color: rgba(0, 0, 0, 0.87);
+$medium-emphasis-color: rgba(0, 0, 0, 0.6);
+$disabled-color: rgba(0, 0, 0, 0.38);
+$page-background-color: white;
+
+// missing in Oblique 8/9 - inserted value used in Oblique 7:
+$ob-layout-collapse: 992px !default; // Breakpoint at which the layout becomes expanded.
+$ob-layout-collapse-max: $ob-layout-collapse - 0.02;
+$ob-header-height-md: 55px;
+// missing in Oblique 11 - inserted value used in Oblique 10:
+$ob-cerulean: #006699;
+$ob-error-50: #fdeaee; // use $ob-default as contrast color
+$ob-success-50: #e6f6eb; // use $ob-default as contrast color
+$ob-primary-50: #f2f7fa; // use $ob-default as contrast color
+
+$focus-background-color: #CCE0EB;
+$focus-color: #069;
+$focus-dropdown-background-color: #E5E5E5;
+$dropdown-active-color: #D5D5D5;
+// Added for Oblique 11 migration:
+$smoke: #F5F5F5; // gray 4%;
+$light-grey: #D5D5D5; // gray 16%;
+$gray-dark: #333;
+$venetian-red: #DC0018;
+
+// HRD
+$idp-card-background-color: #fff;
+$idp-card-color: black;
+$idp-card-border: 4px solid #f2f7fa;
+$idp-card-box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 2px 1px -1px rgba(0, 0, 0, 0.12), 0px 1px 3px 0px rgba(0, 0, 0, 0.20);
+$idp-card-focus-background-color: #f3faffff;
+$idp-card-focus-outline-color: variables.$ob-gray-dark;
+$idp-card-focus-visible-box-shadow: 0 5px 14px #999;
+$idp-card-disabled-background-color: rgba(225, 225, 225, 0.75);
+$idp-card-disabled-hover-background-color: rgba(200, 200, 200, 0.75);

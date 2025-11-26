@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+    <RelyingParty id='urn:test:invalidcerts'>
+        <Certificates>
+            <SignerKeystore>
+                <CertPath>test-tb-signer-keystore.jks</CertPath>
+                <Alias>signertb</Alias>
+                <Password>wrong</Password>
+            </SignerKeystore>
+            <SignerTruststore>
+                <CertPath>unknown_keystore.pem</CertPath>
+		<Password/>
+            </SignerTruststore>
+        </Certificates>
+        <!-- HRD -->
+        <ClaimsProviderMappings>
+	    <ClaimsProvider id="urn:test:MOCK" clientNetworks="PRIVATE,INTRANET"/>
+        </ClaimsProviderMappings>
+        <IDMLookup>
+            <IDMQuery name='IDENTITY'>
+                <ClientExtId>100</ClientExtId>
+            </IDMQuery>
+            <IDMQuery name='TENANT'>
+                <ClientExtId>501</ClientExtId>
+            </IDMQuery>
+        </IDMLookup>
+    </RelyingParty>
+</RelyingPartySetup>
+

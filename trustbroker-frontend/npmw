@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+##############################################################################
+##
+##  NPM runner for your gradle-installed local npm version
+##
+##############################################################################
+
+SCRIPT_DIR=$(cd "$(dirname "$0")"; pwd)
+
+function runLocalNpm() {
+	local executableLocation="bin"
+	if [ "$OSTYPE" = "msys" ]; then
+		executableLocation=""
+	fi
+
+	local gradleDir=$SCRIPT_DIR/.gradle
+	local npmBinDir=($gradleDir/npm/npm-v*/$executableLocation)
+	local nodeBinDir=($gradleDir/nodejs/node-v*/$executableLocation)
+
+    if [ ! -d "$gradleDir" ]; then
+        echo "ERROR: No '.gradle' directory found. Please run 'gw npmSetup'." >&2
+        return 1
+    fi
+
+	if  [ ${#npmBinDir[@]} -gt 1 ]; then
+		echo "ERROR: Found multiple files for binary dir '$npmBinDir':" >&2
+		for i in "${npmBinDir[@]}"; do
+			echo "    $i" >&2
+		done
+		return 1
+	fi
+
+	if  [ ${#nodeBinDir[@]} -gt 1 ]; then
+		echo "ERROR: Found multiple files for binary dir '$nodeBinDir':" >&2
+		for i in "${nodeBinDir[@]}"; do
+			echo "    $i" >&2
+		done
+		return 1
+	fi
+
+    export PATH=$npmBinDir:$nodeBinDir:$PATH
+    runExecutable "$npmBinDir/npm" "$@"
+}
+
+function runExecutable() {
+    local executable="$1"
+
+    if ! compgen -G "$executable" > /dev/null; then
+        echo "ERROR: No files found for binary '$executable'. Please run 'gw npmSetup'." >&2
+        return 1
+    fi
+
+    [ -n "$executable" ] && "$executable" "${@:2}"
+}
+
+runLocalNpm "$@"

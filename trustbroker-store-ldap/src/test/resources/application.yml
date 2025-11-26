@@ -1,0 +1,21 @@
+spring:
+  ldap:
+    urls: ldap://localhost:1389
+    base: dc=trustbroker,dc=swiss
+    username: cn=admin,dc=trustbroker,dc=swiss
+    password: secret
+    embedded:
+      base-dn: dc=trustbroker,dc=swiss
+      credential:
+        username: cn=admin
+        password: secret
+      ldif: classpath:test-data.ldif
+      port: 1389
+      validation:
+        enabled: false
+
+trustbroker:
+  config:
+    ldap:
+      enabled: true
+      searchBase: cn=user

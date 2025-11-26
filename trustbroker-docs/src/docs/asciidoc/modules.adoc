@@ -1,0 +1,67 @@
+= Modules
+
+XTB consists of the following modules:
+
+[cols="5,4,10"]
+|===
+|Module | Java Package | Content
+
+|``trustbroker-api``
+|``swiss.trustbroker.api``
+|link:plugins.adoc[Plugin APIs].
+
+|``trustbroker-test``
+|``swiss.trustbroker.test``
+|Classes used by tests of other modules.
+
+|``trustbroker-common``
+|``swiss.trustbroker.common``
+|Classes shared between ``trustbroker-service`` and ``trustbroker-samlmock``.
+
+|``trustbroker-wstrust-service``
+|``swiss.trustbroker.wstrust``
+|Service for integrating WS-Trust.
+
+|``trustbroker-store-ldap``
+|``swiss.trustbroker.ldap``
+|IDM service backed by an LDAP.
+
+|``trustbroker-service``
+|``swiss.trustbroker.*``
+|The core services of XTB.
+
+|``trustbroker-xmlconfig``
+|``swiss.trustbroker.xmlconfig``
+|Configuration XML schema generated from DTO classes representing the configuration model for external use.
+
+|``trustbroker-application``
+|``swiss.trustbroker``
+|The XTB Spring Boot application
+
+|``trustbroker-frontend``
+|N/A
+|Angular-based frontend
+
+|``trustbroker-samlmock``
+|``swiss.trustbroker.samlmock``
+|Mock for testing SAML exchanges based on recorded or hand-crafted messages.
+
+|``trustbroker-oidcmock``
+|``swiss.trustbroker.oidcmock``
+|Mock for testing OICD interaction.
+
+|``trustbroker-install``
+|N/A
+|Docker image creation.
+
+|``trustbroker-docs``
+|N/A
+|This AsciiDoc documentation.
+
+|``xtb-gitops-demo``
+|N/A
+|GIT repository with sample XTB configuration.
+
+|===
+
+

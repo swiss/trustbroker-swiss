@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<SSOGroupSetup>
+	<SSOGroup name="SSOGroup.default" maxIdleTimeMinutes="120" maxSessionTimeMinutes="480" maxCachingTimeMinutes="180"/>
+	<SSOGroup name="SSO-Group_Test.1" maxIdleTimeMinutes="5" maxSessionTimeMinutes="16" maxCachingTimeMinutes="10"/>
+	<SSOGroup name="SSO-Group_Test.2" maxIdleTimeMinutes="10" maxSessionTimeMinutes="29" maxCachingTimeMinutes="15"/>
+</SSOGroupSetup>

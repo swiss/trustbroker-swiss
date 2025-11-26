@@ -1,0 +1,248 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+
+	<RelyingParty id='urn:test:SAMPLERP' base="ProfileRP_Standard.xml" enabled="true">
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+			<ClaimsProvider id="urn:test:ENTERPRISE" clientNetworks="PRIVATE,BUSINESS" />
+			<ClaimsProvider id="urn:test:KERBEROS" clientNetworks="PRIVATE,INTRANET,BUSINESS" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="502" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>502</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+		<Scripts>
+			<!-- Order is not relevant, a script A should not depend on a script B -->
+			<Script type="BeforeIdm">DefaultModifyCpAttributesSelection.groovy</Script>
+			<Script type="BeforeIdm">SpecifcModifyCpAttributesSelection.groovy</Script>
+			<!-- Before we sign the outcome, we can still manipulate the data -->
+			<Script type="AfterIdm">ApplyBlacklistAttributesNeverToBeSentToRp.groovy</Script>
+		</Scripts>
+	</RelyingParty>
+
+	<RelyingParty id='urn:test:TESTRP' base="ProfileRP_Standard.xml">
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="INTRANET" relyingPartyAlias="urn:test:TESTRP-MOCK"/>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="INTERNET,INTRANET" relyingPartyAlias="urn:test:TESTRP-PRIVATE"/>
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="502" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>502</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+		<Scripts>
+			<Script type="AfterHrd">DefaultModifyCpSelection.groovy</Script>
+			<!-- Order is not relevant, a script A should not depend on a script B -->
+			<Script type="BeforeIdm">DefaultModifyCpAttributesSelection.groovy</Script>
+			<Script type="BeforeIdm">SpecifcModifyCpAttributesSelection.groovy</Script>
+			<!-- Before we sign the outcome, we can still manipulate the data -->
+			<Script type="AfterIdm">ApplyBlacklistAttributesNeverToBeSentToRp.groovy</Script>
+		</Scripts>
+	</RelyingParty>
+
+	<RelyingParty id='urn:test:MOCKRP' base="ProfileRP_Standard.xml">
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="INTRANET"/>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="INTERNET,INTRANET" />
+			<ClaimsProvider id="urn:test:URLTESTER" clientNetworks="SPECIAL,INTRANET" relyingPartyAlias="urn:test:MOCKRP-DIRECT"/>
+		</ClaimsProviderMappings>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>502</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+	<!-- RPs to test ACS matching -->
+
+	<RelyingParty id='https://referring-party.localdomain' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<ACWhitelist>
+			<ACUrl>https://referring-party-acs.localdomain:43443/auth/saml2/acs</ACUrl>
+			<ACUrl>https://referring-party-top.localdomain/caller</ACUrl>
+			<ACUrl>https://referring-party-top.localdomain/</ACUrl>
+		</ACWhitelist>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="501" />
+		</ConstAttributes>
+		<IDMLookup>
+		    <IDMQuery name='TENANT'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+	<RelyingParty id='https://idp.referring-party.localdomain' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<ACWhitelist>
+		    <ACUrl>https://referring-party-acs.localdomain:43443/auth/saml2/idp/acs</ACUrl>
+		</ACWhitelist>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="501" />
+		</ConstAttributes>
+		<IDMLookup>
+		    <IDMQuery name='TENANT'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	  </RelyingParty>
+
+	<RelyingParty id='urn:test:MOCKRP-REMOVE-DEVINT' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="503" />
+		</ConstAttributes>
+		<IDMLookup >
+		    <IDMQuery name='TENANT'>
+			<ClientExtId>503</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	  </RelyingParty>
+
+	<RelyingParty id='urn:test:MOCKRP-DROP-DEVINT' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="503" />
+		</ConstAttributes>
+		<IDMLookup >
+		    <IDMQuery name='TENANT'>
+			<ClientExtId>503</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	  </RelyingParty>
+	<RelyingParty id='urn:test:DROP-pep:SAMPLE' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="503" />
+		</ConstAttributes>
+		<IDMLookup >
+		    <IDMQuery name='TENANT'>
+			<ClientExtId>503</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	  </RelyingParty>
+
+
+	<RelyingParty id='urn:test:NOIDM' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET" />
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId'
+				namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="503" />
+		</ConstAttributes>
+	  </RelyingParty>
+
+	<RelyingParty id='urn:test:SSO-GROUP2-PART1-TEST' base="ProfileRP_Standard_SM.xml">
+		<ACWhitelist>
+		    <ACUrl>https://saml-test.localdomain</ACUrl>
+		</ACWhitelist>
+		<Certificates/>
+		<SSO enabled="true" groupName="SSO-Group_Test.2" sloUrl="http://localhost:7070/auth/saml/slo" skipHrdWithSsoSession="true"/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET"/>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="PRIVATE,INTRANET"/>
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+		    <Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="501" />
+		</ConstAttributes>
+		<IDMLookup >
+			<IDMQuery name='TENANT'>
+			    <ClientExtId>501</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+	<RelyingParty id='urn:test:SSO-GROUP1-SINGLE-CP-TEST' base="ProfileRP_Standard.xml">
+		<ACWhitelist>
+		    <ACUrl>https://saml-test.localdomain</ACUrl>
+		</ACWhitelist>
+		<Certificates/>
+		<SSO enabled="true" groupName="SSO-Group_Test.1" sloUrl="http://localhost:7070/auth/saml/slo"/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="PRIVATE,INTRANET"/>
+		</ClaimsProviderMappings>
+		<IDMLookup >
+		    <IDMQuery name='EXTID'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		    <IDMQuery name='NAMEID'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+	<RelyingParty id='urn:test:SINGLE-CP-TEST' base="ProfileRP_Standard.xml">
+		<ACWhitelist>
+		    <ACUrl>https://saml-test.localdomain</ACUrl>
+		</ACWhitelist>
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="PRIVATE,INTRANET"/>
+		</ClaimsProviderMappings>
+		<IDMLookup >
+		    <IDMQuery name='EXTID'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		    <IDMQuery name='NAMEID'>
+			<ClientExtId>501</ClientExtId>
+		    </IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+	<RelyingParty id='urn:test:MOCKRP-QOA' base="ProfileRP_Standard.xml">
+		<ClientName>SAMPLERP</ClientName>
+		<Certificates/>
+		<Qoa>
+			<ACClass>urn:anyQoa</ACClass>
+		</Qoa>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId' value="503" />
+		</ConstAttributes>
+		<IDMLookup >
+			<IDMQuery name='TENANT'>
+				<ClientExtId>503</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+
+</RelyingPartySetup>
