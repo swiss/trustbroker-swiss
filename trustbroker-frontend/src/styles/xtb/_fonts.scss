@@ -1,0 +1,56 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@import "variables";
+
+$ft-bd-woff-path: "../../assets/fonts/xtb/FrutigerNeueW02-Bd.woff";
+$ft-bd-woff2-path: "../../assets/fonts/xtb/FrutigerNeueW02-Bd.woff2";
+$ft-it-woff-path: "../../assets/fonts/xtb/FrutigerNeueW02-It.woff";
+$ft-it-woff2-path: "../../assets/fonts/xtb/FrutigerNeueW02-It.woff2";
+$ft-reg-woff-path: "../../assets/fonts/xtb/FrutigerNeueW02-Regular.woff";
+$ft-reg-woff2-path: "../../assets/fonts/xtb/FrutigerNeueW02-Regular.woff2";
+$ft-lt-woff-path: "../../assets/fonts/xtb/FrutigerNeueW02-Light.woff";
+$ft-lt-woff2-path: "../../assets/fonts/xtb/FrutigerNeueW02-Light.woff2";
+
+@font-face {
+	font-family: 'Frutiger Neue';
+	src: local('Frutiger Neue'), url($ft-bd-woff2-path) format('woff2'), url($ft-bd-woff-path) format('woff');
+	font-weight: $font-weight-bold;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Frutiger Neue';
+	src: local('Frutiger Neue'), url($ft-it-woff2-path) format('woff2'), url($ft-it-woff-path) format('woff');
+	font-weight: $font-weight-normal;
+	font-style: italic;
+	font-display: fallback;
+}
+
+@font-face {
+	font-family: 'Frutiger Neue';
+	src: local('Frutiger Neue'), url($ft-reg-woff2-path) format('woff2'), url($ft-reg-woff-path) format('woff');
+	font-weight: $font-weight-normal;
+	font-style: normal;
+	font-display: fallback;
+}
+
+@font-face {
+	font-family: 'Frutiger Neue';
+	src: local('Frutiger Neue'), url($ft-lt-woff2-path) format('woff2'), url($ft-lt-woff-path) format('woff');
+	font-weight: $font-weight-light;
+	font-style: normal;
+	font-display: fallback;
+}

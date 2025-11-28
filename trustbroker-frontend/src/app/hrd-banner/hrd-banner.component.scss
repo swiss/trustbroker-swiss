@@ -1,0 +1,110 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+:host {
+	padding: 20px;
+	background-color: var(--background-color, #F5F5F5);
+	display: flex;
+	flex-direction: var(--main-direction, row);
+	gap: 32px;
+	border-radius: 15px;
+
+	div {
+		flex: 1 1 0;
+
+		&.title {
+			padding: 1em;
+			background-color: white;
+			border-radius: 10px;
+
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+
+			.images {
+				display: flex;
+				flex-direction: row;
+				justify-content: space-between;
+				align-items: center;
+				padding: 0 0.5em;
+			}
+
+			.title {
+				font-size: 1.5rem !important;
+			}
+		}
+
+		&.main-image-container .main-image {
+			display: flex;
+			justify-content: center;
+			overflow: hidden;
+			max-width: 300px;
+		}
+
+		.text-body2 {
+			font-size: 0.875rem;
+			color: rgba(0, 0, 0, .6);
+		}
+	}
+
+	.link-button {
+		outline: none;
+		border: none;
+		background-color: transparent;
+		color: #767676;
+		text-align: left;
+		text-decoration: underline;
+		padding-left: 0;
+
+		&:hover {
+			font-weight: bold;
+		}
+	}
+
+	// S - MOBILE
+	@media screen and (max-width: 511px) {
+		.title .images {
+			display: none !important;
+			background-color: pink;
+		}
+		.main-image-container {
+			display: none;
+			flex: 0
+		}
+	}
+
+	// M
+	@media screen and (min-width: 512px) and (max-width: 731px) {
+		.main-image-container {
+			display: none;
+		}
+	}
+
+	// L
+	@media screen and (min-width: 732px) and (max-width: 1013px) {
+		.main-image-container {
+			display: none;
+		}
+	}
+
+	// XL
+	@media screen and (min-width: 1014px) {
+		.main-image-container {
+			flex: 0.33;
+			display: flex;
+			align-items: center;
+		}
+	}
+}

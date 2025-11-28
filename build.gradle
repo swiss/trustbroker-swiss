@@ -1,0 +1,246 @@
+buildscript {
+	ext {
+		top = ''
+		buildVersion = '1.12.0'
+		buildTimestamp = null
+		// build promotion
+		buildName = System.env.BUILD_NAME
+		buildNumber = System.env.BUILD_NUMBER
+		// docker build
+		baseImage = System.env.BUILD_IMAGE ? System.env.BUILD_IMAGE : 'docker.io/azul/zulu-openjdk-alpine:17'
+		// repo publishing and promotion
+		repoBaseUrl = System.env.BUILD_REGISTRY
+		repoPublishBaseUrl = System.env.BUILD_REGISTRY
+		dockerRegistry = System.env.DOCKER_REGISTRY ? System.env.DOCKER_REGISTRY : 'ghcr.io'
+	}
+}
+
+plugins {
+	id 'base'
+	// https://central.sonatype.com/artifact/org.springframework.boot/spring-boot/versions
+	id 'org.springframework.boot' version '3.5.6' apply false
+	// https://plugins.gradle.org/plugin/org.ajoberstar.grgit
+	id 'org.ajoberstar.grgit' version '4.1.1' apply true
+	// https://plugins.gradle.org/plugin/org.unbroken-dome.test-sets
+	id "org.unbroken-dome.test-sets" version '4.1.0' apply false
+	// https://central.sonatype.com/artifact/com.google.cloud.tools/jib-maven-plugin/versions
+	id 'com.google.cloud.tools.jib' version '3.4.5' apply false
+	// https://github.com/node-gradle/gradle-node-plugin
+	id "com.github.node-gradle.node" version "7.1.0" apply false
+	// https://plugins.gradle.org/plugin/com.jfrog.artifactory
+	id 'com.jfrog.artifactory' version '4.33.1'
+}
+
+allprojects {
+	// project versioning
+	if (!rootProject.buildTimestamp) {
+		rootProject.buildTimestamp = grgit.head().date.format("yyyyMMdd'T'HHmmss'Z'", TimeZone.getTimeZone('GMT'))
+	}
+	version = "${rootProject.buildVersion}.${rootProject.buildTimestamp}"
+	group = 'swiss.trustbroker'
+}
+
+subprojects {
+	// dependencyResolutionManagement in settings.gradle somehow does not work for our sub-projects so repeat
+	repositories {
+		mavenCentral()
+		maven {
+			url 'https://build.shibboleth.net/maven/releases'
+		}
+	}
+
+	// Set JUnit 5 as default testing platform for all Java modules + AssertJ for assertions
+	pluginManager.withPlugin('java') {
+		// all modules use dpedency management
+		apply plugin: 'io.spring.dependency-management'
+
+		// all modules should test
+		apply plugin: "org.unbroken-dome.test-sets"
+
+		// some modules publish to maven registries
+		apply plugin: 'maven-publish'
+		apply plugin: 'com.jfrog.artifactory'
+
+		dependencyManagement {
+			imports {
+				// spring-boot: https://spring.io/projects/spring-boot (configured via plugin above)
+				// https://central.sonatype.com/artifact/org.springframework.boot/spring-boot/2.7.11/versions
+				mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+				// spring-cloud: https://spring.io/projects/spring-cloud
+				// https://central.sonatype.com/artifact/org.springframework.cloud/spring-cloud-dependencies/2025.0.0/versions
+				mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.0.0'
+			}
+			// dependency management for libraries used in multiple components
+			dependencies {
+				// opensaml
+				// https://build.shibboleth.net/maven/releases/org/opensaml/opensaml-core/
+				// https://shibboleth.atlassian.net/wiki/spaces/IDP5/pages/3199500367/ReleaseNotes
+				dependencySet(group: 'org.opensaml', version: '5.1.6') {
+					entry 'opensaml-messaging-impl'
+					entry 'opensaml-saml-impl'
+					entry 'opensaml-saml-api'
+					entry 'opensaml-core-impl'
+					entry 'opensaml-core-api'
+				}
+				// transitive io.commons dependency reported as false-positive
+				// https://central.sonatype.com/artifact/org.apache.velocity/velocity-engine-core/versions
+				dependency 'org.apache.velocity:velocity-engine-core:2.4.1'
+
+				// web-service and XMl processing
+				// https://central.sonatype.com/artifact/org.apache.cxf/apache-cxf/versions
+				// https://central.sonatype.com/artifact/com.sun.xml.messaging.saaj/saaj-impl/versions
+				// NOTE: WS-import from wsdl not managed here, see trustbroker-wstrust-service for that.
+				dependencySet(group: 'org.apache.cxf', version: '4.0.9') {
+					entry 'cxf-rt-transports-http'
+					entry 'cxf-rt-frontend-jaxws'
+				}
+
+				// git integration
+				// https://central.sonatype.com/artifact/org.eclipse.jgit/org.eclipse.jgit/versions
+				dependency 'org.eclipse.jgit:org.eclipse.jgit:7.3.0.202506031305-r'
+				dependency 'org.eclipse.jgit:org.eclipse.jgit.ssh.apache:7.3.0.202506031305-r'
+
+				// apache baseline (opensaml mainly depends on these)
+				// https://central.sonatype.com/artifact/org.apache.commons/commons-text/versions
+				// https://central.sonatype.com/artifact/org.apache.commons/commons-lang3/versions
+				// https://central.sonatype.com/artifact/commons-beanutils/commons-beanutils/versions
+				// https://central.sonatype.com/artifact/commons-io/commons-io/versions
+				dependency 'org.apache.commons:commons-text:1.14.0'
+				dependency 'org.apache.commons:commons-lang3:3.18.0'
+				dependency 'commons-beanutils:commons-beanutils:1.11.0'
+				dependency 'commons-io:commons-io:2.20.0'
+
+				// state cache feature
+				// https://central.sonatype.com/artifact/org.mariadb.jdbc/mariadb-java-client/versions
+				// https://mariadb.com/kb/en/mariadb-connector-j-release-notes/
+				dependency 'org.mariadb.jdbc:mariadb-java-client:3.4.2'
+
+				// script support
+				// dependency 'org.codehaus.groovy:groovy-all' is too much for security so reduce to the max
+				// https://central.sonatype.com/artifact/org.apache.groovy/groovy-jsr223/versions
+				dependencySet(group: 'org.apache.groovy', version: '4.0.28') {
+					entry 'groovy-jsr223'
+					entry 'groovy'
+				}
+
+				// OIDC support (JSON parsing) - trustbroker-api needs the version
+				// https://central.sonatype.com/artifact/com.nimbusds/nimbus-jose-jwt/9.37.3/versions
+				dependency 'com.nimbusds:nimbus-jose-jwt:9.43'
+
+				// JCE provider
+				// https://www.bouncycastle.org/latest_releases.html
+				// https://central.sonatype.com/artifact/org.bouncycastle/bcprov-jdk18on/1.79/versions
+				dependencySet(group: 'org.bouncycastle', version: '1.79') {
+					entry 'bcprov-jdk18on'
+					entry 'bcpkix-jdk18on'
+				}
+
+				// WSS4J compatibility issue with OpenSAML5
+				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-common/versions
+				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-web/versions
+				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-dom/versions
+				dependency('org.apache.wss4j:wss4j-ws-security-common:3.0.4') {
+					exclude group: 'org.opensaml', name: 'opensaml-core'
+				}
+				dependency 'org.apache.wss4j:wss4j-ws-security-web:3.0.4'
+				dependency 'org.apache.wss4j:wss4j-ws-security-dom:3.0.4'
+
+				// exclude old opensaml stuff from spring-security too
+				// https://central.sonatype.com/artifact/org.springframework.security/spring-security-saml2-service-provider/versions
+				dependency('org.springframework.security:spring-security-saml2-service-provider:6.4.11') {
+					exclude group: 'org.opensaml', name: 'opensaml-core'
+				}
+
+				// monitoring
+				// https://central.sonatype.com/artifact/io.micrometer/micrometer-registry-prometheus/versions
+				dependency 'io.micrometer:micrometer-registry-prometheus:1.13.15'
+
+				// JAX-WS
+				// https://central.sonatype.com/artifact/org.glassfish.jaxb/jaxb-xjc/versions
+				// https://central.sonatype.com/artifact/jakarta.xml.bind/jakarta.xml.bind-api/versions
+				dependency 'jakarta.xml.bind:jakarta.xml.bind-api:4.0.4'
+				dependencySet(group: 'org.glassfish.jaxb', version: '4.0.5') {
+					entry 'jaxb-xjc'
+					entry 'jaxb-runtime'
+				}
+			}
+		}
+
+		dependencies {
+			// testing
+			testImplementation 'org.junit.jupiter:junit-jupiter-api'
+			testImplementation 'org.mockito:mockito-junit-jupiter'
+			testImplementation 'org.assertj:assertj-core'
+			testImplementation 'org.junit.jupiter:junit-jupiter-engine'
+			// https://stackoverflow.com/questions/79640685/cannot-build-project-after-upgrading-spring-boot-to-3-5
+			testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+			// boilerplate
+			compileOnly 'org.projectlombok:lombok:'
+			annotationProcessor 'org.projectlombok:lombok'
+		}
+
+		tasks.withType(Test) { Test task ->
+			task.useJUnitPlatform()
+		}
+
+		// NOTE: Do not use build timestamp based version here, otherwise you trigger a new docker image layereach time you build
+		// OK here as our timestamp reflects the git commit timestamp and that really reflects a change.
+		tasks.withType(Jar) { jar ->
+			jar.manifest {
+				attributes(
+						'Implementation-Title': project.name,
+						'Implementation-Version': project.version,
+						'Implementation-Vendor': 'trustbroker.swiss'
+				)
+			}
+		}
+
+		tasks.withType(JavaCompile) {
+			options.encoding = 'UTF-8'
+			options.warnings = true
+			options.deprecation = true
+			options.compilerArgs += ["-Xlint:unchecked"]
+		}
+	}
+
+	plugins.withId('org.unbroken-dome.test-sets') {
+		testSets {
+			integrationTest
+			systemTest
+		}
+		integrationTest {
+			group = LifecycleBasePlugin.VERIFICATION_GROUP
+			description 'Run self-contained integration tests.'
+		}
+		systemTest {
+			group = LifecycleBasePlugin.VERIFICATION_GROUP
+			description 'Run self-contained system tests.'
+			systemProperties = System.properties
+			outputs.upToDateWhen { false } // run every time task is executed
+		}
+		tasks.check.dependsOn integrationTest
+	}
+
+	plugins.withType(JacocoPlugin) {
+		tasks.withType(JacocoReport) { task ->
+			task.with {
+				reports.xml.required = true
+			}
+		}
+	}
+}
+
+task showProjectInfo() {
+	description 'Shows project configuration details for CI integration'
+	group 'Debug'
+	println("       project: ${rootProject.name}")
+	println("          root: ${rootProject.rootDir}")
+	println("         group: ${rootProject.group}")
+	println("       version: ${rootProject.version}")
+	println("     buildName: ${rootProject.buildName}")
+	println("   buildNumber: ${rootProject.buildNumber}")
+	println("     baseImage: ${rootProject.baseImage}")
+	println("dockerRegistry: ${rootProject.dockerRegistry}")
+
+}

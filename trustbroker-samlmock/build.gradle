@@ -1,0 +1,112 @@
+plugins {
+	id 'application'
+	id "org.springframework.boot"
+	id 'com.google.cloud.tools.jib'
+}
+
+dependencies {
+	// components
+	implementation project("${rootProject.top}:trustbroker-common")
+
+	// baseline
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+	// management
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// SAML handling
+	implementation 'org.opensaml:opensaml-saml-impl'
+
+	// UI styling
+	implementation('org.webjars:bootstrap:5.3.5')
+}
+
+springBoot {
+	mainClassName = 'swiss.trustbroker.samlmock.SamlMockApplication'
+}
+
+// We are using bootJar but with spring-boot 2.3 we have build warnings. Remove this with spring-boot upgarde.
+// Details: https://github.com/spring-projects/spring-boot/issues/23797
+jar {
+	enabled = true
+	archiveAppendix = 'impl'
+}
+
+bootRun {
+	// source env.proj
+	// git clone from GIT_URL using CONFIG_BRANCH to TRUSTBROKER_HOME selecting inventory with PKI_PASSPHRASE encrypted pem files
+	environment 'GIT_URL', System.getenv('GIT_URL')
+	environment 'CONFIG_BRANCH', System.getenv('CONFIG_BRANCH')
+	environment 'TRUSTBROKER_HOME', System.getenv('TRUSTBROKER_HOME')
+	environment 'SPRING_PROFILES_ACTIVE', System.getenv('SPRING_PROFILES_ACTIVE')
+	environment 'PKI_PASSPHRASE', System.getenv('PKI_PASSPHRASE')
+	// switch to node dev proxy
+	systemProperty 'trustbroker.samlmock.tbApplicationUrl', 'http://localhost:4200'
+	// If you are blocked on /dev/random (SecureRandom => nextBytes) configure the JVM to use a better random device
+	//systemProperty 'java.security.egd', 'file:/dev/urandom'
+	args = [
+			'--spring.config.location=optional:classpath:/,file:${TRUSTBROKER_HOME}/configCache/trustbroker-samlmock/${SPRING_PROFILES_ACTIVE}/config/'
+	]
+}
+
+// test bootstrap without a cache
+task deleteCaches(type: Delete) {
+	delete 'home/.config', 'home/configCache', 'home/configuration'
+}
+
+// JIB publishing
+jib {
+	from {
+		image = rootProject.baseImage
+	}
+	to {
+		image = rootProject.dockerRegistry + '/trustbroker-swiss/trustbroker-samlmock'
+		tags += project.version
+		auth {
+			username = project.repoUser
+			password = project.repoPass
+		}
+	}
+	extraDirectories {
+		// bootstrap the configuration cache structure we refer to with TRUSTBROKER_HOME (populated from git)
+		// In DEV mode this is the same as ${project.rootDir}/config/trustbroker used by bootRun
+		paths {
+			path {
+				from = "./etc/extra"
+				into = "/etc"
+			}
+		}
+		permissions = [
+				'/etc/**': '777' // nobody:nobody can write
+		]
+	}
+	container {
+		user = "nobody:nobody" // uid=99, gid=99
+		creationTime = "USE_CURRENT_TIMESTAMP"
+		args = [
+				'--spring.config.location=optional:classpath:/,file:${TRUSTBROKER_HOME}/configCache/trustbroker-samlmock/${SPRING_PROFILES_ACTIVE}/config/'
+		]
+		environment = [
+				GIT_URL         : 'https://github.com/swiss/xtb-gitops-demo.git',
+				CONFIG_BRANCH   : 'master',
+				TRUSTBROKER_HOME: '/etc/trustbroker',
+				XDG_CONFIG_HOME : '/etc/trustbroker' // https://bugs.eclipse.org/bugs/show_bug.cgi?id=582064
+		]
+	}
+}
+
+publishing {
+	publications {
+		uberJar(MavenPublication) {
+			artifact bootJar
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.uberJar)
+}
+
+tasks.jibDockerBuild.dependsOn assemble
+tasks.jib.dependsOn assemble

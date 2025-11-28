@@ -1,0 +1,137 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+@use "src/styles/variables";
+
+:host {
+	--large-gap: 2rem;
+	--small-gap: 0.5rem;
+
+	display: flex;
+	justify-content: center;
+
+	.main {
+		flex-grow: 1;
+		max-width: 512px;
+
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+
+		.cards {
+			display: flex;
+			flex-direction: column;
+			gap: var(--large-gap);
+
+			.card-section {
+				display: grid;
+				grid-template-columns: 1fr;
+				grid-gap: var(--small-gap);
+
+				.idp-card-container {
+					position: relative;
+
+					.idp-card {
+						--border-size: 4px;
+						padding: 0.25rem;
+						border-radius: 0.625rem;
+						height: 4rem;
+						width: 100%;
+						background-color: variables.$idp-card-background-color;
+						border: variables.$idp-card-border;
+						box-shadow: variables.$idp-card-box-shadow;
+						text-align: left;
+						color: variables.$idp-card-color;
+
+						display: flex;
+						flex-direction: row;
+						align-items: center;
+						gap: 1rem;
+
+						img {
+							width: 48px;
+							height: 48px;
+						}
+
+						&:enabled:hover {
+							cursor: pointer;
+							background-color: variables.$idp-card-focus-background-color;
+						}
+
+						&:enabled:focus {
+							background-color: variables.$idp-card-focus-background-color;
+							outline: 2px solid variables.$idp-card-focus-outline-color;
+						}
+
+						&:focus-visible {
+							box-shadow: variables.$idp-card-focus-visible-box-shadow;
+						}
+					}
+
+					.disabled-overlay {
+						position: absolute;
+						height: 100%;
+						width: 100%;
+						left: 0;
+						top: 0;
+
+						padding: 10px;
+						backdrop-filter: blur(2px);
+						background: variables.$idp-card-disabled-background-color;
+						display: grid;
+						grid-template-rows: 1fr 1fr;
+						grid-template-columns: 48px 1fr;
+						grid-column-gap: 1rem;
+						cursor: pointer;
+						border: 0;
+						color: variables.$idp-card-color;
+
+						box-sizing: border-box;
+						border-radius: 0.625rem;
+
+						&:focus-visible {
+							box-shadow: variables.$idp-card-focus-visible-box-shadow;
+							background: variables.$idp-card-disabled-hover-background-color;
+						}
+
+						p {
+							grid-column: 2;
+							align-self: center;
+							text-align: start;
+							margin-bottom: 0;
+						}
+
+						.help-icon {
+							position: absolute;
+							right: 10px;
+							top: 10px;
+							width: 16px;
+							height: 16px;
+						}
+
+						&:hover {
+							background: variables.$idp-card-disabled-hover-background-color;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+::ng-deep .disabledDialogContent {
+	&.ob-alert:before {
+		align-content: center !important;
+	}
+}

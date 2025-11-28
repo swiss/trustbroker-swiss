@@ -1,0 +1,100 @@
+
+plugins {
+	id 'java-library'
+	id 'jacoco'
+}
+
+configurations {
+	cxf
+	schemaGen
+}
+
+dependencies {
+	// components
+	implementation project("${rootProject.top}:trustbroker-api")
+	implementation project("${rootProject.top}:trustbroker-common")
+	testImplementation project("${rootProject.top}:trustbroker-test")
+
+	// spring-boot baseline
+	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+	implementation 'org.springframework.boot:spring-boot-actuator'
+	implementation 'org.springframework.cloud:spring-cloud-starter'
+
+	// security (required for oidc)
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation "org.springframework.security:spring-security-oauth2-authorization-server"
+	implementation 'org.springframework.security:spring-security-saml2-service-provider'
+
+	// spring-test baseline
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// configuration reload from git
+	implementation 'org.springframework.cloud:spring-cloud-config-client'
+
+	// script service
+	implementation 'org.apache.groovy:groovy-jsr223'
+
+	// cache (h2 for dev, MariaDB4j could be used for integration testing)
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+
+	// for version issues in Java 11 see
+	// https://stackoverflow.com/questions/51485137/how-do-you-invoke-schemagen-in-java-11#answer-51502196
+	schemaGen "org.glassfish.jaxb:jaxb-jxc"
+
+	// workaround for funny classloader problem in embedded tomcat running our own servlet filetrs
+	implementation 'ch.qos.logback:logback-classic'
+	implementation "org.apache.tomcat.embed:tomcat-embed-core"
+
+	implementation 'org.opensaml:opensaml-core-impl'
+	implementation 'org.opensaml:opensaml-core-api'
+
+	// monitoring
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+}
+
+def dtoDir = 'src/main/java/swiss/trustbroker/federation/xmlconfig'
+// output of schemagen (including .class files)
+def buildSchemaGenDir = 'build/resources/schemagen'
+// resulting schema files to be included in jar
+def buildSchemaDir = 'build/resources/main'
+def schemaGenClass = 'com.sun.tools.jxc.SchemaGeneratorFacade'
+def schemaClasses = [
+		'ClaimsProviderDefinitions',
+		'ClaimsProviderMappings',
+		'ClaimsProviderSetup',
+		'RelyingParty',
+		'RelyingPartySetup',
+		'SsoGroupSetup'
+]
+
+schemaClasses.each { name ->
+	def srcFile = "${dtoDir}/${name}.java"
+	def destFile = file("${buildSchemaDir}/${name}.xsd")
+	def pathSep = File.pathSeparatorChar
+	task "schemaGen${name}" (type: JavaExec, dependsOn: [compileJava,configurations.schemaGen]) {
+		// dependencies for up-to-date checks
+		inputs.file(srcFile)
+		outputs.file(destFile)
+		classpath configurations.schemaGen
+		mainClass = schemaGenClass
+		args '-d', buildSchemaGenDir , '-classpath', "${compileJava.destinationDir}${pathSep}${compileJava.classpath.asPath}", srcFile
+		doFirst {
+			file(buildSchemaGenDir).mkdirs()
+			file(buildSchemaDir).mkdirs()
+			logger.info "schemagen: java -cp ${classpath.asPath} ${schemaGenClass} ${args.join(' ')}"
+		}
+		doLast {
+			// Above creates "${buildSchemaGenDir}/schema1.xsd" (despite printing a different path!) - rename
+			destFile.delete()
+			if (!file("${buildSchemaGenDir}/schema1.xsd").renameTo(destFile)) {
+				throw new GradleException("Failed to write target xsd in ${buildSchemaDir}")
+			}
+			logger.info("Produced ${destFile}")
+		}
+	}
+
+	processResources.dependsOn "schemaGen${name}"
+
+}

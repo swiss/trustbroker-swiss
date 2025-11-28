@@ -1,0 +1,41 @@
+pluginManagement {
+	repositories {
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+// plugins need to be first, then we can configure the rest
+ext {
+	// build promotion
+	buildName = System.env.BUILD_NAME
+	buildNumber = System.env.BUILD_NUMBER
+}
+
+dependencyResolutionManagement {
+	repositories {
+		mavenCentral()
+		maven {
+			url 'https://build.shibboleth.net/maven/releases'
+		}
+	}
+}
+
+// project setup
+rootProject.name = "trustbroker-swiss"
+
+// OSS published main services
+include 'trustbroker-api'
+include 'trustbroker-test'
+include 'trustbroker-common'
+include 'trustbroker-service'
+include 'trustbroker-xmlconfig'
+include 'trustbroker-wstrust-service'
+include 'trustbroker-frontend'
+include 'trustbroker-application'
+include 'trustbroker-samlmock'
+include 'trustbroker-oidcmock'
+include 'trustbroker-docs'
+include 'trustbroker-store-ldap'
+// plus 'trustbroker-install'
+

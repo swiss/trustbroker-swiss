@@ -1,0 +1,50 @@
+= Plugin APIs
+
+XTB provides various API hooks for implementing certain features.
+They are defined in the ``trustbroker-api`` module.
+
+[cols="1,10,1"]
+|===
+|API | Purpose | Status
+
+|``IdmQueryService``
+|Interface for accessing an Identity Management (IDM) service.
+
+E.g. an implementation could use LDAP or a custom API of the IDM.
+|Stable
+
+|``HrdService``
+|Home realm discovery related customizations.
+|Stable
+
+|``QualityOfAuthenticationService``
+|Service for mapping between string based authentication levels / quality of authentication to numerical levels.
+|Stable
+
+|AttributeInitializer
+|Interface used for configuring custom sets of attributes in the ``AttributeRegistry``
+|Stable
+
+|``OutputService``
+|A service to render SAML requests and responses.
+
+An implementation is provided by ``trustbroker-service``, generally there should be no need to change that.
+|May still change -
+
+|``AnnouncementService``
+|Announcements can be shown e.g. for operational purposes.
+|Preliminary, may still change
+
+|``ProfileSelectionService``
+|A user that has different profiles may need to select the profile to use for authentication.
+
+Note: The related OIDC feature ``prompt=select_account`` is not yet implemented in XTB.
+|Preliminary, may still change
+
+|``AccessRequestService``
+|Access request triggers onboarding of a user to an application due to a missing role.
+|Preliminary, may still change
+
+|===
+
+

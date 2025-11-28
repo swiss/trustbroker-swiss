@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingParty>
+	<Certificates>
+		<SignerKeystore>
+			<CertPath>token-signer/keystore.pem</CertPath>
+			<KeyPath>token-signer/keystore.pem</KeyPath>
+			<Password>testpass</Password>
+		</SignerKeystore>
+		<SignerTruststore>
+			<CertPath>idp-private-token-signer/truststore.pem</CertPath>
+			<Password>testpass</Password>
+		</SignerTruststore>
+	</Certificates>
+	<AttributesSelection>
+		<Definition name="FirstName" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"/>
+		<Definition name="Name" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"/>
+		<Definition name="EMail" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"/>
+	</AttributesSelection>
+	<IDMLookup >
+		<IDMQuery name='IDENTITY'>
+			<ClientExtId>100</ClientExtId>
+			<UserDetailsSelection>
+				<Definition name="LoginId" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/LoginId"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+		<IDMQuery name='TENANT'>
+			<UserDetailsSelection>
+				<Definition name="FirstName" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"/>
+				<Definition name="Name" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"/>
+				<Definition name="EMail" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"/>
+				<Definition name="ClientExtId" namespaceUri="http://trustbroker.swiss/claims/issuedClientExtId"/>
+				<Definition name="ClientName" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+	</IDMLookup>
+	<PropertiesSelection>
+		<Definition name="IssuedClientExtId" namespaceUri="http://trustbroker.swiss/claims/issuedClientExtId"/>
+		<Definition name="HomeName" namespaceUri="http://trustbroker.swiss/claims/homeName"/>
+		<Definition name="HomeRealm" namespaceUri="http://trustbroker.swiss/claims/homeRealm"/>
+		<Definition name="SsoSessionId" namespaceUri="http://trustbroker.swiss/claims/ssoSessionId"/>
+	</PropertiesSelection>
+</RelyingParty>

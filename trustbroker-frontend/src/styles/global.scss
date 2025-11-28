@@ -1,0 +1,51 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+@forward "src/styles/variables";
+
+@use "src/styles/spacing";
+@use "src/styles/typography";
+@use "src/styles/material/cards";
+
+@use "src/styles/xtb/fonts";
+
+@use "src/styles/xtb/typography" as xtb-typography;
+
+@use "src/styles/xtb/variables";
+
+@use "src/styles/xtb/app";
+
+@use "src/styles/xtb/material-frame";
+
+@use "src/styles/xtb/material-header";
+
+@use "src/styles/xtb/tile-layout";
+
+@use "src/styles/xtb/hrd-cards";
+
+@use "src/styles/xtb/small-card";
+
+@use "src/styles/xtb/error-page";
+
+@use "src/styles/xtb/error-box";
+
+@use "src/styles/xtb/announcements";
+
+@use "src/styles/xtb/announcement";
+
+@use "src/styles/xtb/backdrop";
+
+@use "src/styles/xtb/theme-selector";
+
+@use "src/styles/xtb/button";

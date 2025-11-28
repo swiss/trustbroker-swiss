@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ClaimsProviderSetup>
+	<ClaimsParty id='urn:test:SampleCP'>
+		<HomeName>SampleCP</HomeName>
+		<SSOUrl>https://idp.trustbroker.swiss/login</SSOUrl>
+		<Certificates>
+			<SignerTruststore>
+				<CertPath>test-idp-mock-keystore.pem</CertPath>
+				<Password>testit</Password>
+			</SignerTruststore>
+		</Certificates>
+		<SecurityPolicies validateXmlSchema="false"/>
+	</ClaimsParty>
+</ClaimsProviderSetup>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+</head>
+<body>
+<script type="module">
+	checkStorageAccess();
+
+	async function checkStorageAccess() {
+		const hasAccess = await hasStorageAccess();
+		if (hasAccess) {
+			window.parent.postMessage(hasAccess ? "supported" : "unsupported", "*");
+		}
+		else {
+			signalSupport(false); // 3rd-party storage access not granted
+		}
+	}
+
+	async function hasStorageAccess() {
+		if (!("hasStorageAccess" in document)) {
+			return true; // browser does not support storage access API
+		}
+		return document.hasStorageAccess();
+	}
+
+	function signalSupport(isSupported) {
+		// signal 3rd-party access support to the page embedding this iframe
+		window.parent.postMessage(isSupported ? "supported" : "unsupported", "*");
+	}
+</script>
+</body>
+</html>

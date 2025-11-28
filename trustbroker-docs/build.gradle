@@ -1,0 +1,39 @@
+plugins {
+	id 'org.asciidoctor.jvm.convert' version '2.4.0'
+	// NOTE: Task asciidoctorPdf needs a theme, see https://docs.asciidoctor.org/pdf-converter/latest/
+	//id 'org.asciidoctor.jvm.pdf' version '3.3.0'
+	//id 'org.asciidoctor.jvm.gems' version '3.3.0'
+}
+
+asciidoctor {
+	// Quick intro on src content: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
+	// Customizations see https://asciidoctor.org/docs/asciidoctor-gradle-plugin/
+	outputDir file('build/docs/asciidoc')
+	sourceDir file('src/docs/asciidoc')
+	sources {
+		include '*.adoc'
+	}
+	baseDirFollowsSourceDir()
+	inProcess = JAVA_EXEC
+	forkOptions {
+		jvmArgs("--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED", "--add-opens", "java.base/java.io=ALL-UNNAMED")
+	}
+}
+
+asciidoctorj {
+	version("2.5.12")
+	modules {
+		diagram.use()
+		diagram.version '2.3.0'
+	}
+}
+
+// asciidoc is slow so build it with an optional task and populate public doc project
+task publishHtml(type: Copy) {
+	description 'Compile asciidoc markup files and publish HTML to trustbroker.swiss checkout'
+	group 'publishing'
+	from 'build/docs/asciidoc'
+	exclude '.asciidoctor'
+	into "${rootProject.rootDir}/trustbroker.swiss/html"
+	dependsOn 'asciidoctor'
+}

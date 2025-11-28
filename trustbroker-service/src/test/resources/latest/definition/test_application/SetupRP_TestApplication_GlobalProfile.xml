@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+	<RelyingParty id='urn:test:TEST_APPLICATION_GLOBAL_PROFILE' base="ProfileRP_Global.xml"> <!-- in global profile directory -->
+		<Certificates/>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="INTRANET" relyingPartyAlias="urn:test:TESTRP-MOCK"/>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="INTERNET,INTRANET" relyingPartyAlias="urn:test:TESTRP-PRIVATE"/>
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="1900" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>1900</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+		<Scripts>
+			<Script type="BeforeIdm">Global.groovy</Script> <!-- in global scripts -->
+		</Scripts>
+	</RelyingParty>
+</RelyingPartySetup>

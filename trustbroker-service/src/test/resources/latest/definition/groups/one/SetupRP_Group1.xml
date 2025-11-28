@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+	<RelyingParty id='urn:test:GROUP1' base="ProfileRP_Standard.xml">
+		<Certificates/>
+		<Announcements enabled="true">
+				<AppUrl>https://localhost</AppUrl>
+		</Announcements>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="INTRANET" relyingPartyAlias="urn:test:TESTRP-MOCK"/>
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="1900" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>1900</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+</RelyingPartySetup>

@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingParty>
+	<ACWhitelist>
+		<ACUrl>https://localhost:8321/SAML2.0/ServiceProvider/AssertionConsumer</ACUrl>
+		<ACUrl>https://localhost:10443/auth/saml2/sso/IDP-PRIVATE</ACUrl>
+		<ACUrl>https://saml-test.localdomain/caller</ACUrl>
+		<ACUrl>https://saml-test.localdomain</ACUrl>
+	</ACWhitelist>
+	<Certificates>
+		<SignerKeystore>
+			<CertPath>test-cert.pem</CertPath>
+			<KeyPath>test-key.pem</KeyPath>
+			<Password>testit</Password>
+		</SignerKeystore>
+		<SignerTruststore>
+			<CertPath>test-trust.pem</CertPath>
+			<CertType>pem</CertType>
+			<Password>testit</Password>
+		</SignerTruststore>
+	</Certificates>
+	<SecurityPolicies validateHttpHeaders="true"/>
+	<IDMLookup>
+		<IDMQuery name='IDENTITY'>
+			<ClientExtId>100</ClientExtId>
+			<UserDetailsSelection>
+				<Definition name="LoginId" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/LoginId"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+		<IDMQuery name='TENANT'>
+			<UserDetailsSelection>
+				<Definition name="FirstName" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"/>
+				<Definition name="Name" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"/>
+				<Definition name="EMail" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"/>
+				<Definition name="ClientExtId" namespaceUri="http://trustbroker.swiss/claims/issuedClientExtId"/>
+				<Definition name="ClientName" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+	</IDMLookup>
+</RelyingParty>

@@ -1,0 +1,76 @@
+## Derivative work of original template from org.opensaml:opensaml-saml-impl:5.1.2:
+## saml2-post-binding.vm
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
+##
+## Velocity Template for SAML 2 HTTP-POST binding
+## Customized for SSO logout notification
+##
+## Velocity context may contain the following properties
+##
+## OpenSAML:
+## action - String - the action URL for the form
+## binding - String - the SAML binding type in use
+## RelayState - String - the relay state for the message
+## SAMLRequest - String - the Base64 encoded SAML Request
+## SAMLResponse - String - the Base64 encoded SAML Response
+##
+## Binding:
+## XTBHttpMethod - String - HTTP method to use (default: post)
+## XTBSigAlg - String - Signature algorithm for redirect binding
+## XTBSignature - String - Signature for redirect binding
+##
+## XTBSloConsoleDebug - boolean - enable console.debug logging
+##
+## SLO:
+## XTBSloNotifications - Set<SloNotification> - URLs for SSO
+## XTBSloMaxWaitMillis - int - timeout in millis for mode notify-fail
+## XTBSloMinWaitMillis - int - minimum wait in millis (for mode notify-try)
+## XTBSloWaitForCount - int - count of notifications to wait for i.e. mode notify-fail
+##
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+    <head>
+    #parse ( "/templates/add-html-head-content.vm" )
+    #parse ( "/templates/SLO-Notifications.vm" )
+    </head>
+    <body onload="performSlo()">
+        <noscript>
+            <p>
+                <strong>Note:</strong> Since your browser does not support JavaScript,
+                you must press the Continue button once to proceed.
+            </p>
+        </noscript>
+        <form name="saml.result" action="${action}" method="#if($XTBHttpMethod)${XTBHttpMethod}#{else}POST#end">
+            <div>
+                #if($RelayState)<input type="hidden" name="RelayState" value="${RelayState}"/>#end
+
+                #if($SAMLRequest)<input type="hidden" name="SAMLRequest" value="${SAMLRequest}"/>#end
+
+                #if($SAMLResponse)<input type="hidden" name="SAMLResponse" value="${SAMLResponse}"/>#end
+
+				#if($XTBSignature)<input type="hidden" name="Signature" value="${XTBSignature}"/>#end
+
+				#if($XTBSigAlg)<input type="hidden" name="SigAlg" value="${XTBSigAlg}"/>#end
+
+            </div>
+            <noscript>
+                <div>
+                    <input type="submit" value="Continue"/>
+                </div>
+            </noscript>
+        </form>
+        <div id="slo"></div>
+        #parse ( "/templates/add-html-body-content.vm" )
+    </body>
+</html>

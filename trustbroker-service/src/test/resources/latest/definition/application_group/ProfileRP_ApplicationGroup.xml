@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingParty>
+	<ACWhitelist>
+		<ACUrl>https://application-group.localdomain</ACUrl>
+	</ACWhitelist>
+	<Certificates>
+		<SignerKeystore>
+			<CertPath>application_group/group-cert.pem</CertPath> <!-- relative to keystores -->
+			<KeyPath>application_group/group-key.pem</KeyPath ><!-- relative to keystores -->
+			<Password>testit</Password>
+		</SignerKeystore>
+		<SignerTruststore>
+			<CertPath>application_group/group-trust.pem</CertPath> <!-- relative to keystores -->
+			<CertType>pem</CertType>
+			<Password>testit</Password>
+		</SignerTruststore>
+	</Certificates>
+	<IDMLookup>
+		<IDMQuery name='IDENTITY'>
+			<ClientExtId>100</ClientExtId>
+			<UserDetailsSelection>
+				<Definition name="LoginId" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/LoginId"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+	</IDMLookup>
+</RelyingParty>

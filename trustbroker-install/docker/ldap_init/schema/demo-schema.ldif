@@ -1,0 +1,8 @@
+dn: cn=customperson,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: customperson
+olcAttributeTypes: ( 1.3.6.1.4.1.4203.666.1.90 NAME 'app' DESC 'application name' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: ( 1.3.6.1.4.1.4203.666.1.92 NAME 'adminglobalId' DESC 'admin global ID' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.4203.666.1.93 NAME 'memberOf' DESC 'member of group' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: ( 1.3.6.1.4.1.4203.666.1.94 NAME 'org' DESC 'organization' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcObjectClasses: ( 1.3.6.1.4.1.4203.666.2.90 NAME 'customPerson' DESC 'person with app and org' SUP inetOrgPerson STRUCTURAL MAY ( app $ adminglobalId $ memberOf $ org ) )

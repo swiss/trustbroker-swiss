@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+	<RelyingParty id='urn:test:TESTRP' base="ProfileRP_Standard2.xml">
+		<Certificates/>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="1900" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>1900</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+	</RelyingParty>
+</RelyingPartySetup>

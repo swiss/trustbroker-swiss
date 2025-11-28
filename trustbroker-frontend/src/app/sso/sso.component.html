@@ -1,0 +1,87 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+<div class="mainContent">
+	<div class="title-container" id="titleContainer">
+		<h2>{{ "trustbroker.sso.main.title" | translate }}</h2>
+		<div>
+			<div id="selectionText">
+				<p [innerHTML]="'trustbroker.sso.main.subtitle' | translate | safeMarkup"></p>
+			</div>
+		</div>
+	</div>
+
+	<div class="cards-padding">
+		@for (ssoGroupParticipants of ssoParticipants; track ssoGroupParticipants) {
+			<div>
+				@if (ssoGroupParticipants.ssoGroupName) {
+					<fieldset class="body-1 high-emphasis mb-4" [id]="'sso-group.' + ssoGroupParticipants.ssoGroupName + '.' + ssoGroupParticipants.ssoSubject">
+						<legend>
+							{{ "trustbroker.sso.group." + ssoGroupParticipants.ssoGroupName + ".subtitle" | translate: { Default: ssoGroupParticipants.ssoGroupName } }}
+							@if (ssoGroupParticipants.ssoSubject) {
+								<span>({{ ssoGroupParticipants.ssoSubject }})</span>
+							}
+						</legend>
+						<p>{{ "trustbroker.sso.main.created" | translate }} {{ ssoGroupParticipants.ssoEstablishedTime | date: "dd.MM.yyyy HH:mm:ss" }}</p>
+						<p>{{ "trustbroker.sso.main.expires" | translate }} {{ ssoGroupParticipants.expirationTime | date: "dd.MM.yyyy HH:mm:ss" }}</p>
+						<div class="cards-container" role="list" id="cardcontainer">
+							@for (participant of ssoGroupParticipants.participants; track participant) {
+								<div class="card-container" role="listitem">
+									<!--Normal cards -->
+									@if (!isButtonSize) {
+										<mat-card
+											appearance="outlined"
+											class="small"
+											id="{{ ssoGroupParticipants.ssoGroupName + '.' + participant.rpId }}"
+											role="button"
+											[attr.aria-label]="'trustbroker.sso.rp.' + participant.name + '.title' | translate: { Default: participant.name }"
+											(keydown.enter)="onClickCard(ssoGroupParticipants.ssoGroupName, participant.rpId, participant.cpId, ssoGroupParticipants.ssoSubject)"
+											(keydown.space)="onClickCard(ssoGroupParticipants.ssoGroupName, participant.rpId, participant.cpId, ssoGroupParticipants.ssoSubject)"
+											(click)="onClickCard(ssoGroupParticipants.ssoGroupName, participant.rpId, participant.cpId, ssoGroupParticipants.ssoSubject)"
+										>
+											<img
+												mat-card-image
+												[src]="getImageUrl(participant.image)"
+												alt="{{ participant.name }}"
+												(click)="onClickCard(ssoGroupParticipants.ssoGroupName, participant.rpId, participant.cpId, ssoGroupParticipants.ssoSubject)"
+											/>
+											<mat-card-title class="high-emphasis">
+												<p
+													class="strong"
+													[id]="'sso-participant.' + +ssoGroupParticipants.ssoGroupName + '.' + ssoGroupParticipants.ssoSubject + '.' + participant.name"
+													[innerHTML]="'trustbroker.sso.rp.' + participant.name + '.title' | translate: { Default: participant.name } | safeMarkup"
+												></p>
+											</mat-card-title>
+										</mat-card>
+									}
+									<!--Buttons -->
+									<app-small-card
+										[id]="ssoGroupParticipants.ssoGroupName + '.' + ssoGroupParticipants.ssoSubject + '.' + participant.rpId"
+										[showSmallCards]="isButtonSize"
+										[inputColor]="participant.color"
+										[inputShortcut]="participant.shortcut"
+										[theme]="theme"
+										[cardText]="'trustbroker.sso.rp.' + participant.name + '.title' | translate: { Default: participant.name } | safeMarkup"
+										(cardClick)="onClickCard(ssoGroupParticipants.ssoGroupName, participant.rpId, participant.cpId, ssoGroupParticipants.ssoSubject)"
+									>
+									</app-small-card>
+								</div>
+							}
+						</div>
+					</fieldset>
+				}
+			</div>
+		}
+	</div>
+</div>

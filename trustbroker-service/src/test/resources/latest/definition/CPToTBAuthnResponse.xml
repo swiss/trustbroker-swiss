@@ -1,0 +1,152 @@
+<saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
+				 xmlns:xs="http://www.w3.org/2001/XMLSchema"
+				 Destination="https://test.trustbroker.swiss/api/v1/saml"
+				 ID="Response_d56c04bab3466e5262243c99d4a260d5772e0e2d"
+				 InResponseTo="id-e666ae1d-9d4b-439a-bd0f-c6663885a0c3"
+				 IssueInstant="2020-11-04T10:17:27.284Z"
+				 Version="2.0"
+>
+	<saml2:Issuer xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">urn:test:TESTCP</saml2:Issuer>
+	<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+		<ds:SignedInfo>
+			<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+			<ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" />
+			<ds:Reference URI="#Response_d56c04bab3466e5262243c99d4a260d5772e0e2d">
+				<ds:Transforms>
+					<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" />
+					<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+						<ec:InclusiveNamespaces xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"
+												PrefixList="xs"
+						/>
+					</ds:Transform>
+				</ds:Transforms>
+				<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+				<ds:DigestValue>yCDKtFDdt7aC04MMlE0SsJzHsuI=</ds:DigestValue>
+			</ds:Reference>
+		</ds:SignedInfo>
+		<ds:SignatureValue>xrfEW3HtFTKd3P631AtCFmM4z5+F917qKv3Nh5pkTwQlyNb1QaxXCc4lkdxDCnOxQskMvUahm+/zo+H50AkPjKadPBv4OBm7J8/m73GVarlQPyyb4/EDWMo9+k0lOQmZjTdLJ1RxgQxC3Eu8JEHn1N5wZ11Li7mrePAbhjLUdYxrUo02FvkSp5/4RVtEML/rHDSbYLcKOhDMNcV0r5Xo53UOphBOtRQhsSrz/Zc+N9LOpg+3rq1WPgyx6p06OV0kcluWmw4N7rE8hC0EjJwZoKTlF7gEjY9jCH0YpdJFVNNclkahGjhjbm3y+EpfWh7B2lsOs6f/goFthmJIYz6icw==</ds:SignatureValue>
+		<ds:KeyInfo>
+			<ds:X509Data>
+				<ds:X509Certificate>MIIDgzCCAmugAwIBAgIUc5NXgfuXbEnlUIEGqLpjwXNK2QwwDQYJKoZIhvcNAQEL
+BQAwUTELMAkGA1UEBhMCY2gxGTAXBgNVBAoMEHN3aXNzdHJ1c3Ricm9rZXIxDTAL
+BgNVBAsMBGRlbW8xGDAWBgNVBAMMD2lkcC1tb2NrLXNpZ25lcjAeFw0yNDA0MDgw
+NzUwMTVaFw0zNDA0MDYwNzUwMTVaMFExCzAJBgNVBAYTAmNoMRkwFwYDVQQKDBBz
+d2lzc3RydXN0YnJva2VyMQ0wCwYDVQQLDARkZW1vMRgwFgYDVQQDDA9pZHAtbW9j
+ay1zaWduZXIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCN8KHCq9NH
+pvy1yJ7oLpyPNRIrI8AyX4ph6DDPn25W4atvYutNtYmTpyM0/YdJdJMcY8H1hsTt
+Q6vP8W1OYP9CpJA1mLVddAJHvBjkMEZ1CQZgd+U7C081a6tzatATF84U9t2soShy
+PUsOJ/XJU+vwP35AvXx3CA7NHCHbfWPK53279WH2ffLVBttAD86Yfl1X3OKYca0r
+HP970PS8eYsD7NeIEygSoVb0Jrn8iVHDsKiKS5wYQAacllUyeQKkFk8OA8OLqUpf
+R1K5+Mk+24rk04ifPdRgjJtl+pVPcku5S322htwQBT5hTStA2aOTNNru1vKnCl9B
+DRGEB3fD1JCpAgMBAAGjUzBRMB0GA1UdDgQWBBRuNnVEjHJk5IGvkTy74nLLUPWz
+xzAfBgNVHSMEGDAWgBRuNnVEjHJk5IGvkTy74nLLUPWzxzAPBgNVHRMBAf8EBTAD
+AQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB4yC9AsEtKK7caDLyXehp5VYB7DVNXRfZ7
+gM2UxQ7nUKth4gOitPJ13y9Voq7VFfO7qB+yw0bE4bVzvqEEXeFD86p8hvlbxQ0D
+2GH9JU26FsNzTPF5uqgJmci/AJVLvTAP+AhiPi2qMSK/eEVqQBMYg3Eu7RqpYlOI
+1P83tMDmO06zgVZQhRYjpUeypth2vWDVARA6w+C6ok8lyExA4VMouoDV+skF+Qc3
+5Ycpxy/VUGg9KbbYcjNClOFn86qHMfJdjkinsTvN826HFHRUNT0VIHa/DcLc94nS
+5HJJ6sGN+4SuvoS4knPpu4S4ocMc1AqjKMtc4JvmI3tf+QQ1lv+3</ds:X509Certificate>
+			</ds:X509Data>
+		</ds:KeyInfo>
+	</ds:Signature>
+	<saml2p:Status>
+		<saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success" />
+	</saml2p:Status>
+	<saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion"
+					 xmlns:xs="http://www.w3.org/2001/XMLSchema"
+					 ID="Assertion_aa522823413626379d63e1d89602da9d5c87d041"
+					 IssueInstant="2020-11-04T10:17:27.278Z"
+					 Version="2.0"
+	>
+		<saml2:Issuer>urn:test:TESTCP</saml2:Issuer>
+		<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+			<ds:SignedInfo>
+				<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+				<ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" />
+				<ds:Reference URI="#Assertion_aa522823413626379d63e1d89602da9d5c87d041">
+					<ds:Transforms>
+						<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" />
+						<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#">
+							<ec:InclusiveNamespaces xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#"
+													PrefixList="xs"
+							/>
+						</ds:Transform>
+					</ds:Transforms>
+					<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+					<ds:DigestValue>e8PrapO6dqz9yFMYx/p7Wnla65o=</ds:DigestValue>
+				</ds:Reference>
+			</ds:SignedInfo>
+			<ds:SignatureValue>J/tS7q0mxuJ0+gMVm/p6brVejRy1X+Er4SH4bREGlvraiDJav29kW/hIdkj9UIOkyUkVutjvLcwmBOOTf3eUFR7Y24KnaVJ7TqKkFsVpdDtR0ag9LctynkIetrsihZKL4lL2R902VC47Xqzu5ENhzo4eferomtCsypzuzGlM5h/A/HcMIvmEDPBKwGfQ8RjZXJ9eoc2d2iHAw0SlHHO796lqCPnHzUBqcB+JHbnaBdNMXSGzR3gP4t2ACOCyWrcjk3XzkOdhfutngvKg2thoGbmFf7U5n8tIuIvJROAUiOs4it39psML91Ky4AfDDkWV8HOg9NfHeWVOz+XQZcu7eA==</ds:SignatureValue>
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDgzCCAmugAwIBAgIUc5NXgfuXbEnlUIEGqLpjwXNK2QwwDQYJKoZIhvcNAQEL
+BQAwUTELMAkGA1UEBhMCY2gxGTAXBgNVBAoMEHN3aXNzdHJ1c3Ricm9rZXIxDTAL
+BgNVBAsMBGRlbW8xGDAWBgNVBAMMD2lkcC1tb2NrLXNpZ25lcjAeFw0yNDA0MDgw
+NzUwMTVaFw0zNDA0MDYwNzUwMTVaMFExCzAJBgNVBAYTAmNoMRkwFwYDVQQKDBBz
+d2lzc3RydXN0YnJva2VyMQ0wCwYDVQQLDARkZW1vMRgwFgYDVQQDDA9pZHAtbW9j
+ay1zaWduZXIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCN8KHCq9NH
+pvy1yJ7oLpyPNRIrI8AyX4ph6DDPn25W4atvYutNtYmTpyM0/YdJdJMcY8H1hsTt
+Q6vP8W1OYP9CpJA1mLVddAJHvBjkMEZ1CQZgd+U7C081a6tzatATF84U9t2soShy
+PUsOJ/XJU+vwP35AvXx3CA7NHCHbfWPK53279WH2ffLVBttAD86Yfl1X3OKYca0r
+HP970PS8eYsD7NeIEygSoVb0Jrn8iVHDsKiKS5wYQAacllUyeQKkFk8OA8OLqUpf
+R1K5+Mk+24rk04ifPdRgjJtl+pVPcku5S322htwQBT5hTStA2aOTNNru1vKnCl9B
+DRGEB3fD1JCpAgMBAAGjUzBRMB0GA1UdDgQWBBRuNnVEjHJk5IGvkTy74nLLUPWz
+xzAfBgNVHSMEGDAWgBRuNnVEjHJk5IGvkTy74nLLUPWzxzAPBgNVHRMBAf8EBTAD
+AQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB4yC9AsEtKK7caDLyXehp5VYB7DVNXRfZ7
+gM2UxQ7nUKth4gOitPJ13y9Voq7VFfO7qB+yw0bE4bVzvqEEXeFD86p8hvlbxQ0D
+2GH9JU26FsNzTPF5uqgJmci/AJVLvTAP+AhiPi2qMSK/eEVqQBMYg3Eu7RqpYlOI
+1P83tMDmO06zgVZQhRYjpUeypth2vWDVARA6w+C6ok8lyExA4VMouoDV+skF+Qc3
+5Ycpxy/VUGg9KbbYcjNClOFn86qHMfJdjkinsTvN826HFHRUNT0VIHa/DcLc94nS
+5HJJ6sGN+4SuvoS4knPpu4S4ocMc1AqjKMtc4JvmI3tf+QQ1lv+3</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</ds:Signature>
+		<saml2:Subject>
+			<saml2:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">eid\5300\32306</saml2:NameID>
+			<saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+				<saml2:SubjectConfirmationData InResponseTo="id-e666ae1d-9d4b-439a-bd0f-c6663885a0c3"
+											   NotOnOrAfter="2020-11-04T10:17:57.284Z"
+				/>
+			</saml2:SubjectConfirmation>
+		</saml2:Subject>
+		<saml2:Conditions NotBefore="2020-11-04T10:17:27.278Z"
+						  NotOnOrAfter="2020-11-04T10:17:57.278Z"
+		>
+			<saml2:AudienceRestriction>
+				<saml2:Audience>http://test.trustbroker.swiss</saml2:Audience>
+			</saml2:AudienceRestriction>
+		</saml2:Conditions>
+		<saml2:AuthnStatement AuthnInstant="2020-11-04T10:17:27.278Z">
+			<saml2:AuthnContext>
+				<saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>
+			</saml2:AuthnContext>
+		</saml2:AuthnStatement>
+		<saml2:AttributeStatement>
+			<saml2:Attribute Name="http://trustbroker.swiss/claims/issuedClientExtId">
+				<saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+									  xsi:type="xs:string"
+				>5300</saml2:AttributeValue>
+			</saml2:Attribute>
+			<saml2:Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress">
+				<saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+									  xsi:type="xs:string"
+				>test.user@trustbroker.swiss</saml2:AttributeValue>
+			</saml2:Attribute>
+			<saml2:Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname">
+				<saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+									  xsi:type="xs:string"
+				>User</saml2:AttributeValue>
+			</saml2:Attribute>
+			<saml2:Attribute Name="http://trustbroker.swiss/claims/authLevel">
+				<saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+									  xsi:type="xs:string"
+				>weak</saml2:AttributeValue>
+			</saml2:Attribute>
+			<saml2:Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname">
+				<saml2:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+									  xsi:type="xs:string"
+				>Test</saml2:AttributeValue>
+			</saml2:Attribute>
+		</saml2:AttributeStatement>
+	</saml2:Assertion>
+</saml2p:Response>

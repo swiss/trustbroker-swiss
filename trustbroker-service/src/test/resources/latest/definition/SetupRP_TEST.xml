@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+	<RelyingParty id='urn:test:TESTRP' base="ProfileRP_Standard.xml">
+		<Certificates/>
+		<Announcements enabled="true">
+				<AppUrl>https://tp.host(app</AppUrl>
+		</Announcements>
+		<ClaimsProviderMappings>
+			<ClaimsProvider id="urn:test:MOCK" clientNetworks="INTRANET" relyingPartyAlias="urn:test:TESTRP-MOCK"/>
+			<ClaimsProvider id="urn:test:TESTCP" clientNetworks="INTERNET,INTRANET" relyingPartyAlias="urn:test:TESTRP-PRIVATE"/>
+		</ClaimsProviderMappings>
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="1900" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>1900</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+		<Scripts>
+			<!-- Order is not relevant, a script A should not depend on a script B -->
+			<Script type="BeforeIdm">DefaultModifyCpAttributesSelection.groovy</Script>
+			<Script type="BeforeIdm">SpecifcModifyCpAttributesSelection.groovy</Script>
+			<!-- Before we sign the outcome, we can still manipulate the data -->
+			<Script type="AfterIdm">ApplyBlacklistAttributesNeverToBeSentToRp.groovy</Script>
+		</Scripts>
+	</RelyingParty>
+</RelyingPartySetup>

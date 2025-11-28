@@ -1,0 +1,74 @@
+plugins {
+	id 'base'
+	id 'com.github.node-gradle.node'
+}
+
+node {
+	version = '20.18.1'
+	npmVersion = '10.9.2'
+	// If true, it will download node using above parameters.
+	// If false, it will try to use globally installed node.
+	download = true
+}
+
+task bootRun(dependsOn: ['npm_start'], group: 'Application',
+	description: 'Runs the frontend in node server for development (ng serve)')
+
+tasks.register('npmBuild', NpxTask) {
+	dependsOn 'npmInstall'
+	command = 'npm'
+	args = ['run', 'build']
+}
+
+tasks.register('npmLint', NpxTask) {
+	dependsOn 'npmInstall'
+	command = 'npm'
+	args = ['run', 'lint']
+}
+
+tasks.register('npmTest', NpxTask) {
+	dependsOn 'npmInstall'
+	command = 'npm'
+	args = ['run', 'test']
+}
+
+check.dependsOn('npmTest', 'npmLint')
+
+task npmClean(type: Delete) {
+	delete "dist"
+}
+
+def mainSourcePaths = [
+	'src',
+	// If this list gets too hard to manage, we should simplify the build by checking changes only in `src`.
+	'package.json', 'package-lock.json',
+	'.browserslistrc',
+	'.angular.json',
+	'proxy.conf.json',
+	'tsconfig.json', 'tsconfig.app.json'
+]
+
+tasks.register('npmRunBuild', NpmTask) {
+	description = 'Build frontend'
+	group = LifecycleBasePlugin.BUILD_GROUP
+	dependsOn 'npmInstall'
+
+	npmCommand = ['run', 'build']
+	inputs.files mainSourcePaths
+	outputs.dir "dist"
+}
+
+tasks.register('staticResourceArchive', Zip) {
+	dependsOn 'npmRunBuild'
+	setDestinationDirectory(file("${projectDir}/build/distributions"))
+	from tasks.named('npmRunBuild')
+	into 'static'
+}
+
+configurations {
+	archives
+}
+
+artifacts {
+	archives tasks.named('staticResourceArchive')
+}

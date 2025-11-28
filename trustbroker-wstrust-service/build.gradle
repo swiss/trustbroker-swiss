@@ -1,0 +1,23 @@
+plugins {
+	id 'java-library'
+}
+
+configurations {
+	jaxb
+}
+
+dependencies {
+	implementation project("${rootProject.top}:trustbroker-api")
+	implementation project("${rootProject.top}:trustbroker-common")
+	implementation project("${rootProject.top}:trustbroker-service")
+	testImplementation project("${rootProject.top}:trustbroker-test")
+
+	// baseline
+	implementation 'org.springframework.boot:spring-boot-starter-web-services'
+	implementation('org.springframework.ws:spring-ws-security') {
+		exclude group: 'net.sf.ehcache', module: 'ehcache'
+	}
+
+	// test
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

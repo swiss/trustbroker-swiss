@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+    <RelyingParty id='urn:test:unknownbase' base="ProfileRP_Unknown.xml">
+	<Certificates/>
+        <!-- HRD -->
+        <ClaimsProviderMappings>
+	    <ClaimsProvider id="urn:test:MOCK" clientNetworks="PRIVATE,INTRANET"/>
+        </ClaimsProviderMappings>
+        <IDMLookup>
+            <IDMQuery name='IDENTITY'>
+                <ClientExtId>100</ClientExtId>
+            </IDMQuery>
+            <IDMQuery name='TENANT'>
+                <ClientExtId>501</ClientExtId>
+            </IDMQuery>
+        </IDMLookup>
+    </RelyingParty>
+</RelyingPartySetup>
+

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>XTB SAML Response</title>
+	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
+</head>
+<body>
+<h3 class="container">XTB SAML Response (
+	<a href="/authn/samples">Mock Startover</a>,&nbsp;
+	<a th:href="${tbApplicationUrl} + '/app/sso'" target="xtb-sso">XTB SSO</a>
+	)
+</h3>
+<div class="bg-info d-flex justify-content-center p-2">
+	<pre class="bg-light w-75" lang="xml" th:text="${SAMLResponse}"></pre>
+</div>
+</body>
+</html>

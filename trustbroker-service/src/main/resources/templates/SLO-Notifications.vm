@@ -1,0 +1,149 @@
+##
+## Copyright (C) 2024 trustbroker.swiss team BIT
+##
+## This program is free software.
+## You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+## as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+## without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+##
+## See the GNU Affero General Public License for more details.
+## You should have received a copy of the GNU Affero General Public License along with this program.
+## If not, see <https://www.gnu.org/licenses/>.
+##
+##
+<script>
+
+  var awaitCompletions = $XTBSloWaitForCount;
+  var startTimeMillis = Date.now();
+  var timeoutId;
+
+  function submitLogoutResponse() {
+    var form = document.forms['saml.result'];
+    #if($XTBSloConsoleDebug)console.debug('Submitting SAML LogoutResponse to', form.action);#end
+    form.submit();
+  }
+
+  function allCompleted() {
+    return awaitCompletions == 0;
+  }
+
+  function timedOut() {
+    return ($XTBSloMaxWaitMillis > 0) && (Date.now() - startTimeMillis > $XTBSloMaxWaitMillis);
+  }
+
+  function resetTimeoutHandler() {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+  }
+
+  function checkTimeout() {
+    if (timedOut() && !allCompleted()) {
+      console.info('Timed out while there are still outstanding responses:', awaitCompletions);
+      awaitCompletions = 0;
+    }
+  }
+
+  function completeLogoutResponse() {
+    if (allCompleted()) {
+      resetTimeoutHandler();
+      submitLogoutResponse();
+      return true;
+    }
+    return false;
+  }
+
+  function setupTimeoutHandler() {
+    timeoutId = setTimeout(handleTimeout, 100);
+  }
+
+  function handleTimeout() {
+    if (!completeLogoutResponse()) {
+      #if($XTBSloConsoleDebug)console.debug('Still waiting for responses:', awaitCompletions);#end
+      setupTimeoutHandler();
+    }
+  }
+
+  function handleCompletedLogout(url, result) {
+    #if($XTBSloConsoleDebug)console.debug(result, 'for:', url);#end
+    --awaitCompletions;
+    completeLogoutResponse();
+  }
+
+  function setupNotifications() {
+    #foreach( $result in $XTBSloNotifications )
+      #set($description = "${result.Slo.Protocol}:${result.Slo.Mode}:${result.Slo.Url}")
+      #if($XTBSloConsoleDebug)console.debug('Logout notification $description');#end
+      ## Url originates from trusted XTB configuration, can be savely used
+      ## fetch(Url) / XMLHttpRequest(Url) might not work due to CORS restrictions
+      ## (for fire-and-forget we could just ignore the response)
+      ## Instead render an iframe to do the GET/POST on the URL
+      ## If the target server sends X-Frame-Options we might run into the same problem.
+      #if ($result.Slo.Mode.isWaitForResponse())
+        ## if we get any HTTP response and the document is rendered, the logout is considered successful
+        #set($completedHook = "handleCompletedLogout(\'${description}\', \'Received response\')")
+        #set($autoComplete = "")
+      #else
+        ## just wait a little to give the browser some time to send the request
+        ## (a very fast response that could be quicker than the wait, but the wait is only a few hundred milliseconds)
+        #set($completedHook = "")
+        #set($autoComplete =
+          "setTimeout(function() { handleCompletedLogout('${description}', 'Reached timeout'); }, $XTBSloMinWaitMillis);")
+      #end
+      #if ($result.Slo.Protocol == 'SAML2')
+        ## form is embedded in iframe srcdoc hence the HTML encoded quotes
+        ## there is a different DOM so the form name does not have to be unique
+        #set($form = "<form name=&quot;saml.notify&quot; action=&quot;${result.EncodedUrl}&quot; method=&quot;${result.samlHttpMethod}&quot;>")
+        #if($result.SamlRelayState)
+          #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;RelayState&quot; value=&quot;${result.SamlRelayState}&quot;/>")
+        #end
+        #if($result.SamlLogoutRequest)
+          #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;SAMLRequest&quot; value=&quot;${result.SamlLogoutRequest}&quot;/>")
+        #end
+		#if($result.SamlRedirectSignatureAlgorithm)
+		  #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;SigAlg&quot; value=&quot;${result.SamlRedirectSignatureAlgorithm}&quot;/>")
+	    #end
+		 #if($result.SamlRedirectSignature)
+		  #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;Signature&quot; value=&quot;${result.SamlRedirectSignature}&quot;/>")
+		 #end
+        #set($form = "${form}</form>")
+        ## first on load based on srcdoc submits the form, second one fails because of cross origin and does the completion hook
+        #set($completedHook =
+          "try { \
+             this.contentWindow.document.forms[\'saml.notify\'].submit(); \
+           } \
+           catch (ex) { \
+             if (ex instanceof DOMException) { \
+               ${completedHook} \
+             } \
+           }")
+        #set($code = "<iframe srcdoc=""${form}"" onLoad=""${completedHook}"" style=""visibility:hidden;""></iframe>")
+      #else
+          ## HTTP and OIDC Front-Channel just use a GET URL
+          #set($code = "<iframe src=""${result.EncodedUrl}"" onLoad=""${completedHook}"" style=""visibility:hidden;""></iframe>")
+      #end
+      var elt = document.getElementById('slo');
+      #if($XTBSloConsoleDebug)console.debug('Adding DOM to element "slo": $code', typeof elt);#end
+      var subElt = document.createElement('div');
+      subElt.innerHTML = '$code';
+      elt.appendChild(subElt);
+      $autoComplete
+    #end
+
+    setupTimeoutHandler();
+  }
+
+  function performSlo() {
+    if (awaitCompletions == 0) {
+      ## no notifications
+      submitLogoutResponse();
+    }
+    else {
+      setupNotifications();
+    }
+  }
+
+</script>

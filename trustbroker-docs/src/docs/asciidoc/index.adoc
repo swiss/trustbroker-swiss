@@ -1,0 +1,19 @@
+:doctype: book
+
+= trustbroker.swiss (XTB) [[xtb_documentation]]
+:toc: left
+:toclevels: 2
+
+:leveloffset: 1
+
+include::architecture.adoc[]
+include::api.adoc[]
+include::installation.adoc[]
+include::configuration.adoc[]
+include::scripting.adoc[]
+include::plugins.adoc[]
+include::modules.adoc[]
+include::credits.adoc[]
+
+:leveloffset: 0
+

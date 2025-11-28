@@ -1,0 +1,533 @@
+# XTB application configuration establishing the default service behavior.
+# The service configuration itself is downloaded from GIT_URL.
+spring:
+  application:
+    name: trustbroker-application
+  cloud:
+    config:
+      enabled: false
+  data:
+    ldap:
+      repositories:
+        enabled: false
+  datasource:
+    url: ${spring.flyway.url}/${spring.flyway.schemas}
+    username: trustbroker
+    password: ${STATECACHE_PASS}
+    driverClassName: ${spring.flyway.driver-class-name}
+    hikari:
+      # https://github.com/brettwooldridge/HikariCP (translate xY into x-y fro spring-boot)
+      maximum-pool-size: 30 # we run 3 pods in PROD => 90 connections max on mariadb (max acceptable is 150 per default)
+      connection-timeout: 15000 # DB connection establish timeout in case of network problems (default: 30000ms = 10min)
+      minimum-idle: 3 # close connections being idle for idle-timeout except if we have too few afterwards
+      idle-timeout: 300000 # maximum connection idle time (default: 600000ms = 10min)
+      max-lifetime: 1800000 # maximum connection lifetime in the pool after close (default: 1800000ms = 30min, mariadb has 60min)
+      # as keepalive-time is > idle-timeout we only actively probe sessiondb on the unused idle ones
+      keepalive-time: 600000 # less than max-lifetime using connection-test-query to probe the DB (default: 0ms == disabled)
+      connection-test-query: select 1 from dual # probe DB according to keepalive-time
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  flyway:
+    enabled: true
+    url: jdbc:mariadb://mariadb:3306
+    user: root
+    password: ${STATECACHE_PASS}
+    schemas: TBSS16
+    driver-class-name: org.mariadb.jdbc.Driver
+    locations: [ classpath:db/migration/mariadb ]
+    baselineOnMigrate: true # force upgrading XTB schema even though the database is not empty
+    placeholders:
+      databaseName: ${spring.flyway.schemas}
+  task:
+    scheduling:
+      pool:
+        size: 2
+  #ldap:
+  #  urls: ldap://localhost:1389
+  #  base: dc=trustbroker,dc=swiss
+  #  username: cn=admin,dc=trustbroker,dc=swiss
+  #  password: secret
+
+server:
+  port: 8090
+  max-http-request-header-size: 64KB
+  tomcat:
+    threads:
+      max: 100
+      min-spare: 50
+  # HTTP session cache is not used with IN_DB mode, but web container cookie is used during federated login
+  servlet:
+    session:
+      timeout: 12h
+      cookie:
+        name: BSESSION
+  ssl:
+    enabled: false
+    # TLS versions on server side (for reference, we only use HTTP in DEV now)
+    #enabled-protocols: TLSv1.2,TLSv1.3
+  error:
+    path: /error
+    whitelabel:
+      enabled: false
+
+# /actuator customization
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    prometheus:
+      access: unrestricted
+    health:
+      #show-components: always
+      #show-details: always
+      # auto-enabled on K8S environment:
+      probes:
+        enabled: true
+      group:
+        # names are the class names without "HealthIndicator"
+        readiness:
+          include: readinessState,stateCache
+        liveness:
+          include: livenessState
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: trustbroker
+  server:
+    port: 8091
+  security:
+    enabled: false
+  health:
+    ldap:
+      enabled: false
+
+client:
+  ssl:
+    enabled: true
+    enabled-protocols: TLSv1.2,TLSv1.3
+
+# trustbroker defaults
+trustbroker:
+  config:
+    perimeterUrl: ${trustbroker.config.issuer} # needs to be defined in stage application.yml
+    # gitops repository structure
+    claimsDefinitionMapping: definition/ClaimsProviderDefinition.xml
+    claimsProviderSetup: definition/SetupCP.xml
+    relyingPartySetup: definition/SetupRP.xml
+    scriptPath: definition/
+    globalScriptPath: scripts/
+    globalProfilesPath: profiles/
+    ssoGroupSetup: definition/SetupSSOGroups.xml
+    keystoreBasePath: ${TRUSTBROKER_HOME}/configuration/latest/keystore/
+    secureBrowserHeaders: true # false required for OIDC when XTB runs on http instead of https
+    supportedTlsVersions: TLSv1.2,TLSv1.3
+    traceIdHeader: X-Request-Id # HTTP perimeter request ID tracking
+    # Sessions are created with a shorter lifetime of 30min to be able to debug slow interactions and in SSO go up to 12h
+    sessionLifetimeSec: 1800
+    ssoSessionLifetimeSec: 43200
+    ssoMinQoaLevel: -2
+    ssoSessionIdPolicy: always # ssoSessionId claim always produced to identify XTB and improve OIDC correlation
+    handleResponderErrors: false
+    skinnyAssertionNamespaces: a,no-type
+    # Allow access to some halfway public APIs usually not exposed on internet (header injected by network perimeter)
+    #network:
+    #  networkHeader: 'X-ClientNetwork'
+    #  internetNetworkName: INTERNET
+    #  intranetNetworkName: INTRANET
+    # XTB global signer overridable per RP, rollover signer is used to publish a future signer before using it
+    signer:
+      signerCert: ${TRUSTBROKER_HOME}/configuration/latest/keystore/token-signer/keystore.pem
+      password: "${PKI_PASSPHRASE}"
+      keyEntryId: first # Correct value only required for PKCS12 and JKS
+    rolloverSigner:
+      signerCert: ${TRUSTBROKER_HOME}/configuration/latest/keystore/token-signer/rollover-keystore.pem
+      password: "${trustbroker.config.signer.password}"
+    claimsMapping:
+      # Check for new definitions every 1 minute
+      syncSchedule: '0 */1 * * * *'
+    stateCache:
+      # Reaper collects expired sessions,  for DOS resilience also sooner expiring valid ones (# > targetMaxEntries)
+      reapSchedule: '30 * * * * *' # every 30sec
+      reapMaxDelaySec: 25 # each replica reaps, so reduce propability for parallel processing
+      targetMaxEntries: 250000 # limiting session (10G PVC, 40k/login => 10G / 40k == 250000 retained sessions)
+      minSessionLifetimeSec: 600 # minimum remaining session lifetime not to reap anymore
+      txRetryDelayMs: 10 # try to save and load DB state with a resilient retry in case of TX problems
+      txRetryCount: 2 # retry times (doubling the delay on each try)
+    security:
+      acceptSubjectConfirmationMethods: "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key,urn:oasis:names:tc:SAML:2.0:cm:bearer"
+      doSignAssertions: true
+      doSignFailureResponse: true
+      doSignSuccessResponse: true
+      messageLifetimeSec: 28800 # AuthnRequest/Response/LogoutRequest IssueInstant timestamp check (accepted max)
+      notBeforeToleranceSec: -5 # NTP time drift accepted from peer for notBefore timestamps
+      notOnOrAfterToleranceSec: 5 # NTP time drift accepted from peer for notOnOrAfter timestamps
+      renewNotOnOrAfterToleranceRenewSec: 5 # accept WSTrust assertion RENEW requests after assertion expiry (if enabled)
+      requireAudienceRestriction: false
+      requireSignedAssertion: true
+      requireSignedAuthnRequest: true
+      requireSignedResponse: true
+      requireSubjectConfirmation: true
+      saveStateOnValidationFailure: false
+      tokenLifetimeSec: 3600 # Assertion/Condition/Subject timestamp create/check, override on RP SecurityPolicies.notOnOrAfter
+      validateAcs: true
+      validateHttpHeaders: false # backward compatibility - RP ACWhitelist may need to be adjusted when enabling this
+      validateAssertionIssueInstant: true
+      validateAudience: true
+      validateAuthnRequest: true
+      validateAuthnStatementIssueInstant: true
+      enforceQoaIfMissing: false
+      validateRelayState: true
+      validateRequestCondition: true
+      validateRequestIssueInstant: true
+      validateResponseIssueInstant: true
+      validateResponseIssuer: true
+      validateSecurityTokenRequest: false # deprecated assertion check on RST by wss4j
+      validateSecurityTokenRequestAssertion: true # used assertion check on RST by XTB
+      validateSubjectConfirmationInResponseTo: true
+      validateSubjectConfirmationTimestamp: true
+      validateXmlSchema: true
+    # global Qoa model defining the order, order then optional in SetupRP/SetupCP
+    qoa:
+      defaultQoa: 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport'
+      strongestPossible: 'urn:oasis:names:tc:SAML:2.0:ac:classes:SmartcardPKI'
+      mapping:
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:MobileOneFactorUnregistered]': 100
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport]': 200
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:NomadTelephony]': 300
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwareTimeSyncToken]': 300
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:Kerberos]': 400
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:SoftwarePKI]': 500
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract]': 500
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken]': 500
+        '[urn:oasis:names:tc:SAML:2.0:ac:classes:SmartcardPKI]': 600
+    cors:
+      allowedOrigins:
+        - '*'
+      allowedMethods:
+        - GET
+        - HEAD
+        - OPTIONS
+        - POST
+      allowedHeaders:
+        - Origin
+        - Accept
+        - Access-Control-Request-Method
+        - Access-Control-Request-Headers
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+        - traceparent
+    # HTTP security headers - see defaults in ContentSecurityPolicies, FrameOptionsPolicies.
+    csp:
+      #oidc:
+      #saml:
+      #frontend:
+      fallback: "default-src 'self'"
+    frameOptions:
+      oidc: SAMEORIGIN
+      fallback: SAMEORIGIN
+    # SAML 2.0 protocol support
+    saml:
+      # CP side destination setup
+      # path requested on XTB must be one of /api/v1/saml, /adfs/ls, /adfs/ls/, trustbroker/adfs/ls (deprecated)
+      consumerUrl: ${trustbroker.config.perimeterUrl}/api/v1/saml
+      flowPolicyNamespaces:
+        # namespace prefix added to IDs of FlowPolicies
+        - namespace: urn:oasis:names:tc:SAML:2.0:status
+          prefix: oasis
+      bindings:
+        - urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+        - urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect
+        - urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact
+        - urn:oasis:names:tc:SAML:2.0:bindings:SOAP
+      spMetadataEnabled: false
+      spLogoutMetadataEnabled: false
+      spNameFormats:
+        - urn:oasis:names:tc:SAML:2.0:nameid-format:transient
+        - urn:oasis:names:tc:SAML:2.0:nameid-format:persistent
+      idpMetadataEnabled: true
+      idpLogoutMetadataEnabled: true
+      idpNameFormats:
+        - urn:oasis:names:tc:SAML:2.0:nameid-format:transient
+        - urn:oasis:names:tc:SAML:2.0:nameid-format:persistent
+      artifactResolution:
+        # path requested on XTB must be /api/v1/saml/arp
+        serviceUrl: ${trustbroker.config.perimeterUrl}/api/v1/saml/arp
+        index: 0
+        artifactLifetimeSecs: 60
+        artifactReapIntervalSecs: 300
+        persistentCache: true
+        truststore:
+          signerCert: ${TRUSTBROKER_HOME}/configuration/latest/keystore/outgoing-tls-trust/truststore.p12
+          password: "${PKI_PASSPHRASE}"
+    # OIDC 1.0 protocol support
+    oidc:
+      issuer: "${trustbroker.config.issuer}"
+      # path requested on XTB must be /login/saml2/sso
+      perimeterUrl: "${trustbroker.config.perimeterUrl}/login/saml2/sso"
+      sessionMode: IN_DB
+      # path requested on XTB must be /logout
+      endSessionEndpoint: "${trustbroker.config.oidc.issuer}/logout"
+      # 30min for overall login process (12min would be enough potentially)
+      sessionLifetimeSec: ${trustbroker.config.sessionLifetimeSec}
+      sessionCookie: true
+      codeLifetimeSec: 60
+      identityProvider:
+        assertionConsumerService: "${trustbroker.config.saml.consumerUrl}"
+        responseIssuerId: ${trustbroker.config.issuer}
+        signer:
+          signerCert: ${trustbroker.config.signer.signerCert}
+          password: ${trustbroker.config.signer.password}
+          keyEntryId: ${trustbroker.config.signer.keyEntryId}
+      samlEncrypt: false # encrypt SAML POST data on user-agent when switching to OIDC
+      keySchedule: "0 0 1 * * MON"
+      keyExpirationMinutes: 10080 # 7 days
+      keyDeletionMinutes: 11520 # 8 days
+      reapSchedule: '30 * * * * *'
+      syncSchedule: '0 */15 * * * *'
+      # disable OIDC endpoints not required by applications
+      revocationEnabled: true
+      introspectionEnabled: true
+      userInfoEnabled: true
+      # No acr_values in /authorize request? No Qoa element on RelyingParty or Oidc Client?
+      defaultQoa: "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified"
+      idTokenEncryptionAlgorithms:
+        - ECDH-ES+A256KW
+        - ECDH-ES+A192KW
+        - ECDH-ES+A128KW
+        - RSA-OAEP
+        - RSA-OAEP-256
+        - RSA1_5
+        - ECDH-ES
+      idTokenEncryptionMethods:
+        - A256GCM
+        - A192GCM
+        - A128GCM
+        - A128CBC-HS256
+        - A192CBC-HS384
+        - A256CBC-HS512
+      userInfoEncryptionAlgorithms:
+        - ECDH-ES+A256KW
+        - ECDH-ES+A192KW
+        - ECDH-ES+A128KW
+        - RSA-OAEP
+        - RSA-OAEP-256
+        - RSA1_5
+        - ECDH-ES
+      userInfoEncryptionMethods:
+        - A256GCM
+        - A192GCM
+        - A128GCM
+        - A128CBC-HS256
+        - A192CBC-HS384
+        - A256CBC-HS512
+      keycloakTransparencyModeOn: false
+      # Name plus value and/or regex:
+      jsonErrorPageHeaders:
+        - name: 'Accept'
+          regex: 'application/json'
+        - name: 'Accept'
+          value: '*/*'
+      # Globally customize OIDC header (e.g. adding option typ=JWT)
+      addTokenHeader:
+        - typ
+      # Globally customize /token and /userinfo output dropping technical claims (typ=JWT and iss=issuer we keep for now)
+      addTokenClaims:
+        - acr # authcontext class refs
+        - aud # audience => client_id and other audiences
+        - auth_time # authorize time
+        - azp # authorized party => client_id
+        - exp # token expiration
+        - iat # token issued at
+        - iss # OIDC issuer ID
+        - jti # JSON token ID
+        - nbf # token valid not before
+        - nonce # message only once ID
+        - scope # claims selection
+        - session_state # OIDC session spec (future)
+        - sid # front channel logout session ID
+        - typ # keycloak specific token typing
+      removeUserInfoClaims:
+        - aud
+        - auth_time
+        - azp
+        - exp
+        - iat
+        - jti
+        - nbf
+        - nonce
+        - scope
+        - session_state
+        - sid
+      samlNamespacesMappedToOidcFormat:
+        - namespace: urn:oasis:names:tc:SAML:2.0:status
+    # WSTrust is supported for clients sending our own assertions in the SOAP security header of an RST request to get a new one
+    wstrust:
+      enabled: true
+      issueEnabled: true
+      renewEnabled: false
+      renewRequiresSsoSession: true
+      renewRequiresSecurityToken: true
+      wsBasePath: /api/v1/wstrust
+      soapHeadersToConsider:
+        - Security
+        - Action
+        - MessageID
+        - ReplyTo
+        - To
+        - Timestamp
+        - Assertion
+
+    # XTB LDAP sub-system disabled by default
+    #ldap:
+    #  enabled: true
+    #  searchBase: dc=users
+
+    attributes:
+      # required attributes without predefined standard namespaces:
+      definitions:
+        - name: IssuedClientExtId
+          namespaceUri: http://trustbroker.swiss/claims/issuedClientExtId
+        - name: HomeName
+          namespaceUri: http://trustbroker.swiss/claims/homeName
+        - name: HomeRealm
+          namespaceUri: http://trustbroker.swiss/claims/homeRealm
+        - name: AuthLevel
+          namespaceUri: http://trustbroker.swiss/claims/authLevel
+        - name: SsoSessionId
+          namespaceUri: http://trustbroker.swiss/claims/ssoSessionId
+        - name: ConversationId
+          namespaceUri: http://trustbroker.swiss/claims/conversationId
+
+    gui:
+      images: ${TRUSTBROKER_HOME}/configuration/latest/images/
+      translations: ${TRUSTBROKER_HOME}/configuration/latest/translations/
+      themeAssets: ${TRUSTBROKER_HOME}/configuration/latest/assets/
+      defaultLanguage: de
+      versionedResourceMaxAgeDay: 365
+      versionedResourcePaths:
+        # Versioned Angular resources in root path:
+        - /*.js
+        - /*.woff
+        - /*.woff2
+        - /*.css
+      taggedResourceMaxAgeSec: 60
+      features:
+        - HEADER
+        - FOOTER
+        # - BACKDROP
+      buttons:
+        - HELP_PANEL # HELP_LINK
+        - LANGUAGE_SHORT # LANGUAGE_LONG
+        # - THEME
+      themeCookie:
+        name: THEME
+        #domain:
+        path: /
+        defaultValue: default
+        values:
+          - default
+        #maxAge: -1
+        #secure: ${trustbroker.config.secureBrowserHeaders}
+        # On server side sameSite is always set to ${trustbroker.config.cookieSameSite} (default None):
+        #sameSite: 'Lax'
+      languageCookie:
+        name: LANG
+        #domain:
+        path: /
+        #defaultValue: ${trustbroker.config.gui.defaultLanguage}
+        #values:
+        #  - de
+        #  - en
+        #  - fr
+        #  - it
+        #maxAge: -1
+        #secure: ${trustbroker.config.secureBrowserHeaders}
+        #sameSite: 'Lax'
+    # Workaround: MSIE backward compat for SPS19
+    # NOTE: Other variants skinnyHRD, skinnyImgHRD and skinnyHRDV2 are trails and will be removed
+    skinnyHrdTriggers:
+      - name: 'User-Agent'
+        regex: '.*Trident/7.*'
+        value: '/skinnyColHRD.html'
+    monitoringHints:
+      - name: 'X-Simulated-Forwarded-For'
+        regex: '10\.10\.10\.[2-254]*'
+    # Separate client identifying data (CID) free auditing on group OpsAuditLogger:
+    audit:
+      ops:
+        enabled: false
+        #cidFields:
+        # detail: true
+        # responseAttributesDefault: true
+        # subjectNameId: true
+        # principal: true
+
+# console logging only in docker and K8Sm, also OK for systemd enabled service
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p --- [%X{clientIp:-}] [%X{traceId:-}] [%t] %-40.40logger{39} : %m%n%wEx"
+  level:
+    root: INFO
+    # Suppress Velocity exception logging with stack traces that VelocityUtil handles
+    # (mainly we see broken pipe errors here if the client disconnects):
+    org.apache.velocity.directive.parse: OFF
+    # Audit facility only logs RP side in INFO level, to see CP side use DEBUG and to see claim details use TRACE
+    swiss.trustbroker.audit.service.AuditLogger: TRACE
+    #swiss.trustbroker.audit.service.OpsAuditLogger: TRACE
+    # Access logging (DEBUG on op logger shows incoming requests as well, DEBUG on full logger shows conversational HTTP headers)
+    #swiss.trustbroker.op: DEBUG
+    #swiss.trustbroker.op.http: DEBUG
+    # opensaml is not happy with RelayState > 80 bytes (according top spec) but handles it anyway
+    org.opensaml.saml.common.binding.SAMLBindingSupport: ERROR
+    # SAML handling in spring-authorization-server (Processing SAML response from... Found x validation errors in...)
+    org.springframework.security.saml2.provider.service.authentication.OpenSaml4AuthenticationProvider: DEBUG
+    # injection container warnings about beans not valid for AOP proxying
+    org.springframework.context.support.PostProcessorRegistrationDelegate: ERROR
+    # XML santuario complains when we iterate over multiple credentials from JKS/PEM/P12 truststores
+    org.apache.xml.security.signature.XMLSignature: ERROR
+    # Debug Assertion Encryption/Decryption
+    #org.opensaml.xmlsec.encryption.support: TRACE
+    #org.opensaml.saml.saml2.encryption: TRACE
+    # SAML traffic in developer readable form
+    #swiss.trustbroker.common.saml.util.SamlTracer: DEBUG
+    # Script hook debugging
+    #swiss.trustbroker.script.service.ScriptService: TRACE
+    # SSH problems requires DEBUG to see key exchange details
+    #swiss.trustbroker.common.service.GitLogger: DEBUG
+    # Session state debugging
+    #swiss.trustbroker.sessioncache.service.StateCacheService: TRACE
+    # wss4j problems not giving enough details about an incomplete PKI setup
+    #org.apache.wss4j.common.crypto: DEBUG
+    # OIDC debugging
+    #swiss.trustbroker.oidc: DEBUG
+    #swiss.trustbroker.oidc.session: DEBUG
+    #swiss.trustbroker.sessioncache.service.JWKCacheService: DEBUG
+    # Show stacktrace also for RequestDeniedException
+    #swiss.trustbroker.exception.GlobalExceptionHandler: DEBUG
+    #org.springframework.security: DEBUG
+    #org.springframework.security.oauth2: TRACE
+    #org.springframework.security.saml2: TRACE
+    #spring.security.debug: DEBUG
+    # wire tracing
+    #org.apache.coyote: DEBUG
+    #org.apache.http.conn: DEBUG
+    #org.apache.http.wire: DEBUG
+    # DB tracing
+    #org.flywaydb.core.internal.command.DbMigrate: DEBUG
+    #org.flywaydb: DEBUG
+    #org.hibernate.SQL: DEBUG
+    #org.hibernate.orm.jdbc: TRACE
+    # LDAP sub-system (
+    #swiss.trustbroker.ldap.service: DEBUG
+
+# NOTE: The rest of the configuration is fetched from GIT_URL

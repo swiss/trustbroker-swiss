@@ -1,0 +1,157 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "src/styles/spacing";
+@use "src/styles/variables";
+@use "src/styles/icons";
+@use "src/styles/material/_mixins";
+
+app-mat-header {
+
+	.ob-master-layout-header-controls {
+		// We are hacking the original Oblique header which would hide these controls in
+		// mobile view, but we need them
+		visibility: visible !important;
+		display: flex !important;
+		// below $ob-layout-collapse width, we get height: 0 and overflow: hidden
+		height: variables.$ob-header-height-md !important;
+		overflow: visible !important;
+
+		// To prevent having to much space between the back to app, language selector and logout buttons
+		.ob-control-item {
+			padding-left: 0 !important;
+			padding-right: 16px;
+		}
+
+		ul {
+			padding-inline-start: 0;
+		}
+	}
+
+	// Layout issues after Oblique 11 update
+
+	.ob-header-controls {
+		list-style: none;
+		display: inline-flex;
+		align-items: center;
+		margin: 0;
+	}
+
+	// So that the language selector dropdown is visible
+	.ob-master-layout-header-title {
+		overflow: visible !important;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+
+		.ob-master-layout-brand-app-title.mobile {
+			font-size: 1rem;
+			font-weight: 600;
+		}
+	}
+
+	.app-language-selector {
+		&.ob-expanded .ob-dropdown-content {
+			max-height: none;
+			padding: 8px !important;
+		}
+
+		.mat-focus-indicator:focus {
+			outline: none !important;
+		}
+
+		.app-language-dropdown {
+			margin-left: 0;
+			min-width: 55px;
+
+			ul {
+				padding-left: 0;
+			}
+
+			li {
+				list-style: none;
+
+				&:last-of-type button {
+					border-bottom: 0;
+				}
+
+				button {
+					width: 100%;
+					font-size: small;
+					line-height: 28px;
+				}
+			}
+
+			img.app-selected-language-icon {
+				padding-left: 1rem;
+			}
+		}
+
+	}
+
+	button.app-header-button {
+		border-color: #e7e7e7 !important;
+		background-color: white !important;
+		border-radius: 0 !important;
+		border: none;
+		outline: none;
+
+		.ob-icon-wrapper {
+			margin-right: 0 !important;
+		}
+
+		// this icon is used in the help (similar, but not identical to ob-chevron-down) - adjust chevron position
+		.mat-expansion-indicator {
+			position: relative;
+			top: -5px;
+			padding-left: 0.5em;
+		}
+	}
+
+	// for proper vertical alignment of the hamburger menu
+	.ob-header-toggle li {
+		display: flex;
+	}
+}
+
+// Layout issues after Oblique 11 update
+
+.ob-master-layout-header {
+	.ob-control-locale {
+		padding: .375rem .75rem;
+		background-color: transparent;
+		border: none transparent;
+		border-radius: 0;
+	}
+}
+
+span.stage-banner {
+	position: absolute;
+	top: .5em;
+	font-size: 1.25em;
+	text-align: center;
+	word-break: normal;
+	transform: rotate(-45deg);
+	transform-origin: center;
+
+	&:before {
+		content: "";
+		position: absolute;
+		display: block;
+		background-color: inherit;
+		z-index: -1;
+		inset: 0 -100px;
+	}
+}

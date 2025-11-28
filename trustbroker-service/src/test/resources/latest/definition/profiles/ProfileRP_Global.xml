@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingParty>
+	<ACWhitelist>
+		<ACUrl>https://global-test.localdomain</ACUrl>
+	</ACWhitelist>
+	<Certificates>
+		<SignerKeystore>
+			<CertPath>global/global-cert.pem</CertPath>
+			<KeyPath>global/global-key.pem</KeyPath>
+			<Password>testit</Password>
+		</SignerKeystore>
+		<SignerTruststore>
+			<CertPath>global/global-trust.pem</CertPath>
+			<CertType>pem</CertType>
+			<Password>testit</Password>
+		</SignerTruststore>
+	</Certificates>
+	<IDMLookup>
+		<IDMQuery name='IDENTITY'>
+			<ClientExtId>100</ClientExtId>
+			<UserDetailsSelection>
+				<Definition name="LoginId" namespaceUri="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/LoginId"/>
+			</UserDetailsSelection>
+		</IDMQuery>
+	</IDMLookup>
+</RelyingParty>

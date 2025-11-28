@@ -1,0 +1,63 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "src/styles/variables";
+@use "@oblique/oblique/styles/scss/core/mixins/shadow";
+
+app-mat-frame {
+	mat-sidenav-container {
+		height: 100%;
+	}
+
+	// min-width to keep text readable at small screen sizes
+	mat-sidenav {
+		--mat-sidenav-container-divider-color: black;
+		width: 40% !important;
+		min-width: 300px;
+	}
+
+	// avoid min-width that is wider than the screen
+	@media (max-width: 300px) {
+		mat-sidenav {
+			width: 100% !important;
+			min-width: inherit;
+		}
+	}
+
+	.ob-master-layout-footer {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+	}
+
+	.w-100 {
+		width: 100%;
+	}
+
+	.ob-main-nav {
+		padding-left: 0 !important;
+	}
+
+	.ob-master-layout-scrolling .ob-top-control-btn {
+		visibility: hidden !important;
+	}
+
+	@media (max-width: 992px) {
+		.ob-master-layout .ob-master-layout-content {
+			padding-top: 0 !important;
+		}
+	}
+}
+

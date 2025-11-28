@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RelyingPartySetup>
+
+	<RelyingParty id='urn:test:missing' base="ProfileRP_Standard.xml">
+		<!-- required: <Certificates/> -->
+		<ConstAttributes>
+			<Definition name='IssuedClientExtId' namespaceUri='http://trustbroker.swiss/claims/issuedClientExtId'
+						value="502" />
+		</ConstAttributes>
+		<IDMLookup>
+			<IDMQuery name='TENANT' issuerNameId="TESTCP">
+				<ClientExtId>502</ClientExtId>
+			</IDMQuery>
+		</IDMLookup>
+		<Scripts>
+			<!-- Order is not relevant, a script A should not depend on a script B -->
+			<Script type="BeforeIdm">DefaultModifyCpAttributesSelection.groovy</Script>
+			<Script type="BeforeIdm">SpecifcModifyCpAttributesSelection.groovy</Script>
+			<!-- Before we sign the outcome, we can still manipulate the data -->
+			<Script type="AfterIdm">ApplyBlacklistAttributesNeverToBeSentToRp.groovy</Script>
+		</Scripts>
+	</RelyingParty>
+
+</RelyingPartySetup>

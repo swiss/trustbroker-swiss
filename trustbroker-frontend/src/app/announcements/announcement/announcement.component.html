@@ -1,0 +1,55 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+<div id="announcementCard" [class]="theme.name + ' ' + alertType + '-background'">
+	<div [class]="'ob-alert ' + alertType" class="high-emphasis">
+		<p class="title body-3">{{ title }}</p>
+		<p class="subtitle body-3">{{ message }}</p>
+	</div>
+	<div id="contactInfo">
+		@if (contactUrl) {
+			<div class="infoColumn">
+				<p class="title high-emphasis body-3">{{ "trustbroker.announcements.furtherinfo" | translate }}</p>
+				<p class="body-3">
+					<a href="{{ contactUrl }}" target="_blank">{{ "trustbroker.announcements.documentation" | translate }}</a>
+				</p>
+			</div>
+		}
+
+		@if (announcement.phoneNumber || announcement.emailAddress) {
+			<div class="infoColumn high-emphasis">
+				<p class="title body-3">{{ "trustbroker.announcements.servicedesk" | translate }}</p>
+				@if (announcement.emailAddress) {
+					<div class="infoContainer">
+						<p class="infoContent subtitle body-3">{{ "trustbroker.announcements.emailladdress" | translate }}</p>
+						<p class="body-3">
+							<a href="mailto:{{ announcement.emailAddress }}">{{ announcement.emailAddress }}</a>
+						</p>
+					</div>
+				}
+				@if (announcement.phoneNumber) {
+					<div class="infoContainer">
+						<p class="infoContent subtitle body-3">{{ "trustbroker.announcements.phonennumber" | translate }}</p>
+						<p class="body-3">
+							<a href="tel:{{ announcement.phoneNumber }}"> {{ announcement.phoneNumber }}</a>
+						</p>
+					</div>
+				}
+			</div>
+		}
+	</div>
+	@if (announcement.applicationAccessible) {
+		<mat-checkbox (change)="updateCookie($event)">{{ "trustbroker.announcements.skipnexttime" | translate }}</mat-checkbox>
+	}
+</div>

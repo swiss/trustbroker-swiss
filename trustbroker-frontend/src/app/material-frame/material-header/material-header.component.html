@@ -1,0 +1,128 @@
+<!--
+ Copyright (C) 2024 trustbroker.swiss team BIT
+
+ This program is free software.
+ You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ See the GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License along with this program.
+ If not, see <https://www.gnu.org/licenses/>.
+-->
+<header class="{{ theme.name }} ob-master-layout-header-title">
+	<div class="ob-master-layout-brand">
+		@if (environment) {
+			<span role="note" class="stage-banner" [style.color]="bannerColor()" [style.backgroundColor]="bannerBgColor()" (click)="hideBanner()">
+				{{ environment }}
+			</span>
+		}
+		<span class="ob-master-layout-logo" tabindex="-1">
+			<img class="{{ theme.name }}" [alt]="'trustbroker.header.logo' | translate" src="{{ imageUrl('logo.svg') }}" />
+		</span>
+		<span class="{{ theme.name }} ob-master-layout-brand-app-title" [ngClass]="{ mobile: isMobile() }">
+			@if (pageTitle$ | async; as pageTitle) {
+				@if (isMobile()) {
+					{{ pageTitle | translate }}
+				} @else {
+					{{ appName }}&nbsp;&ndash;&nbsp;{{ pageTitle | translate }}
+				}
+			} @else {
+				{{ appName }}
+			}
+		</span>
+	</div>
+
+	<nav class="ob-master-layout-header-controls">
+		<ul class="ob-header-controls header-locale d-flex" role="menu">
+			@for (button of headerButtons; track button) {
+				<li role="menuitem" class="ob-control-item app-language-selector-button">
+					@if (button === "HELP_LINK") {
+						<a
+							class="{{ theme.name }} app-header-button"
+							mat-button
+							obButton="tertiary"
+							[href]="'trustbroker.header.help.link' | translate"
+							[target]="'trustbroker.header.help.target' | translate"
+						>
+							<img class="{{ theme.name }} app-icon app-help-circle" src="{{ imageUrl('help.svg') }}" alt="" aria-hidden="true" />
+							<span class="{{ theme.name }} app-help-button-text">{{ "trustbroker.header.help" | translate }}</span>
+						</a>
+					}
+
+					@if (button === "HELP_PANEL") {
+						<button
+							mat-stroked-button
+							help-icon-button
+							class="{{ theme.name }} app-header-button"
+							(pointerup)="toggleHelpPanel($event)"
+							(keydown)="toggleHelpPanel($event)"
+							[attr.aria-haspopup]="theme.hasHelpPanel"
+							[attr.aria-expanded]="helpPanelVisible"
+							[attr.aria-label]="'trustbroker.header.help' | translate"
+						>
+							<span class="{{ theme.name }} ob-icon-wrapper" aria-hidden="true">
+								<img class="{{ theme.name }} app-icon app-help-circle" src="{{ imageUrl('help.svg') }}" alt="" aria-hidden="true" />
+								<span class="{{ theme.name }} app-help-button-text">{{ "trustbroker.header.help" | translate }}</span>
+							</span>
+						</button>
+					}
+
+					@if (button === "THEME") {
+						<app-theme-selector [theme]="theme"></app-theme-selector>
+					}
+
+					@if (button === "LANGUAGE_LONG" || button === "LANGUAGE_SHORT") {
+						@if (languageService.langChangeWithTechnicalLang | async; as currentLang) {
+							<div position="left" class="{{ theme.name }} app-language-selector">
+								<button
+									mat-stroked-button
+									[obPopover]="appLanguagePopover"
+									[placement]="'bottom-start'"
+									(click)="languageSelectionToggle()"
+									aria-haspopup="true"
+									[attr.aria-expanded]="languageSelectionExpanded()"
+									[attr.aria-label]="('trustbroker.header.languageselection' | translate) + ' ' + (currentLang | nativeLanguageDisplay)"
+									class="{{ theme.name }} app-header-button"
+								>
+									<img class="{{ theme.name }} app-icon app-globe" src="{{ imageUrl('globe.svg') }}" alt="" aria-hidden="true" />
+									<span>{{ currentLang | languageDisplay: false }}</span>
+									<img class="{{ theme.name }} app-expansion-indicator app-arrow-down" src="{{ imageUrl('arrow_down.svg') }}" alt="" aria-hidden="true" />
+								</button>
+								<ng-template #appLanguagePopover>
+									<div class="app-language-dropdown">
+										<ul>
+											@for (language of languages; track language) {
+												<li class="dropdown" [class.active]="currentLang === language">
+													<button
+														class="ob-control-locale"
+														(click)="changeLanguage(language)"
+														[attr.id]="'lang_' + language"
+														[attr.aria-label]="language | nativeLanguageDisplay"
+													>
+														<span>{{ language | languageDisplay: button === "LANGUAGE_LONG" }}</span>
+														@if (currentLang === language) {
+															<span class="app-selected-language">
+																<img
+																	class="app-selected-language-icon"
+																	src="{{ imageUrl('check.svg') }}"
+																	alt="{{ 'trustbroker.header.languageselection.selected' | translate }}"
+																/>
+															</span>
+														}
+													</button>
+												</li>
+											}
+										</ul>
+									</div>
+								</ng-template>
+							</div>
+						}
+					}
+				</li>
+			}
+		</ul>
+	</nav>
+</header>

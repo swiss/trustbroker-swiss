@@ -1,0 +1,9 @@
+
+# docker run
+mariadb
+gitea
+trustbroker
+samlmock
+env-vault.conf.old
+keys/git_token
+ssh/known_hosts

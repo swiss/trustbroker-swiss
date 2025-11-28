@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>SAMLMock Response selection</title>
+	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
+	<script>
+		function submit(acUrl, method) {
+			var form = document.getElementById("sampleForm");
+			form.action = acUrl;
+			form.method = method;
+			form.submit();
+		}
+
+		function setValue(id, value) {
+			var input = document.getElementById(id);
+			input.disabled = (value == null);
+			input.value = value;
+		}
+
+		function submitPost(encodedMessage, acUrl, relayState) {
+			setValue("SAMLResponse", encodedMessage);
+			setValue("SAMLart", null);
+			setValue("RelayState", relayState);
+			submit(acUrl, 'POST');
+		}
+
+		function submitArtifact(encodedMessage, acUrl, relayState) {
+			setValue("SAMLResponse", null);
+			setValue("SAMLart", encodedMessage);
+			setValue("RelayState", relayState);
+			submit(acUrl, 'GET');
+		}
+
+		function signedDate() {
+			var date = new Date();
+			document.write('(signed ' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + ')');
+		}
+
+	</script>
+</head>
+<body>
+<h3 class="container">MOCK SAML Response</h3>
+<h3 class="container">
+	<a href="/authn/samples">Startover</a>
+	<a href="/authn/samples/refresh">CFG-Reload</a>
+</h3>
+<form id="sampleForm" method="POST" enctype="application/x-www-form-urlencoded">
+	<input type="hidden" id="SAMLResponse" name="SAMLResponse" disabled="disabled"/>
+	<input type="hidden" id="SAMLart" name="SAMLart" disabled="disabled"/>
+	<input type="hidden" id="RelayState" name="RelayState" disabled="disabled"/>
+</form>
+<div class="container">
+	<div class="row">
+		<div class="col-lg-10 mt-2 mb-2">
+			<table id="example" class="table table-bordered" style="width: 100%">
+				<thead>
+				<tr>
+					<th>File Name
+						<script>signedDate();</script>
+					</th>
+					<th colspan="3">Send SAML Response</th>
+				</tr>
+				</thead>
+				<tbody>
+				<tr th:each="response : ${responses}">
+					<td th:text="${response.key}"/>
+					<td>
+						<input type="submit" value="POST"
+							   th:data-response="${response.value.samlPostResponse}"
+							   th:data-relayState="${response.value.relayState}"
+							   th:data-acUrl="${response.value.acsUrl}"
+							   th:onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+					</td>
+					<td>
+						<input type="submit" value="ARTIFACT"
+							   th:data-response="${response.value.samlArtifactResponse}"
+							   th:data-relayState="${response.value.relayState}"
+							   th:data-acUrl="${response.value.acsUrl}"
+							   th:onclick="submitArtifact(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+					</td>
+					<td>
+						<input type="submit" value="Encrypted POST"
+							   th:data-response="${response.value.samlEncryptedResponse}"
+							   th:data-relayState="${response.value.relayState}"
+							   th:data-acUrl="${response.value.acsUrl}"
+							   th:onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+</body>
+</html>

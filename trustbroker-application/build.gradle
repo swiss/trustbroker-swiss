@@ -1,0 +1,130 @@
+plugins {
+	id 'application'
+	id 'jacoco'
+	id 'com.google.cloud.tools.jib'
+	id "org.springframework.boot"
+}
+
+dependencies {
+	// components
+	implementation project("${rootProject.top}:trustbroker-api")
+	implementation project("${rootProject.top}:trustbroker-common")
+	implementation project("${rootProject.top}:trustbroker-service")
+	implementation project("${rootProject.top}:trustbroker-wstrust-service")
+	runtimeOnly project("${rootProject.top}:trustbroker-frontend")
+
+	// baseline
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-mysql'
+}
+
+// We are using bootJar but with spring-boot 2.3 we have build warnings. Remove this with spring-boot upgrade.
+// Details: https://github.com/spring-projects/spring-boot/issues/23797
+jar {
+	enabled = true
+	archiveAppendix = 'impl'
+}
+
+springBoot {
+	mainClassName = 'swiss.trustbroker.Application'
+}
+
+bootRun {
+	// source env.proj
+	// git clone from GIT_URL using CONFIG_BRANCH to TRUSTBROKER_HOME selecting inventory with PKI_PASSPHRASE encrypted pem files
+	environment 'GIT_URL', System.getenv('GIT_URL') //
+	environment 'CONFIG_BRANCH', System.getenv('CONFIG_BRANCH')
+	environment 'TRUSTBROKER_HOME', System.getenv('TRUSTBROKER_HOME')
+	environment 'SPRING_PROFILES_ACTIVE', System.getenv('SPRING_PROFILES_ACTIVE')
+	environment 'PKI_PASSPHRASE', System.getenv('PKI_PASSPHRASE')
+	environment 'STATECACHE_PASS', System.getenv('STATECACHE_PASS')
+
+	// version feature
+	systemProperty 'trustbroker.config.versionInfo', 'XTB/' + project.version + '@' + System.getenv('CONFIG_BRANCH')
+	// disable issuer check because samlmock will fail with issuer mismatch
+	systemProperty 'trustbroker.config.security.validateResponseIssuer', 'false'
+	// no application-dev.yml to enable SAML debug logging, so we inject via sysprops
+	systemProperty 'logging.level.swiss.trustbroker.saml.util.SamlTracer', 'DEBUG'
+	// switch to external frontend service running in node server
+	systemProperty 'trustbroker.config.frontendBaseUrl', 'http://localhost:4200'
+	// override xtb-gitops-demo.git mariadb default using H2 in instead so we can run without additional services in DEV mode
+	systemProperty 'spring.flyway.url', 'jdbc:h2:mem:TBSS16;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS TBSS16'
+	systemProperty 'spring.flyway.user', 'sa'
+	systemProperty 'spring.flyway.schemas', 'TBSS16'
+	systemProperty 'spring.flyway.driver-class-name', 'org.h2.Driver'
+	systemProperty 'spring.flyway.locations', 'classpath:db/migration/h2'
+	systemProperty 'spring.datasource.url', 'jdbc:h2:mem:TBSS16;DB_CLOSE_DELAY=-1;INIT=SET SCHEMA TBSS16'
+	systemProperty 'spring.datasource.username', 'sa'
+	// debug startup
+	//systemProperty 'logging.level.root', 'DEBUG'
+}
+
+// test bootstrap without a cache
+task deleteCaches(type: Delete) {
+	delete 'home/.config', 'home/configCache', 'home/configuration'
+}
+
+// JIB publishing
+jib {
+	from {
+		image = rootProject.baseImage
+	}
+	to {
+		image = rootProject.dockerRegistry + '/trustbroker-swiss/trustbroker-application'
+		tags += project.version
+		auth {
+			username = project.repoUser
+			password = project.repoPass
+		}
+	}
+	extraDirectories {
+		// bootstrap the configuration cache structure we refer to with TRUSTBROKER_HOME (populated from git)
+		// In DEV mode this is the same as ${project.rootDir}/config/trustbroker used by bootRun
+		paths {
+			path {
+				from = "./etc/extra"
+				into = "/etc"
+			}
+			path {
+				from = file("../trustbroker-frontend/dist")
+				into = "/app/resources/static"
+			}
+		}
+		permissions = [
+				'/etc/**': '777' // nobody:nobody can write
+		]
+	}
+	container {
+		user = "nobody:nobody" // uid=99, gid=99
+		creationTime = "USE_CURRENT_TIMESTAMP"
+		args = [
+				'--spring.config.location=optional:classpath:/,file:/etc/trustbroker/configuration/latest/config/'
+		]
+		// NOTE: Bootstrap environment within the docker container (all parameters are MUST, these are the prod defaults)
+		// NOTE: SSH_KEY can be passed by value (base64 encoded SSH private key), see top README.md
+		environment = [
+				GIT_URL         : 'https://github.com/trustbroker.swiss/xtb-gitops-demo',
+				CONFIG_BRANCH   : 'master',
+				TRUSTBROKER_HOME: '/etc/trustbroker'
+		]
+	}
+}
+
+tasks.jib.dependsOn("${rootProject.top}:trustbroker-frontend:assemble")
+tasks.jibDockerBuild.dependsOn("${rootProject.top}:trustbroker-frontend:assemble")
+
+publishing {
+	publications {
+		uberJar(MavenPublication) {
+			artifact bootJar
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.uberJar)
+}
+

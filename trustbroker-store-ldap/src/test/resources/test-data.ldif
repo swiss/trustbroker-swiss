@@ -1,0 +1,109 @@
+
+# Directory root
+
+dn: dc=trustbroker,dc=swiss
+objectClass: top
+objectClass: domain
+dc: trustbroker
+
+
+# Application tree (UNUSED)
+
+dn: dc=apps,dc=trustbroker,dc=swiss
+objectClass: domain
+dc: apps
+
+dn: ou=app1,dc=apps,dc=trustbroker,dc=swiss
+objectClass: organizationalUnit
+ou: app1
+
+dn: ou=app2,dc=apps,dc=trustbroker,dc=swiss
+objectClass: organizationalUnit
+ou: app2
+
+
+# Organization tree (UNUSED)
+
+dn: ou=org1,dc=trustbroker,dc=swiss
+objectClass: organizationalUnit
+ou: org1
+
+dn: ou=org2,dc=trustbroker,dc=swiss
+objectClass: organizationalUnit
+ou: org2
+
+dn: ou=org3,dc=trustbroker,dc=swiss
+objectClass: organizationalUnit
+ou: org3
+
+
+# User tree
+dn: dc=users,dc=trustbroker,dc=swiss
+objectClass: domain
+dc: users
+
+# User authorizations via memberOf
+# NOTE: IDP primary key resolution via uid=subjectNameId or alternate IDP claim
+# NOTE: Aggregates redundant user accounts (tests attribute duplicate elimination)
+# NOTE: Free-style use of Organization or Application information not joining these UNSUED trees
+#       Application authorizations via free-style memberOf not using DNs
+#       Organisational references via free-style org not using DNs
+# Get all data for 1st user from public test ldap service:
+# ldapsearch -x -H ldap://localhost:1389 -b dc=trustbroker,dc=swiss '(&(app=*)(|(uid=max1)(adminGlobalId=max1-global-id-2)))'
+
+dn: cn=max1-app1,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+cn: max1-app1
+uid: max1
+sn: Monde
+givenName: Maxine
+mail: maxine.monde@trustbroker.swiss
+adminglobalId: z-114336
+app: app1
+org: org1
+org: org2
+memberOf: app1-admin-org2
+memberOf: app1-tester-org2
+memberOf: app1-tester-org1
+
+dn: cn=max1-app1-ext,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+cn: max1-app1-ext
+uid: max1
+sn: Monde
+givenName: Maxine
+mail: maxine.monde@trustbroker.swiss
+adminglobalId: p-999887
+app: app1
+org: org1
+org: org3
+memberOf: app1-admin-org1
+memberOf: app1-guest-org3
+
+dn: cn=max1-app2-ext,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+cn: max1-app2-ext
+uid: max1
+sn: Monde
+givenName: Maxine
+mail: maxine.monde@trustbroker.swiss
+adminglobalId: p-999887
+app: app2
+org: org1
+memberOf: app2-guest-org1
+
+# single non-redundant 2nd user with multiple orgs and authorizations
+dn: cn=max2,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+uid: max2
+cn: max2
+sn: Muster
+givenName: Max
+mail: max.muster@trustbroker.swiss
+adminglobalId: x-999887
+app: app1
+app: app2
+org: org1
+org: org3
+memberOf: app1-admin-org1
+memberOf: app1-guest-org3

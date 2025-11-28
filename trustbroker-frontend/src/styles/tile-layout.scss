@@ -1,0 +1,153 @@
+/*
+ * Copyright (C) 2024 trustbroker.swiss team BIT
+ *
+ * This program is free software.
+ * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+@use "src/styles/variables";
+@use "src/styles/spacing";
+
+.mainContent {
+
+  $extra-large-break-point: variables.$extra-large-card-left-spacing + variables.$extra-large-card-width;
+
+  @mixin title-container() {
+    width: variables.$extra-large-card-width + variables.$medium-card-padding;
+
+    @media(max-width: $extra-large-break-point) {
+      margin: auto;
+      width: variables.$large-card-width;
+    }
+
+    @media(max-width: variables.$large-card-width) {
+      width: variables.$medium-card-width;
+    }
+
+    @media(max-width: variables.$medium-card-width) {
+      width: auto;
+      padding-right: variables.$medium-card-padding;
+    }
+
+  }
+
+  .title {
+    padding-bottom: variables.$spacer-2;
+  }
+
+  .details {
+    padding-bottom: variables.$spacer-4;
+    margin-bottom: 0;
+  }
+
+  // The padding should be at least the amount of the negative margin of .cards-container otherwise it can "overflow"
+  $card-spacing: variables.$spacer-2;
+  $margins: variables.$spacer-12;
+  padding-top: variables.$spacer-2;
+  padding-bottom: variables.$spacer-2;
+
+  .cards-padding {
+    padding-left: 0;
+
+    // To achieve the 32 px spacing between elements and to not have extra space anywhere (first/last items)
+    // Similar to what Bootstrap does with its grid layout.
+    .cards-container {
+      margin: -$card-spacing;
+
+
+      .card-container {
+        padding: $card-spacing;
+
+        @media(max-width: variables.$small-page-size) {
+          width: 100%;
+        }
+
+        @media(min-width: variables.$small-page-size) {
+			flex: 0 0 50%;
+          max-width: 50%;
+        }
+
+        @media(min-width: variables.$medium-page-size) {
+          flex: 0 0 33.3%;
+          max-width: 33.3%;
+          width: 50%;
+        }
+
+        @media(min-width: variables.$large-page-size) {
+          flex: 0 0 33.3%;
+          max-width: 33.3%;
+          width: 33.3%;
+        }
+      }
+
+      display: flex;
+      flex-shrink: 0;
+      flex-grow: 1;
+      flex-wrap: wrap;
+    }
+
+    $max-width-for-single-card-row: 2 * ($margins + variables.$small-card-width + $card-spacing) - 1;
+    @media (max-width: variables.$small-page-size) {
+      padding-left: 0;
+      padding-right: 0;
+
+      .cards-container {
+        flex-direction: column;
+        align-content: center;
+        margin-left: 0;
+        margin-right: 0;
+      }
+    }
+  }
+
+  .selectionSubText {
+    color: variables.$medium-emphasis-color !important;
+    font-size: 13px;
+  }
+}
+
+mat-card {
+  cursor: pointer;
+  padding: 0;
+  border: none;
+
+  &.small {
+    width: 100% !important;
+    height: 100%;
+  }
+  .mat-mdc-card-image{
+    margin: 0;
+    max-height: 240px;
+  }
+  .mat-mdc-card-title{
+    p.strong {
+      margin: 20px !important;
+    }
+  }
+}
+
+.cardTitle{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+mat-card img{
+  padding: 24px;
+}
+
+#cardcontainer {
+  padding: 0 16px;
+}
+
+#titleContainer{
+  padding-left: 16px;
+}
