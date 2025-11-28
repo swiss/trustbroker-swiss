@@ -1,0 +1,52 @@
+publiccodeYmlVersion: 0.5.0
+name: trustbroker.swiss
+url: https://github.com/swiss/trustbroker-swiss
+softwareVersion: 1.12.0
+releaseDate: 2025-11-25
+platforms:
+  - web
+categories:
+  - identity-management
+fundedBy:
+  - name: Federal Office of Information Technology, Systems and Telecommunication
+    uri: https://ld.admin.ch/office/V.1.7
+usedBy:
+  - eIAM
+  - AGOV
+  - Federal Office of Information Technology, Systems and Telecommunication
+  - Federal Chancellery
+  - Kanton Zürich Amt für Informatik
+developmentStatus: stable
+softwareType: standalone/web
+organisation:
+  uri: https://ld.admin.ch/office/V.1.7
+  name: Federal Office of Information Technology, Systems and Telecommunication
+description:
+  en:
+    localisedName: trustbroker.swiss
+    shortDescription: OIDC and SAML federator
+    longDescription: trustbroker.swiss provides brokerage functionality between
+      Relying Parties (Applications, other IAM Systems or Policy Enforcement
+      Points) and Identity Providers (IdP) and Trusted Attribute Stores. It
+      enables Identity Providers and Relying Parties to exchange information and
+      to trust without having any clue about each other.
+    documentation: https://github.com/swiss/trustbroker.swiss
+    features:
+      - OIDC federation
+      - SAML federation
+      - IDP selection
+legal:
+  license: AGPL-3.0-or-later
+maintenance:
+  type: internal
+  contacts:
+    - name: trustbroker.swiss
+      email: eiam-art-btb@bit.admin.ch
+      affiliation: Federal Office of Information Technology, Systems and Telecommunication
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - de
+    - en
+    - fr
+    - it
