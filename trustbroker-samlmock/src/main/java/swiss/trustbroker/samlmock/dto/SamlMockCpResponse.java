@@ -29,4 +29,6 @@ public class SamlMockCpResponse {
 	String acsUrl;
 
 	String samlEncryptedResponse;
+
+	String sampleSelector;
 }

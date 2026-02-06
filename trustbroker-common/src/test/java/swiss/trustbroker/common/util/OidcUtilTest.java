@@ -34,7 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
+import swiss.trustbroker.common.saml.util.Base64Util;
 
 class OidcUtilTest {
 
@@ -183,6 +185,22 @@ class OidcUtilTest {
 				{ "qoa:10", List.of("qoa:10") },
 				{ "qoa:10 qoa:20 qoa:30", List.of("qoa:10", "qoa:20", "qoa:30") }
 		};
+	}
+
+	@Test
+	void testRejectPlainToken() {
+		var tokenHeader = """
+				{
+				  "alg": "none",
+				  "typ": "JWT"
+				}""";
+		var tokenPayload = """
+				{
+				  "iss": "clientId",
+				  "sub": "user1"
+				}""";
+		var token = Base64Util.urlEncode(tokenHeader) + '.' + Base64Util.urlEncode(tokenPayload) + '.';
+		assertThrows(RequestDeniedException.class, () -> OidcUtil.verifyJwtToken(token, kid -> null, "clientId"));
 	}
 
 }

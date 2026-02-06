@@ -52,6 +52,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.common.SAMLVersion;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.core.Assertion;
@@ -149,7 +150,22 @@ class ResponseFactoryTest extends SamlTestBase {
 	}
 
 	@Test
-	void isSignatureValidFalseTest() {
+	void isSignatureValidFalseTest() throws Exception {
+		Assertion assertion = (Assertion) dummySignableObject();
+		Signature signature = assertion.getSignature();
+		// modify assertion after signing:
+		var attribute = SamlFactory.createAttribute("name", "value", null);
+		assertion.getAttributeStatements().add(SamlFactory.createAttributeStatement(List.of(attribute)));
+		// update DOM:
+		XMLObjectSupport.getMarshaller(assertion).marshall(assertion);
+		Credential credential = SamlTestBase.dummyCredential();
+		List<Credential> credentials = List.of(credential);
+		boolean signatureValid = SamlUtil.isSignatureValid(signature, credentials);
+		assertFalse(signatureValid);
+	}
+
+	@Test
+	void isSignatureValidUntrustedSignerTest() {
 		Signature signature = dummySignableObject().getSignature();
 		Credential credential = SamlTestBase.dummyInvalidCredential().get(0);
 		List<Credential> credentials = List.of(credential);
@@ -290,7 +306,7 @@ class ResponseFactoryTest extends SamlTestBase {
 	}
 
 	@Test
-	void validateSignature() {
+	void validateRedirectSignature() {
 		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
@@ -298,13 +314,31 @@ class ResponseFactoryTest extends SamlTestBase {
 		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, sigAlg,
 				query.getBytes(StandardCharsets.UTF_8));
 		assertTrue(
-				SamlUtil.validateSignature(credential, sigAlg, query.getBytes(StandardCharsets.UTF_8), signatureBytes)
+				SamlUtil.validateRedirectSignature(credential, sigAlg, query.getBytes(StandardCharsets.UTF_8), signatureBytes,
+						false)
+		);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = { "false", "true" })
+	void validateRedirectSignatureInvalidSignature(boolean redirectBindingSinatureWarning) {
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		// the value does not matter
+		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
+		var credential = SamlTestBase.dummyCredential();
+		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, sigAlg,
+				query.getBytes(StandardCharsets.UTF_8));
+		signatureBytes[0] ^= 0x01;
+		assertThat(
+				SamlUtil.validateRedirectSignature(credential, sigAlg, query.getBytes(StandardCharsets.UTF_8), signatureBytes,
+						redirectBindingSinatureWarning),
+				is (redirectBindingSinatureWarning)
 		);
 	}
 
 	@ParameterizedTest
 	@CsvSource(value = { SignatureConstants.XMLSIG_NS + "unknownalgo", "null" }, nullValues = "null")
-	void validateSignatureInvalidAlgorithm(String sigAlg) {
+	void validateRedirectSignatureInvalidAlgorithm(String sigAlg) {
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		var credential = SamlTestBase.dummyCredential();
@@ -314,7 +348,7 @@ class ResponseFactoryTest extends SamlTestBase {
 				queryBytes);
 		assertThrows(
 				TechnicalException.class,
-				() -> SamlUtil.validateSignature(credential, sigAlg, queryBytes, signatureBytes)
+				() -> SamlUtil.validateRedirectSignature(credential, sigAlg, queryBytes, signatureBytes, false)
 		);
 	}
 
@@ -327,7 +361,24 @@ class ResponseFactoryTest extends SamlTestBase {
 		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, sigAlg,
 				query.getBytes(StandardCharsets.UTF_8));
 		assertTrue(
-				SamlUtil.isRedirectSignatureValid(List.of(credential), sigAlg, query, signatureBytes)
+				SamlUtil.isRedirectSignatureValid(List.of(credential), sigAlg, query, signatureBytes, false)
+		);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = { "false", "true" })
+	void isRedirectSignatureValidInvalidSignature(boolean redirectBindingSignatureWarning) {
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		// the value does not matter
+		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
+		var credential = SamlTestBase.dummyCredential();
+		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, sigAlg,
+				query.getBytes(StandardCharsets.UTF_8));
+		signatureBytes[0] ^= 0x01;
+		assertThat(
+				SamlUtil.isRedirectSignatureValid(List.of(credential), sigAlg, query, signatureBytes,
+						redirectBindingSignatureWarning),
+				is(redirectBindingSignatureWarning)
 		);
 	}
 

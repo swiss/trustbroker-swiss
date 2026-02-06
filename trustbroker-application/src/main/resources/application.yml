@@ -300,6 +300,15 @@ trustbroker:
       userInfoEnabled: true
       # No acr_values in /authorize request? No Qoa element on RelyingParty or Oidc Client?
       defaultQoa: "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified"
+      grantTypes:
+        - authorization_code
+        - refresh_token
+      introspectionEndpointAuthMethods:
+        - client_secret_basic
+        - client_secret_post
+      revocationEndpointAuthMethods:
+        - client_secret_basic
+        - client_secret_post
       idTokenEncryptionAlgorithms:
         - ECDH-ES+A256KW
         - ECDH-ES+A192KW
@@ -375,8 +384,10 @@ trustbroker:
       enabled: true
       issueEnabled: true
       renewEnabled: false
+      renewRequireSignedRequests: true
       renewRequiresSsoSession: true
       renewRequiresSecurityToken: true
+      doSignResponse: false # if set to true, cert/password required, p12 only, no pem
       wsBasePath: /api/v1/wstrust
       soapHeadersToConsider:
         - Security

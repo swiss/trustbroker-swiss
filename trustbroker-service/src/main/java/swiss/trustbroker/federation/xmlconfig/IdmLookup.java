@@ -58,7 +58,7 @@ public class IdmLookup implements Serializable, IdmRequests {
 	/**
 	 * Handling of same attributes across queries.
 	 * <br/>
-	 * Default: MERGE is used if none is defined.
+	 * Default: OVERWRITE is used if none is defined.
 	 * <br/>
 	 * Potentially breaking changes:
 	 * <ul>

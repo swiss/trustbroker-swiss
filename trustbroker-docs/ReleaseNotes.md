@@ -1,5 +1,10 @@
 # Unreleased Versions
 
+# 1.14.0
+
+### Features
+- UI:
+  - Removal of the old tile-based HRD.
 
 ## 1.13.0
 
@@ -9,16 +14,26 @@
   - JDK 21
   - Spring Boot 3.5.7
   - nimbus-jose-jwt 9.47
+- Frontend:
+  - Angular 19.2.17
+  - npm 11.6.4
 
 ### Features
+- OIDC:
+  - Support for grant type token exchange (disabled by default).
+- WS-Fed:
+  - Basic support for SignIn / SignOut (disabled by default).
+- Database:
+  - Add PostgreSQL.
 - Test:
   - Support manipulations on final messages via global script - can be used e.g. to simulate invalid respones towards counter parties for security testing.
 
 ### Improvements
 - OIDC:
   - Restrict default OIDC metadata grant_types_supported, revocation_endpoint_auth_methods_supported, introspection_endpoint_auth_methods_supported to the ones officially supported in XTB.
+  - Option to only accept signed JWT response from backchannel userinfo call.
 - SAML:
-  - SecutityPolicies.requireSignedLogoutRequest now defaults to requireSignedAuthnRequest
+  - SecutityPolicies.requireSignedLogoutRequest now defaults to requireSignedAuthnRequest.
 - DB:
   - Improve transaction boundaries for DB state access.
 - IDM:
@@ -27,6 +42,13 @@
   - Allow picking another claim than the subject from CP response to allow SSO using SubjectName with scope=SSO.
 - LDAP:
   - Improved profile selection support.
+- UI:
+  - Support banners without entry in application.yml.
+  - Support HTML tags in banner subtitle too.
+  - Path of internal UI APIs cleaned up.
+- Announcements:
+  - CP based announcements are now filtered based on the RP's CP mappings.
+  - Disable continue button for global announcements.
 
 ### Bugfixes
 - SSO:
@@ -36,8 +58,33 @@
   - Fix join via OIDC of session established via SAML.
 - WSTrust:
   - Recipient in Issue RSTR was set to issuer in 1.12.0, revert to 1.11.0 behavior.
+- Scripting:
+  - If scripts abort the flow in BeforeIdm hook, JIT provisioning and other processing is aborted.
 
 # Released Versions
+
+## 1.12.0.20260129T105917Z
+
+### Bugfixes
+- SAML:
+  - Fixed SAML request validation issue for redirect binding
+- OIDC:
+  - Unsigned JWT tokens received through backchannel connection are no longer accepted
+- WSTrust:
+  - doSignResponse disabled by default - enabling requires a p12 certificate and password
+- LDAP:
+  - Fix encoding of CP response parameters
+- SSO:
+  - Fix logout redirect URL on SSO screen
+- License:
+  - Remove AGPL template part describing how to adapt the template
+
+### Improvements
+- OIDC:
+  - Metadata defaults for grantTypes, introspectionEndpointAuthMethods, revocationEndpointAuthMethods matching supported values
+- SAML:
+  - SamlMock now supports samples structured in directories and configuration of the buttons to be shown
+  - Optional trust anchor for SAML requests for test automation or monitoring
 
 ## 1.12.0.20251125T141545Z
 

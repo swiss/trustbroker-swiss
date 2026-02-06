@@ -15,24 +15,6 @@
 
 package swiss.trustbroker.samlmock.dto;
 
-import lombok.Data;
+public record SamlMockInboundRequest(String requestId, String requestIssuer, String acsUrl, String relayState) {
 
-@Data
-public class SamlMockRpRequest {
-
-	String samlPostRequest;
-
-	String samlRedirectRequest;
-
-	String samlArtifactRequest;
-
-	String relayState;
-
-	String acsUrl;
-
-	String sigAlg;
-
-	String signature;
-
-	String sampleSelector;
 }

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.micrometer.common.util.StringUtils;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.opensaml.security.credential.Credential;
@@ -34,6 +35,8 @@ import swiss.trustbroker.common.exception.TrustBrokerException;
 import swiss.trustbroker.common.saml.util.CredentialReader;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.common.setup.service.GitService;
+import swiss.trustbroker.common.util.FileServerUtil;
+import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.samlmock.SamlMockProperties;
 
 @Component
@@ -41,9 +44,9 @@ import swiss.trustbroker.samlmock.SamlMockProperties;
 @Slf4j
 public class SamlMockFileService {
 
-	private static final String REQUEST_DIRECTORY = "/request/";
+	private static final String REQUEST_DIRECTORY = File.separatorChar + "request" + File.separatorChar;
 
-	private static final String RESPONSE_DIRECTORY = "/response/";
+	private static final String RESPONSE_DIRECTORY = File.separatorChar + "response" + File.separatorChar;
 
 	private final GitService gitService;
 
@@ -64,12 +67,12 @@ public class SamlMockFileService {
 		credentialCache = new ConcurrentHashMap<>();
 	}
 
-	public List<String> getMockRequestNames() {
-		return getMockFileNames(REQUEST_DIRECTORY);
+	public List<String> getMockRequestNames(File validatedSubDirectory) {
+		return getMockFileNames(buildDirectory(REQUEST_DIRECTORY, validatedSubDirectory));
 	}
 
-	public List<String> getMockResponseNames() {
-		return getMockFileNames(RESPONSE_DIRECTORY);
+	public List<String> getMockResponseNames(File validatedSubDirectory) {
+		return getMockFileNames(buildDirectory(RESPONSE_DIRECTORY, validatedSubDirectory));
 	}
 
 	private List<String> getMockFileNames(String directory) {
@@ -82,15 +85,15 @@ public class SamlMockFileService {
 		}
 	}
 
-	public byte[] getMockRequestFile(String mockFile) {
-		return getMockFile(mockFile, REQUEST_DIRECTORY);
+	public byte[] getMockRequestFile(File validatedSubDirectory, String mockFile) {
+		return getMockFile(buildDirectory(REQUEST_DIRECTORY, validatedSubDirectory), mockFile);
 	}
 
-	public byte[] getMockResponseFile(String mockFile) {
-		return getMockFile(mockFile, RESPONSE_DIRECTORY);
+	public byte[] getMockResponseFile(File validatedSubDirectory, String mockFile) {
+		return getMockFile(buildDirectory(RESPONSE_DIRECTORY, validatedSubDirectory), mockFile);
 	}
 
-	private byte[] getMockFile(String mockFile, String directory) {
+	private byte[] getMockFile(String directory, String mockFile) {
 		var mockFilePath = getMockDirectoryPath(directory) + mockFile;
 		log.trace("Getting mockFile={}", mockFilePath);
 		if (properties.isCacheMockFiles()) {
@@ -101,8 +104,52 @@ public class SamlMockFileService {
 		}
 	}
 
+	public File validateRequestSubDirectory(String subDirectory) {
+		return validateSubDirectory(REQUEST_DIRECTORY, subDirectory);
+	}
+
+	public File validateResponseSubDirectory(String subDirectory) {
+		return validateSubDirectory(RESPONSE_DIRECTORY, subDirectory);
+	}
+
+	private File validateSubDirectory(String directory, String subDirectory) {
+		if (StringUtils.isEmpty(subDirectory) || subDirectory.equals("/")) {
+			return new File("");
+		}
+		var base = getMockDirectoryPath(directory);
+		subDirectory = subDirectory.replace('/', File.separatorChar); // web path
+		if (subDirectory.startsWith(File.separator)) {
+			subDirectory = subDirectory.substring(1);
+		}
+		log.info("Checking subDirectory='{}' in base='{}'", StringUtil.clean(subDirectory), base);
+		var dir = FileServerUtil.getSanitizedFile(base, subDirectory, true);
+		if (dir == null || !dir.isDirectory()) {
+			log.error("Access to invalid subDirectory='{}'", StringUtil.clean(subDirectory));
+			return new File("");
+		}
+		var baseAbsolute = new File(base).getAbsolutePath();
+		var dirAbsolute = dir.getAbsolutePath();
+		if (!dirAbsolute.startsWith(baseAbsolute)) {
+			log.error("Access to subDirectory='{}' not starting with base", StringUtil.clean(subDirectory));
+			return new File("");
+		}
+		// includes leading separator
+		var validatedSubDirectory = dirAbsolute.substring(baseAbsolute.length());
+		log.info("Accessing subDirectory='{}' mapped to validatedSubDirectory='{}'",
+				StringUtil.clean(subDirectory), StringUtil.clean(validatedSubDirectory));
+		return new File(validatedSubDirectory);
+	}
+
+	private String buildDirectory(String directory, File validatedSubDirectory) {
+		return new File(directory, validatedSubDirectory.getPath()).getPath();
+	}
+
 	private static byte[] readFile(String mockFile) {
 		try {
+			if (new File(mockFile).isDirectory()) {
+				log.debug("Found directory={}", mockFile);
+				return new byte[0]; // this assumes there are no empty request/response files, but those would not be usable
+			}
 			var result = SamlIoUtil.getInputStreamFromFile(mockFile).readAllBytes();
 			log.debug("Found mockFile={} size={}", mockFile, result.length);
 			if (log.isTraceEnabled()) {
@@ -167,6 +214,9 @@ public class SamlMockFileService {
 	}
 
 	private String getMockDirectoryPath(String which) {
+		if (!which.endsWith(File.separator)) {
+			which += File.separatorChar;
+		}
 		return properties.getMockDataDirectory() + which;
 	}
 

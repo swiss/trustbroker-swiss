@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>SAMLMock AuthnRequest selection</title>
+	<title>SAMLMock AuthnRequest Selection</title>
 	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
 	<script>
 		function submit(acUrl, method) {
@@ -14,14 +14,14 @@
 
 		function setValue(id, value) {
 			var input = document.getElementById(id);
-			input.disabled = (value == null);
+			input.disabled = (value == null || value === "");
 			input.value = value;
 		}
 
-		function submitPost(encodedMessage, acUrl) {
+		function submitPost(encodedMessage, acUrl, relayState) {
 			setValue("SAMLRequest", encodedMessage);
 			setValue("SAMLart", null);
-			setValue("RelayState", null);
+			setValue("RelayState", relayState);
 			setValue("SigAlg", null);
 			setValue("Signature", null);
 			submit(acUrl, 'POST');
@@ -53,18 +53,20 @@
 	</script>
 </head>
 <body>
-<h3 class="container">MOCK SAML Samples</h3>
-<h3 class="container">
-	<a href="/authn/samples/refresh">CFG-Reload</a>,
-	<a th:href="${tbApplicationUrl} + '/api/v1/config/status'" target="xtb-config-status">CFG-Status</a>,
-	<a th:href="${tbApplicationUrl} + '/api/v1/monitoring/relyingparties?rpId=' + ${testRpIssuer} + '&cpId=' + ${testCpIssuer}"
-	   target="xtb-monitor">Monitor</a>,
-	<a th:href="${tbApplicationUrl} + '/app/sso'" target="xtb-sso">SSO-Status</a>,
+<h3 class="container">MOCK SAML Request Samples</h3>
+<nav class="container">
+	<a href="/authn/samples" role="button" class="btn btn-outline-secondary" th:style="${style_RESTART_AUTHN}" title="Back to top of request samples.">Start over</a>
 	<!-- IDP initiated SSO is not supported by XTB, corresponding IDP samples should be sent to the SAML IDP directly -->
-	<a href="/auth/saml2/idp/samples">IDP-Initiated</a>,
-	<a href="/saml/metadata">SP-Meta</a>,
-	<a th:href="${tbApplicationUrl} + '/api/v1/saml/metadata/sp'" target="xtb-meta-sp">IDP-Meta</a>
-</h3>
+	<a href="/auth/saml2/idp/samples" role="button" class="btn btn-outline-secondary" th:style="${style_IDP_INITIATED}" title="Switch to IDP initiated flow. This is not supported by XTB at the moment.">IDP initiated</a>
+	<a href="/authn/refresh" role="button" class="btn btn-outline-warning" th:style="${style_RELOAD_SAMPLES}" title="Reload samples from Git repository">Reload samples</a>
+	<a th:href="${tbApplicationUrl} + '/app/sso'" role="button" class="btn btn-outline-info" target="xtb-sso" th:style="${style_SSO_STATUS}" title="Show your single sign-on status by application.">SSO status</a>
+	<a href="/saml/metadata" role="button" target="xtb-meta" class="btn btn-outline-info" th:style="${style_MOCK_METADATA}" title="Show SAMLMock SAML metadata.">SAMLMock metadata</a>
+	<a th:href="${tbApplicationUrl} + '/api/v1/config/status'" target="xtb-config-status" role="button" class="btn btn-outline-info" th:style="${style_CONFIG_STATUS}" title="Show XTB configuration errors.">Config status</a>
+	<a th:href="${tbApplicationUrl} + '/api/v1/saml/metadata/idp'" target="xtb-meta" role="button" class="btn btn-outline-info" th:style="${style_IDP_METADATA}" title="Show XTB IDP side SAML metadata.">IDP metadata</a>
+	<a th:href="${tbApplicationUrl} + '/api/v1/saml/metadata/sp'" target="xtb-meta" role="button" class="btn btn-outline-info" th:style="${style_SP_METADATA}" title="Show XTB SP side SAML metadata.">SP metadata</a>
+	<a th:href="${tbApplicationUrl} + '/api/v1/monitoring/relyingparties?rpId=' + ${testRpIssuer} + '&cpId=' + ${testCpIssuer}"
+	   target="xtb-monitor" role="button" class="btn btn-outline-success" th:style="${style_MONITOR}" title="Trigger XTB monitoring endpoint for test application with SAMLMock as IDP.">Monitor</a>
+</nav>
 <form id="sampleForm" method="POST" enctype="application/x-www-form-urlencoded">
 	<input type="hidden" id="SAMLRequest" name="SAMLRequest" disabled="disabled"/>
 	<input type="hidden" id="SAMLart" name="SAMLart" disabled="disabled"/>
@@ -86,27 +88,47 @@
 				</thead>
 				<tbody>
 				<tr th:each="request : ${requests}">
-					<td th:text="${request.key}"/>
-					<td><input type="submit" value="POST"
-							   th:data-response="${request.value.samlPostRequest}"
-							   th:data-acUrl="${request.value.acsUrl}"
-							   th:onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl') )"/>
+					<td th:if="${request.value.sampleSelector}" colspan="4">
+						<div class="d-grid col-6">
+							<a role="button"
+							   class="btn btn-outline-primary"
+							   title="Navigate to this list of requests."
+							   th:href="${request.value.sampleSelector}" >
+							   [[${request.key}]]
+							</a>
+						</div>
 					</td>
-					<td><input type="submit" value="REDIRECT"
-							   th:data-response="${request.value.samlRedirectRequest}"
+					<td th:unless="${request.value.sampleSelector}" th:text="${request.key}"/>
+					<td th:unless="${request.value.sampleSelector}">
+						<input type="submit" value="POST"
+							   class="btn btn-outline-primary"
+							   title="Submit request using SAML POST protocol."
+							   th:data-request="${request.value.samlPostRequest}"
+							   th:data-acUrl="${request.value.acsUrl}"
+							   onclick="submitPost(this.getAttribute('data-request'), this.getAttribute('data-acUrl'),
+												this.getAttribute('data-relayState') )"/>
+					</td>
+					<td th:unless="${request.value.sampleSelector}">
+						<input type="submit" value="REDIRECT"
+							   class="btn btn-outline-secondary"
+							   title="Submit request using SAML REDIRECT protocol."
+							   th:data-request="${request.value.samlRedirectRequest}"
 							   th:data-acUrl="${request.value.acsUrl}"
 							   th:data-relayState="${request.value.relayState}"
 							   th:data-sigAlg="${request.value.sigAlg}"
 							   th:data-signature="${request.value.signature}"
-							   th:onclick="submitRedirect(this.getAttribute('data-response'), this.getAttribute('data-acUrl'),
+							   onclick="submitRedirect(this.getAttribute('data-request'), this.getAttribute('data-acUrl'),
 												this.getAttribute('data-relayState'), this.getAttribute('data-sigAlg'),
 												this.getAttribute('data-signature') )"/>
 					</td>
-					<td><input type="submit" value="ARTIFACT"
-							   th:data-response="${request.value.samlArtifactRequest}"
+					<td th:unless="${request.value.sampleSelector}">
+						<input type="submit" value="ARTIFACT"
+							   class="btn btn-outline-secondary"
+							   title="Submit request using SAML ARTIFACT protocol."
+							   th:data-request="${request.value.samlArtifactRequest}"
 							   th:data-relayState="${request.value.relayState}"
 							   th:data-acUrl="${request.value.acsUrl}"
-							   th:onclick="submitArtifact(this.getAttribute('data-response'), this.getAttribute('data-acUrl'),
+							   onclick="submitArtifact(this.getAttribute('data-request'), this.getAttribute('data-acUrl'),
 												this.getAttribute('data-relayState') )"/>
 					</td>
 				</tr>

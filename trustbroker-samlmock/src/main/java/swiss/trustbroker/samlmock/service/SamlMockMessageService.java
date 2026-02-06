@@ -16,6 +16,7 @@
 package swiss.trustbroker.samlmock.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -46,7 +47,6 @@ import org.opensaml.saml.saml2.core.AudienceRestriction;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Conditions;
 import org.opensaml.saml.saml2.core.EncryptedAssertion;
-import org.opensaml.saml.saml2.core.Issuer;
 import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusResponseType;
@@ -78,6 +78,7 @@ import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.samlmock.SamlMockProperties;
 import swiss.trustbroker.samlmock.dto.SamlMockCpResponse;
+import swiss.trustbroker.samlmock.dto.SamlMockInboundRequest;
 import swiss.trustbroker.samlmock.dto.SamlMockMessage;
 import swiss.trustbroker.samlmock.dto.SamlMockRpRequest;
 
@@ -116,16 +117,24 @@ public class SamlMockMessageService {
 		random = new Random();
 	}
 
-	public Map<String, SamlMockRpRequest> buildEncodedRequestMap() {
+	public Map<String, SamlMockRpRequest> buildEncodedRequestMap(String sampleSelector) {
 		var uuid = UUID.randomUUID();
-		var sampleFiles = fileService.getMockRequestNames();
+		var validatedSubDirectory = fileService.validateRequestSubDirectory(sampleSelector);
+		var sampleFiles = fileService.getMockRequestNames(validatedSubDirectory);
 		Map<String, SamlMockRpRequest> sampleMap = new TreeMap<>();
-		sampleFiles.stream().forEach(fileName -> addRequestFromFile(uuid, sampleMap, fileName));
+		sampleFiles.forEach(fileName -> addRequestFromFile(uuid, sampleMap, validatedSubDirectory, fileName));
 		return sampleMap;
 	}
 
-	private void addRequestFromFile(UUID uuid, Map<String, SamlMockRpRequest> sampleMap, String fileName) {
-		var data = fileService.getMockRequestFile(fileName);
+	private void addRequestFromFile(UUID uuid, Map<String, SamlMockRpRequest> sampleMap, File validatedSubDirectory,
+			String fileName) {
+		var data = fileService.getMockRequestFile(validatedSubDirectory, fileName);
+		if (data.length == 0) { // directory
+			var rpRequest = new SamlMockRpRequest();
+			rpRequest.setSampleSelector(toWebPath(properties.getSpServiceUrl(), validatedSubDirectory, fileName));
+			sampleMap.put(fileName, rpRequest);
+			return;
+		}
 		RequestAbstractType request = SamlIoUtil.unmarshallXmlFile(fileName, new ByteArrayInputStream(data));
 		var sign = true;
 		request.setIssueInstant(Instant.now());
@@ -201,40 +210,40 @@ public class SamlMockMessageService {
 		}
 	}
 
-	public Map<String, SamlMockCpResponse> getCpResponses(String acsUrl, Issuer samlRequestIssuer,
-			String requestId, String relayState, boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses) {
-		var sampleFiles = fileService.getMockResponseNames();
-		var requestIssuer = getAuthnRequestIssuer(samlRequestIssuer, properties.getIssuer());
-		return getEncodedResponseMap(sampleFiles, requestId, acsUrl, relayState, requestIssuer, keepSampleUrls, allowedResponses);
+	public Map<String, SamlMockCpResponse> getCpResponses(SamlMockInboundRequest inboundSamlRequest, HttpServletRequest request,
+			String sampleSelector, boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses) {
+		var validatedSubDirectory = fileService.validateResponseSubDirectory(sampleSelector);
+		var sampleFiles = fileService.getMockResponseNames(validatedSubDirectory);
+		return getEncodedResponseMap(inboundSamlRequest, request, validatedSubDirectory, sampleFiles, keepSampleUrls, allowedResponses);
 	}
 
-	private static String getAuthnRequestIssuer(Issuer issuer, String confIssuer) {
-		if (issuer == null) {
-			return confIssuer;
-		}
-		return issuer.getValue();
-	}
-
-	private Map<String, SamlMockCpResponse> getEncodedResponseMap(List<String> fileNames, String authnRequestId,
-			String acsUrlFromInput, String relayState, String requestIssuer,
-			boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses) {
+	private Map<String, SamlMockCpResponse> getEncodedResponseMap(SamlMockInboundRequest inboundSamlRequest,
+			HttpServletRequest request, File validatedSubDirectory, List<String> fileNames, boolean keepSampleUrls,
+			Class<? extends StatusResponseType> allowedResponses) {
 		Map<String, SamlMockCpResponse> sampleMap = new TreeMap<>();
-		fileNames.stream()
+		fileNames
 				.forEach(fileName ->
 						addResponseFromFile(
-								authnRequestId, acsUrlFromInput, relayState, requestIssuer, keepSampleUrls, allowedResponses,
-								sampleMap, fileName)
+								inboundSamlRequest, request, validatedSubDirectory, fileName, keepSampleUrls, allowedResponses,
+								sampleMap)
 				);
 		return sampleMap;
 	}
 
 	@SuppressWarnings("java:S107") // internal method of mock, might split it to reduce parameter count
-	private void addResponseFromFile(String authnRequestId, String acsUrlFromInput, String relayState, String requestIssuer,
-			boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses,
-			Map<String, SamlMockCpResponse> sampleMap, String fileName) {
+	private void addResponseFromFile(SamlMockInboundRequest inboundSamlRequest, HttpServletRequest request,
+			File validatedSubDirectory, String fileName, boolean keepSampleUrls,
+			Class<? extends StatusResponseType> allowedResponses, Map<String, SamlMockCpResponse> sampleMap) {
 		try {
 			// update response to be valid again
-			var data = fileService.getMockResponseFile(fileName);
+			var data = fileService.getMockResponseFile(validatedSubDirectory, fileName);
+			if (data.length == 0) {  // directory
+				// resubmit original SAML request to Mock on navigation - added globally
+				var cpResponse = new SamlMockCpResponse();
+				cpResponse.setSampleSelector(toWebPath(properties.getIdpServiceUrl(), validatedSubDirectory, fileName));
+				sampleMap.put(fileName, cpResponse);
+				return;
+			}
 			StatusResponseType response = SamlIoUtil.unmarshallXmlFile(fileName, new ByteArrayInputStream(data));
 			if (!allowedResponses.isInstance(response)) {
 				log.debug("Ignoring response from file={} of class={} expected={}",
@@ -243,22 +252,22 @@ public class SamlMockMessageService {
 			}
 			validateSAMLMockResponseSample(response, fileName);
 			response.setIssueInstant(Instant.now());
-			response.setInResponseTo(authnRequestId);
+			response.setInResponseTo(inboundSamlRequest.requestId());
 
 			StatusResponseType responseToEncrypt = SamlIoUtil.unmarshallXmlFile(fileName, new ByteArrayInputStream(data));
 			var overrideDestination = keepSampleUrls ? response.getDestination() : null;
-			var acsUrl = computeDestination(acsUrlFromInput, requestIssuer, overrideDestination, fileName);
+			var acsUrl = computeDestination(inboundSamlRequest.acsUrl(), inboundSamlRequest.requestIssuer(), overrideDestination, fileName);
 
-			correctResponse(authnRequestId, fileName, response, acsUrl);
-			correctResponse(authnRequestId, fileName, responseToEncrypt, acsUrl);
+			correctResponse(inboundSamlRequest.requestId(), fileName, response, acsUrl);
+			correctResponse(inboundSamlRequest.requestId(), fileName, responseToEncrypt, acsUrl);
 
 			// patch issuer references in response elements
 			if (response instanceof Response authnResponse) {
-				correctAssertion(authnRequestId, requestIssuer, acsUrl, keepSampleUrls, authnResponse);
+				correctAssertion(inboundSamlRequest.requestId(), inboundSamlRequest.requestIssuer(), acsUrl, keepSampleUrls, authnResponse);
 				resignAllResponseElements(authnResponse);
 
 				if (responseToEncrypt instanceof Response authnResponseToEncrypt) {
-					correctAssertion(authnRequestId, requestIssuer, acsUrl, keepSampleUrls, authnResponseToEncrypt);
+					correctAssertion(inboundSamlRequest.requestId(), inboundSamlRequest.requestIssuer(), acsUrl, keepSampleUrls, authnResponseToEncrypt);
 
 					reEncryptAssertions(authnResponseToEncrypt);
 					resignStatusResponse(authnResponseToEncrypt, fileService.getResponseCredential());
@@ -271,14 +280,15 @@ public class SamlMockMessageService {
 			// marshal
 			var encodedPostMessage = SamlUtil.encode(response);
 			var encodedArtifactMessage = SamlIoUtil.encodeSamlArtifactData(velocityEngine,
-					artifactCacheService.getArtifactMap(), response, buildArtifactResolutionParameters(), relayState);
+					artifactCacheService.getArtifactMap(), response, buildArtifactResolutionParameters(),
+					inboundSamlRequest.relayState());
 			var encodedEncryptedResponse = SamlUtil.encode(responseToEncrypt);
 
 			// provide to client for selection, they work for 1-2 minutes
 			var cpResponse = new SamlMockCpResponse();
 			cpResponse.setSamlPostResponse(encodedPostMessage);
 			cpResponse.setSamlArtifactResponse(encodedArtifactMessage);
-			cpResponse.setRelayState(relayState);
+			cpResponse.setRelayState(inboundSamlRequest.relayState());
 			cpResponse.setAcsUrl(response.getDestination());
 			cpResponse.setSamlEncryptedResponse(encodedEncryptedResponse);
 			sampleMap.put(fileName, cpResponse);
@@ -446,7 +456,7 @@ public class SamlMockMessageService {
 			return;
 		}
 		var subject = assertion.getSubject();
-		List<SubjectConfirmation> subjectConfirmations = subject.getSubjectConfirmations();
+		List<SubjectConfirmation> subjectConfirmations = subject != null ? subject.getSubjectConfirmations() : Collections.emptyList();
 		if (!CollectionUtils.isEmpty(subjectConfirmations)) {
 			var subjectConfirmationData = subjectConfirmations.get(0).getSubjectConfirmationData();
 			if (subjectConfirmationData != null) {
@@ -679,4 +689,7 @@ public class SamlMockMessageService {
 		return endpointUrl;
 	}
 
+	private static String toWebPath(String webBasePath, File validatedSubDirectory, String fileName) {
+		return webBasePath + validatedSubDirectory.getPath().replace(File.separatorChar, '/') + '/' + fileName;
+	}
 }

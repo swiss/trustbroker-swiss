@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>XTB SAML Response</title>
+	<title>IDP SAML Response</title>
 	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
 </head>
 <body>
-<h3 class="container">XTB SAML Response (
-	<a href="/authn/samples">Mock Startover</a>,&nbsp;
-	<a th:href="${tbApplicationUrl} + '/app/sso'" target="xtb-sso">XTB SSO</a>
-	)
-</h3>
+<h3 class="container">XTB SAML Response</h3>
+<nav class="container">
+	<a href="/authn/samples" role="button" class="btn btn-outline-secondary" th:style="${style_RESTART_AUTHN}" title="Start over authentication by selecting a mock request sample.">Start over authentication</a>
+	<a th:href="${tbApplicationUrl} + '/app/sso'" role="button" class="btn btn-outline-info" target="xtb-sso" th:style="${style_SSO_STATUS}" title="Show your single sign-on status by application.">SSO status</a>
+</nav>
 <div class="bg-info d-flex justify-content-center p-2">
 	<pre class="bg-light w-75" lang="xml" th:text="${SAMLResponse}"></pre>
 </div>

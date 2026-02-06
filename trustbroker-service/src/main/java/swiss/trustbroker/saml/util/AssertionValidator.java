@@ -459,7 +459,9 @@ public class AssertionValidator {
 						request.getClass().getName(), OpenSamlUtil.samlObjectToString(request)));
 			}
 		}
-		return validateSignature(request.getSignature(), credentials, request, signatureContext);
+		var redirectBindingSignatureWarning = properties.getSecurity().isRedirectBindingSignatureWarning()
+				&& (signatureContext.getBinding() == SamlBinding.REDIRECT);
+		return validateSignature(request.getSignature(), credentials, request, signatureContext, redirectBindingSignatureWarning);
 	}
 
 	static MessageValidationResult validateResponseSignature(Response response, List<Credential> credentials, boolean requireSignedResponse) {
@@ -473,7 +475,7 @@ public class AssertionValidator {
 		}
 		var signatureContext = SignatureContext.forPostBinding();
 		signatureContext.setRequireSignature(requireSignedResponse);
-		return validateSignature(response.getSignature(), credentials, response, signatureContext);
+		return validateSignature(response.getSignature(), credentials, response, signatureContext, false);
 	}
 
 	static MessageValidationResult validateAssertionSignature(Assertion assertion,
@@ -491,11 +493,11 @@ public class AssertionValidator {
 		}
 		var signatureContext = SignatureContext.forPostBinding();
 		signatureContext.setRequireSignature(properties.getSecurity().isRequireSignedAssertion());
-		return validateSignature(assertion.getSignature(), credentials, assertion, signatureContext);
+		return validateSignature(assertion.getSignature(), credentials, assertion, signatureContext, false);
 	}
 
 	static void validateRedirectBindingSignature(SignatureContext signatureContext,
-			List<Credential> credentials) {
+			List<Credential> credentials, boolean redirectBindingSignatureWarning) {
 		if (signatureContext.getBinding() != SamlBinding.REDIRECT) {
 			throw new TechnicalException(
 					String.format("Called with invalid context for binding %s", signatureContext.getBinding()));
@@ -534,7 +536,7 @@ public class AssertionValidator {
 
 		// signature check (optional if not required by config)
 		boolean signatureValid = SamlUtil.isRedirectSignatureValid(credentials, signatureAlgorithm, queryString,
-				signatureBytes);
+				signatureBytes, redirectBindingSignatureWarning);
 		if (!signatureValid) {
 			throw new RequestDeniedException(String.format("%s or %s invalid in URL: %s",
 					SamlIoUtil.SAML_REDIRECT_SIGNATURE, SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM,
@@ -565,7 +567,7 @@ public class AssertionValidator {
 	}
 
 	static MessageValidationResult validateSignature(Signature signature, List<Credential> credentials, XMLObject xmlObject,
-			SignatureContext signatureContext) {
+			SignatureContext signatureContext, boolean redirectBindingSignatureWarning) {
 		try {
 			// accept SAML message because we do not have a credential
 			if (CollectionUtils.isEmpty(credentials)) {
@@ -575,7 +577,7 @@ public class AssertionValidator {
 
 			// REDIRECT binding: Handle it with the separated signature parameters in the URL
 			if (signatureContext.getBinding() == SamlBinding.REDIRECT && signature == null) {
-				validateRedirectBindingSignature(signatureContext, credentials);
+				validateRedirectBindingSignature(signatureContext, credentials, redirectBindingSignatureWarning);
 			}
 
 			// POST or ARTIFACT binding or when REDIRECT binding SAMLRequest/Response is signed itself
@@ -1146,7 +1148,7 @@ public class AssertionValidator {
 		}
 		if (artifactResolve.isSigned()) {
 			return validateSignature(artifactResolve.getSignature(), trustCredentials, artifactResolve,
-					SignatureContext.forArtifactBinding());
+					SignatureContext.forArtifactBinding(), false);
 		}
 		else if (properties.getSecurity().isRequireSignedArtifactResolve()) {
 			 throw new RequestDeniedException(String.format("Missing signature in artifactResolve=%s", artifactResolve.getID()));

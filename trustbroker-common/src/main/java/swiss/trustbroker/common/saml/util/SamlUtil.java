@@ -203,14 +203,15 @@ public class SamlUtil {
 	}
 
 	public static boolean isRedirectSignatureValid(List<Credential> credentials, String signatureAlgorithm,
-			String queryString, byte[] signatureBytes) {
+			String queryString, byte[] signatureBytes, boolean redirectBindingSignatureWarning) {
 		if (credentials == null) {
 			return false;
 		}
 		var queryStringBytes = queryString.getBytes(StandardCharsets.UTF_8);
 		return credentials.stream().anyMatch(credential -> {
 			try {
-				return validateSignature(credential, signatureAlgorithm, queryStringBytes, signatureBytes);
+				return validateRedirectSignature(credential, signatureAlgorithm, queryStringBytes,
+						signatureBytes, redirectBindingSignatureWarning);
 			}
 			catch (TechnicalException ex) {
 				log.error("Signature validation failed", ex);
@@ -219,8 +220,8 @@ public class SamlUtil {
 		});
 	}
 
-	public static boolean validateSignature(Credential credential, String signatureAlgorithm, byte[] queryStringBytes,
-			byte[] signatureBytes) {
+	public static boolean validateRedirectSignature(Credential credential, String signatureAlgorithm, byte[] queryStringBytes,
+			byte[] signatureBytes, boolean redirectBindingSignatureWarning) {
 		try {
 			// caller should not pass null here, hence a TechnicalException
 			if (signatureAlgorithm == null) {
@@ -234,9 +235,15 @@ public class SamlUtil {
 			java.security.Signature sig = java.security.Signature.getInstance(algorithmId);
 			sig.initVerify(credential.getPublicKey());
 			sig.update(queryStringBytes);
-			sig.verify(signatureBytes);
-			log.debug("Signature matched for credential {}", credential.getEntityId());
-			return true;
+			boolean matched = sig.verify(signatureBytes);
+			log.debug("Signature matched={} for credential {}", matched, credential.getEntityId());
+			if (!matched && redirectBindingSignatureWarning) {
+				log.warn("Redirect binding signature mismatch for credential {} accepted due to "
+						+ "trustbroker.config.security.redirectBindingSignatureWarning=true - correct RP SignerTruststore",
+						credential.getEntityId());
+				return true;
+			}
+			return matched;
 		}
 		catch (NoSuchAlgorithmException ex) {
 			throw new TechnicalException("Unknown signature algorithm", ex);
@@ -246,7 +253,7 @@ public class SamlUtil {
 					String.format("Invalid key for signature verification: %s", credential.getEntityId()), ex);
 		}
 		catch (java.security.SignatureException ex) {
-			log.debug("Signature not matched for credential {}", credential.getEntityId());
+			log.debug("Signature not initialized for verification");
 			return false;
 		}
 	}

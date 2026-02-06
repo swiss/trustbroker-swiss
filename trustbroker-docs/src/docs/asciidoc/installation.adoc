@@ -33,7 +33,7 @@ a| Endpoints of interest of XTB:
 * Application: http://localhost:8090/app/sso
 * OIDC config: http://localhost:8090/.well-known/openid-configuration
 * SAML config: http://localhost:8090/api/v1/metadata
-| Documentation: https://github.com/swiss/trustbroker.swiss
+| Documentation: https://swiss.github.io/trustbroker.swiss/
 
 | ``trustbroker-samlmock`` simulating a SAML RP and CP to play around with.
 | RP entry points: http://localhost:7070
@@ -146,7 +146,7 @@ Clone the public demo repository:
 
 [source,bash]
 ----
-git clone -b main git@github.com/swiss/xtb-gitops-demo
+git clone -b main https://github.com/swiss/xtb-gitops-demo.git
 cd xtb-gitops-demo
 ----
 

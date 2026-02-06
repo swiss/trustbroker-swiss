@@ -28,6 +28,7 @@ import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Issuer;
 import org.opensaml.saml.saml2.core.LogoutRequest;
 import org.opensaml.saml.saml2.core.LogoutResponse;
+import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusResponseType;
 import org.springframework.http.HttpHeaders;
@@ -35,16 +36,19 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.view.UrlBasedViewResolver;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.exception.TrustBrokerException;
+import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.samlmock.SamlMockProperties;
+import swiss.trustbroker.samlmock.dto.SamlMockInboundRequest;
 import swiss.trustbroker.samlmock.service.SamlMockFileService;
 import swiss.trustbroker.samlmock.service.SamlMockMessageService;
 import swiss.trustbroker.samlmock.service.SamlMockMetadataService;
@@ -79,17 +83,19 @@ public class SamlMockController {
 
 	@GetMapping(path = "/")
 	public String homePage(Model model) {
-		return showAllSamples(model);
+		return showAllSamples(model, null);
 	}
 
-	@GetMapping(path = "/authn/samples")
-	public String showAllSamples(Model model) {
+	@GetMapping(path = { "/authn/samples", "/authn/samples/{*sampleSelector}" })
+	public String showAllSamples(Model model, @PathVariable(required = false) String sampleSelector) {
 		try {
-			var sampleMap = messageService.buildEncodedRequestMap();
+			var sampleMap = messageService.buildEncodedRequestMap(sampleSelector);
 			model.addAttribute("requests", sampleMap);
 			model.addAttribute(TB_APPLICATION_URL, properties.getTbApplicationUrl());
 			model.addAttribute("testCpIssuer", properties.getTestCpIssuer());
 			model.addAttribute("testRpIssuer", properties.getTestRpIssuer());
+			setButtonDisplay(model);
+			log.debug("RP request model={}", model.asMap());
 			return NAVIGATE_SELECT_AUTHN_REQ;
 		}
 		catch (TrustBrokerException e) {
@@ -98,13 +104,15 @@ public class SamlMockController {
 		}
 	}
 
-	@GetMapping(path = "/auth/saml2/idp/samples")
-	public String mockCpResponseCpInitiated(Model model) {
+	@GetMapping(path = { "/auth/saml2/idp/samples", "/auth/saml2/idp/samples/{*sampleSelector}" })
+	public String mockCpResponseCpInitiated(Model model, HttpServletRequest request,
+			@PathVariable(required = false) String sampleSelector) {
 		try {
 			var acsUrl = properties.getConsumerUrl();
 			var relayState = "MOCK_" + UUID.randomUUID();
-			return mockCpResponseProcessing(model, acsUrl, null, null, relayState,
-					properties.isKeepSampleUrlsforCpInitiated(), StatusResponseType.class);
+			var samlRequest = new SamlMockInboundRequest(null, null, acsUrl, relayState);
+			return mockCpResponseProcessing(model, samlRequest, null, request, sampleSelector,
+					properties.isKeepSampleUrlsForCpInitiated(), StatusResponseType.class);
 		}
 		catch (TrustBrokerException e) {
 			log.error("Loading CP initiated response samples failed: {}", e.getInternalMessage());
@@ -112,12 +120,11 @@ public class SamlMockController {
 		}
 	}
 
-	@PostMapping(path = "/auth/saml2/idp/samples")
-	public String mockCpResponse(Model model, HttpServletRequest request) {
+	@PostMapping(path = { "/auth/saml2/idp/samples", "/auth/saml2/idp/samples/{*sampleSelector}" })
+	public String mockCpResponse(Model model, HttpServletRequest request, @PathVariable(required = false) String sampleSelector) {
 		try {
 			var samlMessage = messageService.decodeRequest(request);
 			var samlRequest = samlMessage.message();
-			var requestId = samlRequest.getID();
 			var keepSampleUrls = false;
 			var acsUrl = request.getParameter(HttpHeaders.REFERER);
 			Class<? extends StatusResponseType> allowedResponseType = null;
@@ -130,8 +137,10 @@ public class SamlMockController {
 				keepSampleUrls = true; // no ACS URL in LogoutRequest
 				allowedResponseType = LogoutResponse.class;
 			}
-			return mockCpResponseProcessing(model, acsUrl, samlRequest.getIssuer(), requestId,
-					samlMessage.relayState(), keepSampleUrls, allowedResponseType);
+			var inboundSamlRequest = new SamlMockInboundRequest(samlRequest.getID(), getRequestIssuer(samlRequest.getIssuer()),
+					acsUrl, samlMessage.relayState());
+			return mockCpResponseProcessing(model, inboundSamlRequest, samlRequest, request, sampleSelector, keepSampleUrls,
+					allowedResponseType);
 		}
 		catch (TrustBrokerException e) {
 			log.error("Loading response samples failed: {}", e.getInternalMessage());
@@ -139,12 +148,31 @@ public class SamlMockController {
 		}
 	}
 
-	private String mockCpResponseProcessing(Model model, String acsUrl, Issuer samlRequestIssuer, String requestId,
-			String relayState, boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses) {
-		var responses = messageService.getCpResponses(acsUrl, samlRequestIssuer, requestId, relayState,
-				keepSampleUrls, allowedResponses);
+	private String getRequestIssuer(Issuer issuer) {
+		if (issuer == null) {
+			return properties.getIssuer();
+		}
+		return issuer.getValue();
+	}
+
+	private String mockCpResponseProcessing(Model model, SamlMockInboundRequest inboundSamlRequest,
+			RequestAbstractType samlRequest, HttpServletRequest request,
+			String sampleSelector, boolean keepSampleUrls, Class<? extends StatusResponseType> allowedResponses) {
+		var responses = messageService.getCpResponses(inboundSamlRequest, request, sampleSelector, keepSampleUrls, allowedResponses);
 		model.addAttribute("responses", responses);
+		if (OpenSamlUtil.isSamlArtifactRequest(request)) {
+			// SAMLart can possibly only be consumed once, store retrieved request instead for navigation
+			model.addAttribute("originalSAMLRequest", SamlIoUtil.marshalXmlObject(samlRequest));
+		}
+		else {
+			model.addAttribute("originalSAMLRequest", request.getParameter(SamlIoUtil.SAML_REQUEST_NAME));
+		}
+		model.addAttribute("originalSignature", request.getParameter(SamlIoUtil.SAML_REDIRECT_SIGNATURE));
+		model.addAttribute("originalSigAlg", request.getParameter(SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM));
+		model.addAttribute("originalRelayState", request.getParameter(SamlIoUtil.SAML_RELAY_STATE));
 		model.addAttribute(TB_APPLICATION_URL, properties.getTbApplicationUrl());
+		setButtonDisplay(model);
+		log.debug("CP response model={}", model.asMap());
 		return NAVIGATE_SELECT_RESPONSE;
 	}
 
@@ -186,17 +214,20 @@ public class SamlMockController {
 			log.error("Handling artifact request failed: {}", e.getInternalMessage());
 			throw e;
 		}
-
 	}
 
-	@PostMapping(path = { "/authn/consumer", "/auth/saml2/slo", "/auth/saml/slo" })
-	public String handleSamlPost(Model model, HttpServletRequest request) {
-		return mockSamlMessageConsumer(model, request);
+	@PostMapping(path = { "/authn/consumer", "/authn/consumer/{*sampleSelector}",
+			"/auth/saml2/slo", "/auth/saml2/slo/{*sampleSelector}",
+			"/auth/saml/slo", "/auth/saml/slo/{*sampleSelector}" })
+	public String handleSamlPost(Model model, HttpServletRequest request, @PathVariable(required = false) String sampleSelector) {
+		return mockSamlMessageConsumer(model, request, sampleSelector);
 	}
 
-	@GetMapping(path = { "/authn/consumer", "/auth/saml2/slo", "/auth/saml/slo" })
-	public String handleSamlGet(Model model, HttpServletRequest request) {
-		return mockSamlMessageConsumer(model, request);
+	@GetMapping(path = { "/authn/consumer", "/authn/consumer/{*sampleSelector}",
+			"/auth/saml2/slo", "/auth/saml2/slo/{*sampleSelector}",
+			"/auth/saml/slo", "/auth/saml/slo/{*sampleSelector}" })
+	public String handleSamlGet(Model model, HttpServletRequest request, @PathVariable(required = false) String sampleSelector) {
+		return mockSamlMessageConsumer(model, request, sampleSelector);
 	}
 
 	// Display the returned XTB SAMl Response in the UI on RP side.
@@ -211,13 +242,14 @@ public class SamlMockController {
 		return NAVIGATE_RESPONSE_FROM_XTB;
 	}
 
-	public String mockSamlMessageConsumer(Model model, HttpServletRequest request) {
+	public String mockSamlMessageConsumer(Model model, HttpServletRequest request, String sampleSelector) {
+		setButtonDisplay(model);
 		if (request.getParameter(SamlIoUtil.SAML_REQUEST_NAME) != null) {
 			if (log.isInfoEnabled()) {
 				log.info("Received SAML {} request from referrer={}",
 						request.getMethod(), StringUtil.clean(request.getParameter(HttpHeaders.REFERER)));
 			}
-			return mockCpResponse(model, request);
+			return mockCpResponse(model, request, sampleSelector);
 		}
 		else if (request.getParameter(SamlIoUtil.SAML_RESPONSE_NAME) != null) {
 			if (log.isInfoEnabled()) {
@@ -315,11 +347,19 @@ public class SamlMockController {
 		}
 	}
 
-	@GetMapping(path = "/authn/samples/refresh")
-	public String refreshMockData() {
+	@GetMapping(path = "/authn/refresh")
+	public String refreshMockData(Model model) {
 		fileService.refreshMockData();
+		setButtonDisplay(model);
 		return NAVIGATE_REFRESH_MOCK_DATA;
 	}
 
+	private void setButtonDisplay(Model model) {
+		for (var button : SamlMockProperties.SamlMockButton.values()) {
+			if (!properties.getButtons().contains(button)) {
+				model.addAttribute("style_" + button.name(), "display: none;");
+			}
+		}
+	}
 
 }

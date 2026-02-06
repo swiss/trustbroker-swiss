@@ -28,9 +28,11 @@ trustbroker:
     cacheMockFiles: false # re-load files on access
 
     # RP (as we sign and do not have access to some RPs private key, use 'trust ourselves')
-    assertionConsumerServiceUrl: http://localhost:7070/authn/consumer
-    idpServiceUrl: http://localhost:7070/auth/saml2/idp/samples
-    artifactResolutionServiceUrl: http://localhost:7070/authn/arp
+    perimeterUrl:  http://localhost:7070
+    spServiceUrl: ${trustbroker.samlmock.perimeterUrl}/authn/samples
+    assertionConsumerServiceUrl: ${trustbroker.samlmock.perimeterUrl}/authn/consumer
+    idpServiceUrl: ${trustbroker.samlmock.perimeterUrl}/auth/saml2/idp/samples
+    artifactResolutionServiceUrl: ${trustbroker.samlmock.perimeterUrl}/authn/arp
     artifactResolutionIssuer: urn:trustbroker.swiss:idp:SAML-MOCK-1
     artifactResolutionIssuerIsRp: false
     spSignerKeystore: token-signer/keystore.pem
@@ -58,7 +60,22 @@ trustbroker:
     encryptionKeystore: token-signer/keystore.pem
     encryptionPassword: ${PKI_PASSPHRASE}
     useOriginalAcr: false
-    keepSampleUrlsforCpInitiated: true
+    keepSampleUrlsForCpInitiated: true
+
+    # Buttons enabled on UI
+    buttons:
+      - RESTART_AUTHN
+      - RESTART_RESPONSE
+      - RESPONSE_RESTART_AUTHN
+      - IDP_INITIATED
+      - RELOAD_SAMPLES
+      - RESPONSE_RELOAD_SAMPLES
+      - CONFIG_STATUS
+      - SSO_STATUS
+      - MOCK_METADATA
+      - SP_METADATA
+      - IDP_METADATA
+      - MONITOR
 
 logging:
   pattern:

@@ -106,7 +106,7 @@ jib {
 		// NOTE: Bootstrap environment within the docker container (all parameters are MUST, these are the prod defaults)
 		// NOTE: SSH_KEY can be passed by value (base64 encoded SSH private key), see top README.md
 		environment = [
-				GIT_URL         : 'https://github.com/trustbroker.swiss/xtb-gitops-demo',
+				GIT_URL         : 'https://github.com/swiss/xtb-gitops-demo',
 				CONFIG_BRANCH   : 'master',
 				TRUSTBROKER_HOME: '/etc/trustbroker'
 		]

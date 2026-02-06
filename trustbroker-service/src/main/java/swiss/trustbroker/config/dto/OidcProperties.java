@@ -379,6 +379,8 @@ public class OidcProperties {
 
 	/**
 	 * Cached CP metadata is only refreshed if cached earlier than this.
+	 * <br/>
+	 * Default: 60
 	 *
 	 * @since 1.10.0
 	 */

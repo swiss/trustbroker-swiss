@@ -29,6 +29,21 @@ import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 @Data
 public class SamlMockProperties {
 
+	public enum SamlMockButton {
+		RESTART_AUTHN,
+		RESTART_RESPONSE,
+		RESPONSE_RESTART_AUTHN,
+		IDP_INITIATED,
+		RELOAD_SAMPLES,
+		RESPONSE_RELOAD_SAMPLES,
+		CONFIG_STATUS,
+		SSO_STATUS,
+		MOCK_METADATA,
+		SP_METADATA,
+		IDP_METADATA,
+		MONITOR
+	}
+
 	private String spSignerKeystore;
 
 	private String spSignerPassword;
@@ -49,13 +64,17 @@ public class SamlMockProperties {
 
 	private String assertionConsumerServiceUrl;
 
+	private String perimeterUrl;
+
+	private String spServiceUrl;
+
 	private String idpServiceUrl;
 
 	private String samlPostTargetUrl;
 
 	private Map<String, String> samlPostTargetUrlMap;
 
-	private boolean keepSampleUrlsforCpInitiated;
+	private boolean keepSampleUrlsForCpInitiated;
 
 	private String audienceRestriction;
 
@@ -98,6 +117,8 @@ public class SamlMockProperties {
 	private boolean signAuthnRequest = false;
 
 	private List<String> validReturnUrls = new ArrayList<>();
+
+	private List<SamlMockButton> buttons = new ArrayList<>();
 
 	private boolean cacheMockFiles = false;
 

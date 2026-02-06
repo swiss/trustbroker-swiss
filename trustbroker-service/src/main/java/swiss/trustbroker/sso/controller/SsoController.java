@@ -46,12 +46,16 @@ public class SsoController extends AbstractSamlController {
 
 	private final SsoService ssoService;
 
+	private final ApiSupport apiSupport;
+
 	public SsoController(
 			TrustBrokerProperties trustBrokerProperties,
 			SamlValidator samlValidator,
-			SsoService ssoService) {
+			SsoService ssoService,
+			ApiSupport apiSupport) {
 		super(trustBrokerProperties, samlValidator);
 		this.ssoService = ssoService;
+		this.apiSupport = apiSupport;
 	}
 
 	// Return the list of participants in a particular SSO group
@@ -108,8 +112,8 @@ public class SsoController extends AbstractSamlController {
 				relyingPartyId, claimsProviderId, subjectNameId);
 
 		// response to UI
-		var referer = WebUtil.getHeader(org.springframework.http.HttpHeaders.REFERER, request);
-		var location = referer + "?status=" + (success ? HttpServletResponse.SC_OK : HttpServletResponse.SC_NOT_FOUND);
+		var ssoUrl = apiSupport.getSsoUrl();
+		var location = ssoUrl + "?status=" + (success ? HttpServletResponse.SC_OK : HttpServletResponse.SC_NOT_FOUND);
 		log.debug("Redirecting to {}", location);
 		// change DELETE to GET
 		response.setStatus(HttpServletResponse.SC_SEE_OTHER);

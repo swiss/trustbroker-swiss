@@ -228,6 +228,11 @@ public class SamlIoUtil {
 			InputStream stream;
 			var mappingFile = new File(fileName);
 			if (mappingFile.exists()) {
+				if (mappingFile.isDirectory()) {
+					var workingDir = (new File(".")).getAbsolutePath();
+					throw new TechnicalException(String.format("Found directory=%s"
+							+ " in filesystem or on classpath, workingDir=%s", fileName, workingDir));
+				}
 				stream = new FileInputStream(mappingFile);
 			}
 			else {

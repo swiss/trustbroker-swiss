@@ -31,6 +31,7 @@ import org.apache.commons.text.StringSubstitutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.ldap.core.LdapTemplate;
+import org.springframework.ldap.support.LdapEncoder;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.idm.dto.IdmRequest;
 import swiss.trustbroker.api.idm.dto.IdmRequests;
@@ -138,7 +139,7 @@ public class LdapService implements IdmQueryService {
 		Map<String, Object> params = new HashMap<>();
 
 		for (var placeholder : placeholders) {
-			params.put(placeholder, getPlaceholderValue(placeholder, cpResponse));
+			params.put(placeholder, LdapEncoder.filterEncode(getPlaceholderValue(placeholder, cpResponse)));
 		}
 
 		return StringSubstitutor.replace(appFilter, params, "${", "}");

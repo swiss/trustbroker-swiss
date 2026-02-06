@@ -715,7 +715,7 @@ class AssertionValidatorTest {
 		var signatureContext = SignatureContext.forRedirectBinding(url);
 
 		assertDoesNotThrow(() -> {
-			AssertionValidator.validateRedirectBindingSignature(signatureContext, claimTrustStore);
+			AssertionValidator.validateRedirectBindingSignature(signatureContext, claimTrustStore, false);
 		});
 	}
 

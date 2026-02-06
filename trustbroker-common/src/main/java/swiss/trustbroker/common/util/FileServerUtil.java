@@ -103,7 +103,7 @@ public class FileServerUtil {
 	}
 
 	@SuppressWarnings("javasecurity:S6549") // the purpose of this method is to validate filePath from user controlled data
-	private static File getSanitizedFile(String directoryPath, String filePath, boolean tryOnly) {
+	public static File getSanitizedFile(String directoryPath, String filePath, boolean tryOnly) {
 		var directory = new File(directoryPath);
 		var fileUnsafe = new File(directory, filePath);
 		try {

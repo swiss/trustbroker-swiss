@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>SAMLMock Response selection</title>
+	<title>SAMLMock Response Selection</title>
 	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
 	<script>
 		function submit(acUrl, method) {
@@ -14,11 +14,22 @@
 
 		function setValue(id, value) {
 			var input = document.getElementById(id);
-			input.disabled = (value == null);
+			input.disabled = (value == null || value === "");
 			input.value = value;
 		}
 
+		function resubmitRequest(encodedPostMessage, signature, sigAlg, acUrl, relayState) {
+			setValue("SAMLRequest", encodedPostMessage);
+			setValue("SAMLResponse", null);
+			setValue("SAMLart", null);
+			setValue("Signature", signature);
+			setValue("SigAlg", sigAlg);
+			setValue("RelayState", relayState);
+			submit(acUrl, 'POST');
+		}
+
 		function submitPost(encodedMessage, acUrl, relayState) {
+			setValue("SAMLRequest", null);
 			setValue("SAMLResponse", encodedMessage);
 			setValue("SAMLart", null);
 			setValue("RelayState", relayState);
@@ -26,6 +37,7 @@
 		}
 
 		function submitArtifact(encodedMessage, acUrl, relayState) {
+			setValue("SAMLRequest", null);
 			setValue("SAMLResponse", null);
 			setValue("SAMLart", encodedMessage);
 			setValue("RelayState", relayState);
@@ -40,16 +52,33 @@
 	</script>
 </head>
 <body>
-<h3 class="container">MOCK SAML Response</h3>
-<h3 class="container">
-	<a href="/authn/samples">Startover</a>
-	<a href="/authn/samples/refresh">CFG-Reload</a>
-</h3>
+<h3 class="container">MOCK SAML Response Samples</h3>
+<nav class="container">
+	<input th:if="${originalSAMLRequest} or ${originalSAMLart}"
+		type="submit" value="Start over" class="btn btn-outline-secondary" th:style="${style_RESTART_RESPONSE}" title="Back to top of response samples."
+		onclick="resubmitRequest(document.getElementById('OriginalSAMLRequest').getAttribute('value'), 
+															document.getElementById('OriginalSignature').getAttribute('value'), 
+															document.getElementById('OriginalSigAlg').getAttribute('value'),
+															'/auth/saml2/idp/samples', 
+															document.getElementById('OriginalRelayState').getAttribute('value'))"/>
+	<a th:unless="${originalSAMLRequest} or ${originalSAMLart}"
+		href="/auth/saml2/idp/samples" role="button" class="btn btn-outline-secondary" th:style="${style_RESTART_RESPONSE}" title="Back to top of response samples.">Start over</a>
+	<a href="/authn/samples" role="button" class="btn btn-outline-secondary" th:style="${style_RESPONSE_RESTART_AUTHN}" 
+		title="Start over authentication by selecting a mock request sample.">Start over authentication</a>
+	<a href="/authn/refresh" role="button" class="btn btn-outline-warning" th:style="${style_RESPONSE_RELOAD_SAMPLES}" title="Reload samples from repository.">Reload samples</a>
+</nav>
 <form id="sampleForm" method="POST" enctype="application/x-www-form-urlencoded">
 	<input type="hidden" id="SAMLResponse" name="SAMLResponse" disabled="disabled"/>
+	<input type="hidden" id="SAMLRequest" name="SAMLRequest" disabled="disabled"/>
 	<input type="hidden" id="SAMLart" name="SAMLart" disabled="disabled"/>
+	<input type="hidden" id="Signature" name="Signature" disabled="disabled"/>
+	<input type="hidden" id="SigAlg" name="SigAlg" disabled="disabled"/>
 	<input type="hidden" id="RelayState" name="RelayState" disabled="disabled"/>
 </form>
+<input type="hidden" id="OriginalSAMLRequest" name="OriginalSAMLRequest" disabled="disabled" th:value="${originalSAMLRequest}"/>
+<input type="hidden" id="OriginalSignature" name="OriginalSignature" disabled="disabled" th:value="${originalSignature}"/>
+<input type="hidden" id="OriginalSigAlg" name="OriginalSigAlg" disabled="disabled" th:value="${originalSigAlg}"/>
+<input type="hidden" id="OriginalRelayState" name="OriginalRelayState" disabled="disabled" th:value="${originalRelayState}"/>
 <div class="container">
 	<div class="row">
 		<div class="col-lg-10 mt-2 mb-2">
@@ -64,27 +93,57 @@
 				</thead>
 				<tbody>
 				<tr th:each="response : ${responses}">
-					<td th:text="${response.key}"/>
-					<td>
+					<td th:if="${response.value.sampleSelector}" colspan="4">
+						<div class="d-grid col-6">
+							<input th:if="${originalSAMLRequest} or ${originalSAMLart}"
+								type="submit"
+								th:value="${response.key}"
+								class="btn btn-outline-primary"
+								title="Navigate to this list of responses."
+								th:data-post="${response.value.samlPostResponse}"
+								th:data-art="${response.value.samlArtifactResponse}"
+								th:data-relayState="${response.value.relayState}"
+								th:data-acUrl="${response.value.sampleSelector}"
+								onclick="resubmitRequest(document.getElementById('OriginalSAMLRequest').getAttribute('value'), 
+														 document.getElementById('OriginalSignature').getAttribute('value'), 
+														 document.getElementById('OriginalSigAlg').getAttribute('value'),
+														 this.getAttribute('data-acUrl'), 
+														 document.getElementById('OriginalRelayState').getAttribute('value'))"/>
+							<a th:unless="${originalSAMLRequest} or ${originalSAMLart}"
+								role="button"
+								class="btn btn-outline-primary"
+								th:gref="${response.value.sampleSelector}">
+							   [[${response.key}]]
+							</a>
+						</div>
+					</td>
+					<td th:unless="${response.value.sampleSelector}" th:text="${response.key}"/>
+					<td th:unless="${response.value.sampleSelector}">
 						<input type="submit" value="POST"
+							   class="btn btn-outline-primary"
+							   title="Submit response using SAML POST protocol."
 							   th:data-response="${response.value.samlPostResponse}"
 							   th:data-relayState="${response.value.relayState}"
 							   th:data-acUrl="${response.value.acsUrl}"
-							   th:onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+							   onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
 					</td>
-					<td>
+					<td th:unless="${response.value.sampleSelector}">
 						<input type="submit" value="ARTIFACT"
+							   class="btn btn-outline-secondary"
+							   title="Submit response using SAML ARTIFACT protocol."
 							   th:data-response="${response.value.samlArtifactResponse}"
 							   th:data-relayState="${response.value.relayState}"
 							   th:data-acUrl="${response.value.acsUrl}"
-							   th:onclick="submitArtifact(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+							   onclick="submitArtifact(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
 					</td>
-					<td>
+					<td th:unless="${response.value.sampleSelector}">
 						<input type="submit" value="Encrypted POST"
+							   class="btn btn-outline-secondary"
+							   title="Submit encrypted response using SAML POST protocol."
 							   th:data-response="${response.value.samlEncryptedResponse}"
 							   th:data-relayState="${response.value.relayState}"
 							   th:data-acUrl="${response.value.acsUrl}"
-							   th:onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
+							   onclick="submitPost(this.getAttribute('data-response'), this.getAttribute('data-acUrl'), this.getAttribute('data-relayState'))"/>
 					</td>
 				</tr>
 				</tbody>

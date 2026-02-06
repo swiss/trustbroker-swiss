@@ -16,6 +16,7 @@
 package swiss.trustbroker.sso.controller;
 
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -79,6 +80,9 @@ class SsoControllerTest {
 	@MockitoBean
 	SsoService ssoService;
 
+	@MockitoBean
+	private ApiSupport apiSupportMock;
+
 	@Autowired
 	private WebApplicationContext webApplicationContext;
 
@@ -128,7 +132,11 @@ class SsoControllerTest {
 
 	@Test
 	void logoutSsoParticipant() throws Exception {
-		var referer = "http://localhost:80";
+		var frontend = "http://localhost:80";
+		when(trustBrokerProperties.getFrontendBaseUrl()).thenReturn(frontend);
+		var expectedLocation = apiSupport.getSsoUrl();
+		when(apiSupportMock.getSsoUrl()).thenReturn(expectedLocation);
+		expectedLocation += "?status=" + HttpServletResponse.SC_OK;
 		var cookies = new Cookie[] { new Cookie("n1", "v1") };
 		var clearCookies = List.of(new Cookie("n1", ""));
 		var cpId = "cp1";
@@ -137,12 +145,11 @@ class SsoControllerTest {
 				.logoutSsoParticipantById(SsoService.SsoCookieNameParams.of(SSO_GROUP,  cpId, subjectNameId), cookies,
 						DEVICE_ID, RP_ID);
 		this.mockMvc.perform(delete(apiSupport.getSsoGroupApi(SSO_GROUP, RP_ID, cpId, subjectNameId))
-						.header(HttpHeaders.REFERER, referer)
 						.header(WebSupport.HTTP_HEADER_DEVICE_ID, DEVICE_ID)
 						.cookie(cookies[0]))
 				.andExpect(status().is3xxRedirection())
 				.andExpect(header().string(HttpHeaders.SET_COOKIE, "n1="))
-				.andExpect(header().string(HttpHeaders.LOCATION, referer + "?status=" + HttpServletResponse.SC_OK));
+				.andExpect(header().string(HttpHeaders.LOCATION, expectedLocation));
 	}
 
 	@Test
@@ -158,17 +165,16 @@ class SsoControllerTest {
 	}
 
 	private void logoutSsoParticipant(List<SsoParticipants> ssoParticipants) throws Exception {
-		var referer = "http://localhost:80";
 		var cookies = new Cookie[] { new Cookie("n1", "v1") };
 		var clearCookies = List.of(new Cookie("n1", ""));
 		doReturn(ssoParticipants).when(ssoService).getAllSsoParticipants(cookies, DEVICE_ID);
 		doReturn(clearCookies).when(ssoService)
 				.logoutSsoParticipantById(SsoService.SsoCookieNameParams.of(SSO_GROUP), cookies, DEVICE_ID, RP_ID);
 		this.mockMvc.perform(delete(apiSupport.getSsoRpApi(RP_ID))
-						.header(HttpHeaders.REFERER, referer)
 						.header(WebSupport.HTTP_HEADER_DEVICE_ID, DEVICE_ID)
 						.cookie(cookies[0]))
 				.andExpect(status().isOk())
+				.andExpect(header().doesNotExist(HttpHeaders.LOCATION))
 				.andExpect(ssoParticipants.size() == 1 ? header().string(HttpHeaders.SET_COOKIE, "n1=") :
 						header().doesNotExist(HttpHeaders.SET_COOKIE));
 	}

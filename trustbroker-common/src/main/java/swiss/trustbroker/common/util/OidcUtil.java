@@ -394,24 +394,16 @@ public class OidcUtil {
 		try {
 			var jwt = JWTParser.parse(jwtToken);
 
-			// Plain JWT (not signed and not fully supported)
-			if (jwt instanceof PlainJWT) {
-				return jwt.getJWTClaimsSet();
-			}
-
+			// Plain JWT (not signed) never accepted even if encrypted (encryption as done with a public key, anyone can do this)
 			if (!(jwt instanceof SignedJWT signedJwt)) {
 				throw new RequestDeniedException(
 						String.format("Unsupported JWT type from clientId=%s", clientId));
 			}
 
 			var header = signedJwt.getHeader();
-			if (header.getKeyID() == null) {
-				throw new RequestDeniedException(String.format("Missing keyId in token from=%s", clientId));
-
-			}
 			var kid = header.getKeyID();
 			if (kid == null) {
-				throw new RequestDeniedException(String.format("Invalid keyId=%s token from clientId=%s", kid, clientId));
+				throw new RequestDeniedException(String.format("Missing keyId in token from=%s", clientId));
 			}
 			var key = keySupplier.apply(kid);
 			if (!key.isPresent()) {
@@ -477,18 +469,20 @@ public class OidcUtil {
 	}
 
 	public static JWTClaimsSet decryptAndVerifyToken(String token, Function<String, Optional<JWK>> keySupplier, Credential credential, String clientId) {
-
 		try {
 			JWT jwt = JwtUtil.parseJWT(token);
 			if (jwt instanceof EncryptedJWT) {
 				var decryptJWT = JwtUtil.decryptJwt(token, credential, clientId);
 				return OidcUtil.verifyJwtToken(decryptJWT.getPayload().toString(), keySupplier, clientId);
-			} else {
+			}
+			else {
 				return OidcUtil.verifyJwtToken(token, keySupplier, clientId);
 			}
-		} catch (ParseException e) {
+		}
+		catch (ParseException e) {
 			throw new TechnicalException("Cannot decrypt JWT", e);
-		} catch (JOSEException e) {
+		}
+		catch (JOSEException e) {
 			throw new TechnicalException("Unexpected JOSE exception", e);
 		}
 	}

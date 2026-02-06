@@ -52,6 +52,19 @@ public class SecurityChecks {
 	private boolean requireSignedAuthnRequest = true;
 
 	/**
+	 * Allow to just issue a warning for failing signature check for redirect binding.
+	 * <br/>
+	 * Backwards compatibility flag for transition, to be removed in an upcoming release.
+	 * <br/>
+	 * Default: false
+	 *
+	 * @since 1.12.0
+	 * @deprecated
+	 */
+	@Deprecated(since = "1.12.0", forRemoval = true)
+	private boolean redirectBindingSignatureWarning;
+
+	/**
 	 * Reject unsigned ArtifactResolve?
 	 * <br/>
 	 * Default: true

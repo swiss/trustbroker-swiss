@@ -34,6 +34,7 @@ import org.springframework.cloud.endpoint.event.RefreshEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
+import swiss.trustbroker.common.config.KeystoreProperties;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CredentialReader;
 import swiss.trustbroker.common.setup.config.BootstrapProperties;
@@ -301,11 +302,10 @@ public class AppConfigService {
 		}
 	}
 
-	private List<Credential> getSelfCert() {
-		var selfSigner = trustBrokerProperties.getSigner();
-		checkCertPath(selfSigner.getSignerCert(), "trustbroker.config.signer");
-		return CredentialReader.readTrustCredentials(selfSigner.getSignerCert(), selfSigner.getType(),
-				selfSigner.getPassword(), selfSigner.getKeyEntryId());
+	private List<Credential> geGlobalCert(KeystoreProperties signer, String urn) {
+		checkCertPath(signer.getSignerCert(), urn);
+		return CredentialReader.readTrustCredentials(signer.getSignerCert(), signer.getType(),
+				signer.getPassword(), signer.getKeyEntryId());
 	}
 
 	private void checkAndLoadRelyingPartyCertificates(RelyingParty relyingParty) {
@@ -323,10 +323,17 @@ public class AppConfigService {
 				relyingParty.getSubPath());
 		if (!relyingParty.getOidcClients().isEmpty()) {
 			var selfSigner = trustBrokerProperties.getSigner();
-			var selfCert = getSelfCert();
+			var selfCert = geGlobalCert(selfSigner, "trustbroker.config.signer");
 			credentials.addAll(selfCert);
 			log.debug("rpId={} has OIDC configured, add own signer={} to truststore", relyingParty.getId(),
 					selfSigner.getSignerCert());
+		}
+		else if (trustBrokerProperties.getGlobalRequestTrust() != null) {
+			var globalRequestTrust = trustBrokerProperties.getGlobalRequestTrust();
+			var globalRequestTrustCert = geGlobalCert(globalRequestTrust, "trustbroker.config.globalRequestTrust");
+			credentials.addAll(globalRequestTrustCert);
+			log.debug("rpId={} is using SAML, add configured globalRequestTrust={} to truststore", relyingParty.getId(),
+					globalRequestTrust.getSignerCert());
 		}
 		relyingParty.setRpTrustCredentials(credentials);
 

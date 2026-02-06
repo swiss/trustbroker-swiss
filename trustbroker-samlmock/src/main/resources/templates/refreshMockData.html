@@ -3,12 +3,13 @@
 <head>
 	<meta charset="UTF-8">
 	<title>SAMLMock Refresh Data</title>
+	<link th:rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.5/css/bootstrap.min.css} "/>
 </head>
 <body>
-<h3>SamlMock Data has been successfully refreshed!</h3>
-<div>
-	<a href="/authn/samples">Back to request samples</a><br/>
-	<a href="/auth/saml2/idp/samples">Back to response samples</a>
-</div>
+<div class="alert alert-success" role="alert">SAMLMock samples have been successfully refreshed!</div>
+<nav class="container">
+	<a href="/authn/samples" role="button" class="btn btn-outline-primary" th:style="${style_RELOAD_SAMPLES}">Back to request samples</a><br/>
+	<a href="/auth/saml2/idp/samples" role="button" class="btn btn-outline-secondary" th:style="${style_RESPONSE_RELOAD_SAMPLES}">Back to response samples</a>
+</nav>
 </body>
 </html>

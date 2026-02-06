@@ -160,6 +160,12 @@ public class TrustBrokerProperties {
 	private KeystoreProperties rolloverSigner;
 
 	/**
+	 * Optional trust anchor for SAML request test automation or monitoring.
+	 * @since 1.12.0
+	 */
+	private KeystoreProperties globalRequestTrust;
+
+	/**
 	 * Configuration for optional IDM integration.
 	 */
 	private IdmConfig idm = new IdmConfig();
