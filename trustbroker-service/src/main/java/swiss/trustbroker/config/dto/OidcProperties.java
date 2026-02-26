@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -385,4 +385,13 @@ public class OidcProperties {
 	 * @since 1.10.0
 	 */
 	private long minimumMetadataCacheTimeSecs = 60l;
+
+	/**
+	 * Allow token exchange with external tokens.
+	 * <br/>
+	 * Default: false
+	 *
+	 * @since 1.13.0
+	 */
+	private boolean externalTokenExchangeEnabled;
 }

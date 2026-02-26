@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -21,7 +21,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import jakarta.persistence.OptimisticLockException;
@@ -35,6 +34,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import swiss.trustbroker.common.tracing.TraceSupport;
@@ -42,6 +42,8 @@ import swiss.trustbroker.common.util.ProcessUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.exception.GlobalExceptionHandler;
 import swiss.trustbroker.metrics.service.MetricsService;
+import swiss.trustbroker.oidc.session.HttpExchangeSupport;
+import swiss.trustbroker.util.WebSupport;
 
 // JDBC based token reaper collecting all tokens from the spring-authorization-server token storage.
 // Implementation needs to stay aligned with the JdbcOAuth2AuthorizationService.
@@ -94,7 +96,7 @@ public class CustomOAuth2AuthorizationService extends JdbcOAuth2AuthorizationSer
 	public OAuth2Authorization findById(String id) {
 		var retry = resilientOps.get();
 		var ret = findWithFinder(id, null, null, retry == null || retry);
-		applyConversation(ret);
+		applyRuntimeContext(ret);
 		return ret;
 	}
 
@@ -102,14 +104,15 @@ public class CustomOAuth2AuthorizationService extends JdbcOAuth2AuthorizationSer
 	@Override
 	public OAuth2Authorization findByToken(String token, @Nullable OAuth2TokenType tokenType) {
 		var ret = findWithFinder(null, token, tokenType, true);
-		applyConversation(ret);
+		applyRuntimeContext(ret);
 		return ret;
 	}
 
-	@Override
+	@Override // @Transactional on repository
 	public void save(OAuth2Authorization authorization) {
 		try {
 			resilientOps.set(Boolean.FALSE);
+			authorization = savePenTestScenarioForBackend(authorization);
 			super.save(authorization);
 		}
 		finally {
@@ -218,23 +221,45 @@ public class CustomOAuth2AuthorizationService extends JdbcOAuth2AuthorizationSer
 		log.debug("Deleted tokens={} for ClientID={} PrincipalName={}", deleted, clientId, principalName);
 	}
 
-	public static void saveConversation(Map<String, Object> metaData) {
-		var conversationId = TraceSupport.getOwnTraceParent();
-		if (conversationId == null || metaData == null) {
-			log.warn("Cannot assign conversationId={} to metaData={}", conversationId, metaData);
-			return;
+	// save HTTP context in metadata of FE /authorize request so BE /token call honors it in the BE-for-FE pattern (BFF)
+	public OAuth2Authorization savePenTestScenarioForBackend(OAuth2Authorization authorization) {
+		var scenario = WebSupport.penTestingScenario(HttpExchangeSupport.getRunningHttpRequest(), trustBrokerProperties);
+		if (scenario == null || authorization == null) {
+			return authorization;
 		}
-		var oldValue = metaData.put(TraceSupport.XTB_TRACEID, conversationId);
-		if (oldValue != null && !oldValue.equals(conversationId)) {
-			log.debug("Replaced conversationId={} in metaData={} with newValue={}", oldValue, metaData, conversationId);
+		var code = authorization.getToken(OAuth2AuthorizationCode.class);
+		if (code == null || code.getMetadata() == null) {
+			return authorization;
+		}
+		var penTestMarker = trustBrokerProperties.getPublicPenTestCookie();
+		log.debug("PenTest scenario {}={} saved on clientId={}",
+				penTestMarker, scenario, authorization.getRegisteredClientId());
+		return OAuth2Authorization.from(authorization)
+								  .token(code.getToken(), metadata -> metadata.put(penTestMarker, scenario))
+								  .build();
+	}
+
+	public void applyPenTestScenarioForBackend(OAuth2Authorization authorization) {
+		var code = authorization.getToken(OAuth2AuthorizationCode.class);
+		var penTestMarker = trustBrokerProperties.getPublicPenTestCookie();
+		if (code != null && code.getMetadata() != null) {
+			var scenario = code.getMetadata().get(penTestMarker);
+			if (scenario instanceof String penTestScenario) {
+				log.debug("PenTest scenario {}={} applied on clientId={}",
+						penTestMarker, scenario, authorization.getRegisteredClientId());
+				HttpExchangeSupport.setRunningPenTestScenario(penTestScenario);
+			}
 		}
 	}
 
-	private static void applyConversation(OAuth2Authorization authorization) {
+	private void applyRuntimeContext(OAuth2Authorization authorization) {
 		if (authorization == null || authorization.getAttributes() == null) {
 			return;
 		}
+		// login conversation
 		TraceSupport.switchToConversation((String)authorization.getAttributes().get(TraceSupport.XTB_TRACEID));
+		// PEN testing
+		applyPenTestScenarioForBackend(authorization);
 	}
 
 }

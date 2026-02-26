@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -863,24 +863,8 @@ public class RelyingPartySetupUtil {
 
 			var baseIdmQueryResponseAttributes = baseIdmQuery.getUserDetailsSelection();
 			mergeIdmRespAttributes(idmQuery, baseIdmQueryResponseAttributes);
-
-			if (StringUtils.isBlank(idmQuery.getClientExtId())) {
-				log.error("Rp={} has no ClientExtId configured. IDMLookup will not work! "
-						+ "Check the SetupRP and the corresponding RpProfile", relyingParty.getId());
-			}
-			if (idmQuery.getAttributeSelection().isEmpty()) {
-				log.warn("Rp={} IDMQuery.name={} has no UserDetailsSelection list. Attribute will be picked from the IDM " +
-								"response only if defined in ClaimsSelection. Check the SetupRP and the corresponding RpProfile",
-						relyingParty.getId(), baseIdmQuery.getName());
-			}
-
 		}
 		else {
-			if (baseIdmQuery.getClientExtId() == null || baseIdmQuery.getUserDetailsSelection() == null) {
-				// If everything id defined in the profile the query will work but most probably it will never be the case
-				log.warn("Rp={} has no complete IDMQuery with expected IDMQuery.name={} in SetupRp.xml."
-						+ "Check the SetupRP and the corresponding RpProfile", relyingParty.getId(), baseIdmQuery.getName());
-			}
 			relyingParty.getIdmLookup()
 					.getQueries()
 					.add(baseIdmQuery);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -155,6 +156,12 @@ public class CollectionUtil {
 			return Collections.emptyList();
 		}
 		return values.stream().filter(check).toList();
+	}
+
+	// Usage: stream.filter(CollectionUtil.distinctById(MyClass::getId)
+	public static <T, K> Predicate<T> distinctById(Function<T, K> id) {
+		Set<K> keys = ConcurrentHashMap.newKeySet();
+		return entry -> keys.add(id.apply(entry));
 	}
 
 }

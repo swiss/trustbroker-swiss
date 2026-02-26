@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -438,5 +438,11 @@ public class RelyingParty extends CounterParty implements RelyingPartyConfig {
 	 */
 	public boolean useOidc() {
 		return oidc != null;
+	}
+
+	// returns empty list if not set
+	public static AcWhitelist initializedAcWhitelist(RelyingParty relyingParty) {
+		return relyingParty != null && relyingParty.acWhitelist != null ?
+				relyingParty.acWhitelist : new AcWhitelist(new ArrayList<>());
 	}
 }

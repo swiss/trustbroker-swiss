@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -13,8 +13,20 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-package swiss.trustbroker.ldap.config;
+package swiss.trustbroker.common.config;
 
 public enum ExternalStores {
-	LDAP
+	LDAP;
+
+	public static boolean isValid(String store) {
+		if (store == null) return false;
+		try {
+			ExternalStores.valueOf(store);
+			return true;
+		}
+		catch (IllegalArgumentException e) {
+			return false;
+		}
+
+	}
 }

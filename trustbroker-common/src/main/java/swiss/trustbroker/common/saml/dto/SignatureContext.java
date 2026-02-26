@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -29,13 +29,14 @@ public class SignatureContext {
 	@Builder.Default
 	private boolean requireSignature = true;
 
-	// required for validation of inbound REDIRECT binding requests - path and query string only
-	private String requestUrl;
+	// For REDIRECT binding required for validation of inbound binding requests - path and query string only.
+	// For WS-FED used to store the input context.
+	private String context;
 
-	public static SignatureContext forRedirectBinding(String requestUrl) {
+	public static SignatureContext forRedirectBinding(String context) {
 		return SignatureContext.builder()
 				.binding(SamlBinding.REDIRECT)
-				.requestUrl(requestUrl)
+				.context(context)
 				.build();
 	}
 
@@ -57,12 +58,20 @@ public class SignatureContext {
 				   .build();
 	}
 
-	public static SignatureContext forBinding(SamlBinding binding, String requestUrl) {
+	public static SignatureContext forWsFed(String context) {
+		return SignatureContext.builder()
+							   .binding(SamlBinding.WS_FED)
+							   .context(context)
+							   .build();
+	}
+
+	public static SignatureContext forBinding(SamlBinding binding, String context) {
 		return switch (binding) {
-			case REDIRECT -> SignatureContext.forRedirectBinding(requestUrl);
+			case REDIRECT -> SignatureContext.forRedirectBinding(context);
 			case POST -> SignatureContext.forPostBinding();
 			case ARTIFACT -> SignatureContext.forArtifactBinding();
 			case SOAP -> SignatureContext.forSoapBinding();
+			case WS_FED -> SignatureContext.forWsFed(context);
 		};
 	}
 }

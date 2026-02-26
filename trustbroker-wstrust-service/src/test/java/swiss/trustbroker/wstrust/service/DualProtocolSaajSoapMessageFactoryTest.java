@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -40,11 +40,11 @@ import org.springframework.ws.transport.TransportInputStream;
 class DualProtocolSaajSoapMessageFactoryTest {
 
 	@MockitoBean
-	@Qualifier("1.1")
+	@Qualifier("wsTrustSoapClient11")
 	private SaajSoapMessageFactory mockFactory11;
 
 	@MockitoBean
-	@Qualifier("1.2")
+	@Qualifier("wsTrustSoapClient12")
 	private SaajSoapMessageFactory mockFactory12;
 
 	@MockitoBean

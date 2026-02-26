@@ -25,17 +25,28 @@
 
 package swiss.trustbroker.oidc;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.ClaimAccessor;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
+import swiss.trustbroker.common.util.OidcUtil;
 
 /**
  * Copied from spring-security-oauth2-authorization-server:
@@ -113,4 +124,52 @@ public class CustomOAuth2AuthenticationProviderUtils {
 		return authorizationBuilder.build();
 	}
 
+	static <T extends OAuth2Token> OAuth2AccessToken accessToken(OAuth2Authorization.Builder builder, T token,
+																 OAuth2TokenContext accessTokenContext) {
+
+		OAuth2AccessToken.TokenType tokenType = OAuth2AccessToken.TokenType.BEARER;
+		if (token instanceof ClaimAccessor claimAccessor) {
+			Map<String, Object> cnfClaims = claimAccessor.getClaimAsMap(OidcUtil.OIDC_TOKEN_CNF);
+			if (cnfClaims != null && cnfClaims.containsKey(OidcUtil.OIDC_TOKEN_JKT)) {
+				tokenType = OAuth2AccessToken.TokenType.DPOP;
+			}
+		}
+		OAuth2AccessToken accessToken = new OAuth2AccessToken(tokenType, token.getTokenValue(), token.getIssuedAt(),
+				token.getExpiresAt(), accessTokenContext.getAuthorizedScopes());
+		OAuth2TokenFormat accessTokenFormat = accessTokenContext.getRegisteredClient()
+																.getTokenSettings()
+																.getAccessTokenFormat();
+		builder.token(accessToken, metadata -> {
+			if (token instanceof ClaimAccessor claimAccessor) {
+				metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, claimAccessor.getClaims());
+			}
+			metadata.put(OAuth2Authorization.Token.INVALIDATED_METADATA_NAME, false);
+			metadata.put(OAuth2TokenFormat.class.getName(), accessTokenFormat.getValue());
+		});
+
+		return accessToken;
+	}
+
+	static <T extends OAuth2Token> OidcIdToken idToken(OAuth2Authorization.Builder builder, T token) {
+		if (token == null) {
+			log.error("Invalid null token for idToken");
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_TOKEN);
+		}
+		if (token instanceof Jwt jwt) {
+			var idToken = new OidcIdToken(jwt.getTokenValue(), jwt.getIssuedAt(), jwt.getExpiresAt(), jwt.getClaims());
+			builder.token(idToken, metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, idToken.getClaims()));
+			return idToken;
+		}
+		return null;
+	}
+
+	static <T extends OAuth2Token> OAuth2RefreshToken refreshToken(OAuth2Authorization.Builder builder, T token) {
+		if (token == null) {
+			log.error("Invalid null token for idToken");
+			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_TOKEN);
+		}
+		var refreshToken = new OAuth2RefreshToken(UUID.randomUUID().toString(), token.getIssuedAt(), token.getExpiresAt());
+		builder.token(refreshToken, metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, Collections.emptyMap()));
+		return refreshToken;
+	}
 }

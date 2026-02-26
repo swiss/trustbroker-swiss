@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -24,14 +24,14 @@ import { environment } from '../../environments/environment';
 	providedIn: 'root'
 })
 export class AnnouncementsService {
-	private readonly baseUrl = environment.apiUrl;
+	private readonly apiBaseUrl = environment.apiUrl;
 
 	constructor(private readonly http: HttpClient) {}
 
 	getAnnouncements(issuer, appName): Observable<AnnouncementResponse[]> {
 		if (typeof appName !== 'undefined') {
-			return this.http.get<AnnouncementResponse[]>(`${this.baseUrl}announcements/${issuer}/${appName}`, {});
+			return this.http.get<AnnouncementResponse[]>(`${this.apiBaseUrl}announcements/${issuer}/${appName}`, {});
 		}
-		return this.http.get<AnnouncementResponse[]>(`${this.baseUrl}announcements/${issuer}`, {});
+		return this.http.get<AnnouncementResponse[]>(`${this.apiBaseUrl}announcements/${issuer}`, {});
 	}
 }

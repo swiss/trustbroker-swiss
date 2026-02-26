@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -61,7 +61,7 @@ public enum AuthorizationGrantType {
 	@XmlEnumValue("device_code")
 	DEVICE_CODE(org.springframework.security.oauth2.core.AuthorizationGrantType.DEVICE_CODE, false),
 
-	@XmlEnumValue("token_exchange")
+	@XmlEnumValue("urn:ietf:params:oauth:grant-type:token-exchange")
 	TOKEN_EXCHANGE(org.springframework.security.oauth2.core.AuthorizationGrantType.TOKEN_EXCHANGE, false);
 
 	private static final List<AuthorizationGrantType> DEFAULT_VALUES =

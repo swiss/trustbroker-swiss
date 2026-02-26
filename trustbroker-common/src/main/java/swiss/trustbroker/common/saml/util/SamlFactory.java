@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -478,7 +478,7 @@ public class SamlFactory {
 
 	public static <T extends StatusResponseType> T createResponse(Class<T> responseClass, String issuer) {
 		var response = OpenSamlUtil.buildSamlObject(responseClass);
-		response.setConsent(RequestAbstractType.UNSPECIFIED_CONSENT);
+		response.setConsent(StatusResponseType.UNSPECIFIED_CONSENT);
 		response.setIssueInstant(Instant.now());
 		response.setID(OpenSamlUtil.generateSecureRandomId());
 		response.setVersion(SAMLVersion.VERSION_20);
@@ -487,19 +487,19 @@ public class SamlFactory {
 	}
 
 	public static <T extends RequestAbstractType> T createRequest(Class<T> requestClass, String issuer) {
-		var response = OpenSamlUtil.buildSamlObject(requestClass);
-		response.setConsent(RequestAbstractType.UNSPECIFIED_CONSENT);
-		response.setIssueInstant(Instant.now());
-		response.setID(OpenSamlUtil.generateSecureRandomId());
-		response.setVersion(SAMLVersion.VERSION_20);
-		response.setIssuer(SamlFactory.createIssuer(issuer));
-		return response;
+		var request = OpenSamlUtil.buildSamlObject(requestClass);
+		request.setConsent(RequestAbstractType.UNSPECIFIED_CONSENT);
+		request.setIssueInstant(Instant.now());
+		request.setID(OpenSamlUtil.generateSecureRandomId());
+		request.setVersion(SAMLVersion.VERSION_20);
+		request.setIssuer(SamlFactory.createIssuer(issuer));
+		return request;
 	}
 
 	public static LogoutRequest createLogoutRequest(String issuer, String destination, NameID nameId) {
 		var logoutRequest = SamlFactory.createRequest(LogoutRequest.class, issuer);
 		if (nameId != null) {
-			// need to copy as we cannot have add the same object to multiple DOMs
+			// need to copy as we cannot add the same object to multiple DOMs
 			nameId = SamlFactory.createNameId(nameId.getValue(), nameId.getFormat(), nameId.getSPNameQualifier());
 			logoutRequest.setNameID(nameId);
 		}

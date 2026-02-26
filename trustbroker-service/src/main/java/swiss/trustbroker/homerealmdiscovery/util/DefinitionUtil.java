@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -351,6 +351,19 @@ public class DefinitionUtil {
 			}
 		}
 		return Collections.emptyList();
+	}
+
+	/**
+	 * First value matching attribute's name by definition's name.
+	 */
+	public static List<String> findValueByName(Map<? extends AttributeName, List<String>> attributes,
+															 String attributeName) {
+		return attributes.entrySet()
+						 .stream()
+						 .filter(entry -> attributeName.equals(entry.getKey().getName()))
+						 .map(Map.Entry::getValue)
+						 .findFirst()
+						 .orElse(Collections.emptyList());
 	}
 
 	private static void checkAmbiguities(Map<? extends AttributeName, ?> result, String name, String source) {

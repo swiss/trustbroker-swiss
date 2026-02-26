@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -331,6 +331,7 @@ class SsoServiceTest {
 	@MethodSource
 	void generateCookieWithFullNameFromState(boolean sessionCookie, boolean implicit) {
 		var lifeTime = 10000;
+		var claimsParty = Optional.of(ClaimsParty.builder().build());
 		var ssoStateData = buildStateForSso(SESSION_ID, DEVICE_ID, Set.of(RELYING_PARTY_ID));
 		var secure = true;
 		ssoStateData.getSsoState().setMaxSessionTimeSecs(lifeTime);
@@ -339,6 +340,7 @@ class SsoServiceTest {
 		ssoStateData.setSubjectNameId(SUBJECT_NAME_ID);
 		doReturn(sessionCookie).when(trustBrokerProperties).isUseSessionCookieForSso();
 		doReturn(secure).when(trustBrokerProperties).isSecureBrowserHeaders();
+		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		var ssoGroup = buildSsoGroup();
 		doReturn(ssoGroup).when(relyingPartySetupService).getSsoGroupConfig(SSO_GROUP);
 		var cookie = ssoService.generateCookie(ssoStateData);
@@ -924,7 +926,7 @@ class SsoServiceTest {
 			assertThat(cookie.getValue(), is(""));
 			assertThat(cookie.getMaxAge(), is(0));
 		}
-		verify(stateCacheService).invalidate(ssoStateData, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(ssoStateData, SsoService.class.getSimpleName());
 	}
 
 	@Test
@@ -945,8 +947,8 @@ class SsoServiceTest {
 			assertThat(cookie.getValue(), is(""));
 			assertThat(cookie.getMaxAge(), is(0));
 		}
-		verify(stateCacheService).invalidate(ssoStateData1, SsoService.class.getSimpleName());
-		verify(stateCacheService).invalidate(ssoStateData2, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(ssoStateData1, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(ssoStateData2, SsoService.class.getSimpleName());
 	}
 
 	@Test
@@ -984,7 +986,7 @@ class SsoServiceTest {
 		var ssoStateData = buildStateForSso(SESSION_ID, DEVICE_ID, Set.of(RELYING_PARTY_ID, OTHER_RELYING_PARTY_ID));
 		assertThat(ssoService.internalLogoutSsoParticipant(ssoStateData, RELYING_PARTY_ID), is(RELYING_PARTY_ID));
 
-		verify(stateCacheService).invalidate(ssoStateData, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(ssoStateData, SsoService.class.getSimpleName());
 	}
 
 	@Test
@@ -993,7 +995,7 @@ class SsoServiceTest {
 		assertThat(ssoService.internalLogoutSsoParticipant(stateData, RELYING_PARTY_ID), is(nullValue()));
 
 		// still invalidated
-		verify(stateCacheService).invalidate(stateData, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(stateData, SsoService.class.getSimpleName());
 	}
 
 	@Test
@@ -1002,7 +1004,7 @@ class SsoServiceTest {
 		assertThat(ssoService.internalLogoutSsoParticipant(ssoStateData, "otherRp"), is(nullValue()));
 
 		// still invalidated
-		verify(stateCacheService).invalidate(ssoStateData, SsoService.class.getSimpleName());
+		verify(stateCacheService).tryInvalidate(ssoStateData, SsoService.class.getSimpleName());
 	}
 
 	@ParameterizedTest
@@ -1324,6 +1326,7 @@ class SsoServiceTest {
 		doReturn(new CustomQoa(SamlTestBase.Qoa.SOFTWARE_PKI.getName(), SamlTestBase.Qoa.SOFTWARE_PKI.getLevel())).when(qoaService).extractQoaLevel("urn:oasis:names:tc:SAML:2.0:ac:classes:SmartcardPKI", null);
 
 		if (relyingParty != null) {
+			doReturn(relyingParty.getQoaConfig()).when(qoaService).getQoaConfiguration(any(), any());
 			doReturn(new CustomQoa(SamlTestBase.Qoa.UNSPECIFIED.getName(), -1))
 					.when(qoaService).extractQoaLevel(null, relyingParty.getQoaConfig());
 			doReturn(new CustomQoa(SamlTestBase.Qoa.UNSPECIFIED.getName(), SamlTestBase.Qoa.UNSPECIFIED.getLevel()))
@@ -1754,7 +1757,7 @@ class SsoServiceTest {
 				claimsParty, relyingParty,
 				requestQoas,
 				Optional.ofNullable(assuredQoa),
-				"TEST-Session");
+				"TEST-Session", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(expectedResult));
 	}
 
@@ -1834,7 +1837,7 @@ class SsoServiceTest {
 		mockQoaService(relyingParty, claimsParty, null, expectedQuoas);
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
 				Optional.of(getQoa(20)) , // mapped to PASSWORD_PROTECTED_TRANSPORT
-				"SSO-2");
+				"SSO-2", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(false));
 	}
 
@@ -1849,7 +1852,7 @@ class SsoServiceTest {
 		mockQoaService(relyingParty, claimsParty, null, expectedQuoas);
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
 				Optional.of(getQoa(30)), // mapped to SOFTWARE_TIME_SYNC_TOKEN - contained in expectedQuoas
-				"SSO-3");
+				"SSO-3", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(true));
 	}
 
@@ -1863,7 +1866,7 @@ class SsoServiceTest {
 		mockDefaultProperties();
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
 				Optional.of(getQoa(50)), // mapped to SOFTWARE_PKI - not contained in expectedQoas
-				"SSO-4");
+				"SSO-4", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(true));
 	}
 
@@ -1876,10 +1879,10 @@ class SsoServiceTest {
 		mockDefaultProperties();
 		mockQoaService(relyingParty, claimsParty, null, expectedQuoas);
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
-				Optional.of(getQoa(20)), "SSO-5");
+				Optional.of(getQoa(20)), "SSO-5", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(false));
 		resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
-				Optional.of(getQoa(30)), "SSO-5");
+				Optional.of(getQoa(30)), "SSO-5", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(true));
 	}
 
@@ -1893,10 +1896,10 @@ class SsoServiceTest {
 		mockDefaultProperties();
 		mockQoaService(relyingParty, claimsParty, null, expectedQuoas);
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
-				Optional.of(getQoa(40)), "SSO-6");
+				Optional.of(getQoa(40)), "SSO-6", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(false));
 		resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
-				Optional.of(getQoa(50)), "SSO-6");
+				Optional.of(getQoa(50)), "SSO-6", relyingParty.getQoaConfig());
 		assertThat(resultSufficient, is(true));
 	}
 
@@ -1908,7 +1911,7 @@ class SsoServiceTest {
 		mockDefaultProperties();
 		mockQoaService(relyingParty, claimsParty, null, expectedQuoas);
 		var resultSufficient = ssoService.isQoaLevelSufficient(claimsParty, relyingParty, expectedQuoas,
-				Optional.of(getQoa(10)), "SSO-6");
+				Optional.of(getQoa(10)), "SSO-6", relyingParty.getQoaConfig());
 		//  always false as StrongestPossible is not known
 		assertThat(resultSufficient, is(false));
 	}
@@ -1953,25 +1956,25 @@ class SsoServiceTest {
 	@Test
 	void updateSubjectNameIdInSession() {
 		var stateData = buildStateDataByAuthnReq();
-		assertThrows(TechnicalException.class, () -> SsoService.updateSubjectNameIdInSession(stateData));
 		// establishing SSO session
 		var ssoStateData = buildStateForSso(SESSION_ID, DEVICE_ID, Set.of(RELYING_PARTY_ID));
 		var cpResponse = ssoStateData.getCpResponse();
 		// set original subject name ID
 		setNameId(cpResponse, SUBJECT_NAME_ID, SUBJECT_NAME_ID);
 		assertNull(stateData.getSubjectNameId());
-		SsoService.updateSubjectNameIdInSession(ssoStateData);
+		var claimsParty = ClaimsParty.builder().build();
+		SsoService.updateSubjectNameIdInSession(ssoStateData, claimsParty);
 		assertThat(ssoStateData.getSubjectNameId(), is(SUBJECT_NAME_ID));
 		// update with same subject name ID -> OK
-		SsoService.updateSubjectNameIdInSession(ssoStateData);
+		SsoService.updateSubjectNameIdInSession(ssoStateData, claimsParty);
 		assertThat(ssoStateData.getSubjectNameId(), is(SUBJECT_NAME_ID));
 		// update with NameId modified after CP response -> OK (+ log)
 		setNameId(cpResponse, "otherNameId1", SUBJECT_NAME_ID);
-		SsoService.updateSubjectNameIdInSession(ssoStateData);
+		SsoService.updateSubjectNameIdInSession(ssoStateData, claimsParty);
 		assertThat(ssoStateData.getSubjectNameId(), is(SUBJECT_NAME_ID));
 		// update with changed original CP response name ID -> NOK
 		setNameId(cpResponse, "otherNameId2", "otherNameId2");
-		assertThrows(TechnicalException.class, () -> SsoService.updateSubjectNameIdInSession(ssoStateData));
+		assertThrows(TechnicalException.class, () -> SsoService.updateSubjectNameIdInSession(ssoStateData, claimsParty));
 		assertThat(ssoStateData.getSubjectNameId(), is(SUBJECT_NAME_ID));
 	}
 
@@ -1980,6 +1983,8 @@ class SsoServiceTest {
 		var oidcPrincipal = "oidcPrincipal";
 		var oidcSessionId = "oidcSessionId";
 		var stateData = buildStateDataByAuthnReq();
+		var claimsParty = Optional.of(ClaimsParty.builder().build());
+		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		assertThat(ssoService.isOidcPrincipalAllowedToJoinSsoSession(stateData, oidcPrincipal, oidcSessionId), is(false));
 
 		// established SSO session (minimal flags)
@@ -2187,6 +2192,8 @@ class SsoServiceTest {
 		ssoStateData.setIssuer(CP_ISSUER_ID);
 		var stateDataByAuthnReq = buildStateDataByAuthnReq();
 		var relyingParty = buildRelyingParty(true);
+		var claimsParty = Optional.of(ClaimsParty.builder().build());
+		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		ssoService.completeDeviceInfoPreservingStateForSso(ssoStateData, stateDataByAuthnReq, relyingParty);
 		assertThat(ssoStateData.getCompletedAuthnRequests(), contains(AUTHN_REQUEST_ID));
 		var ssoState = ssoStateData.getSsoState();
@@ -2198,8 +2205,10 @@ class SsoServiceTest {
 	@ParameterizedTest
 	@CsvSource(value = { "false", "true" })
 	void copyToSsoStateAndInvalidateAuthnRequestState(boolean implicit) {
+		var claimsParty = Optional.of(ClaimsParty.builder().build());
 		doReturn(new SecurityChecks()).when(trustBrokerProperties).getSecurity();
 		when(trustBrokerProperties.getQoa()).thenReturn(givenGlobalQoa());
+		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		// ensure the copy includes all the needed fields by comparing with the result of AssertionConsumerService.saveState
 
 		// state generated when saving new AuthnRequest
@@ -2215,11 +2224,11 @@ class SsoServiceTest {
 
 		var request = new MockHttpServletRequest();
 		var relayState1 = "relayState";
-		request.addParameter(SamlIoUtil.SAML_RELAY_STATE, relayState1);
 		var referer1 = "https://referer1";
 		request.addHeader(HttpHeaders.REFERER, referer1);
 
-		var authState = assertionConsumerService.saveState(authnRequest, false, request, relyingParty, Optional.empty(),
+		var authState = assertionConsumerService.saveState(authnRequest, relayState1, false, request, relyingParty,
+				Optional.empty(),
 				SamlBinding.POST);
 		// CpResponse with name ID is required for establishing SSO and copying
 		authState.setCpResponse(CpResponse.builder().build());
@@ -2263,6 +2272,8 @@ class SsoServiceTest {
 		var authState = buildStateForSso(SESSION_ID, DEVICE_ID, Set.of(RELYING_PARTY_ID));
 		setNameId(authState.getCpResponse(), SUBJECT_NAME_ID, SUBJECT_NAME_ID);
 		var ssoStateData = buildStateForSso(SESSION_ID, DEVICE_ID, Set.of(RELYING_PARTY_ID));
+		var claimsParty = Optional.of(ClaimsParty.builder().build());
+		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		// same ID would in practice mean same session, make them different here, so we can verify the copying was done
 		var lastConversation = "conv1";
 		authState.setLastConversationId(lastConversation);

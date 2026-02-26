@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -168,7 +168,7 @@ export class LanguageService {
 
 	private getBrowserLanguageOrDefault(): string {
 		const browserLang = this.translateService.getBrowserLang();
-		return this.isValidLanguage(browserLang) ? browserLang : Constant.DefaultLanguageCode.toString();
+		return browserLang && this.isValidLanguage(browserLang) ? browserLang : Constant.DefaultLanguageCode.toString();
 	}
 
 	private updateLanguageCookie(language: string): void {

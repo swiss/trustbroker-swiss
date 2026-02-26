@@ -40,11 +40,19 @@ public class VelocityUtil {
 
 	public static final String VELOCITY_SLO_TEMPLATE_ID = "/templates/SLO-SAML2-POST.vm";
 
+	public static final String VELOCITY_WS_FED_TEMPLATE_ID = "/templates/WS-FED-POST.vm";
+
 	public static final String VELOCITY_PARAM_XTB_SIG_ALG = "XTBSigAlg";
 
 	public static final String VELOCITY_PARAM_XTB_SIGNATURE = "XTBSignature";
 
 	public static final String VELOCITY_PARAM_XTB_HTTP_METHOD = "XTBHttpMethod";
+
+	public static final String VELOCITY_PARAM_XTB_ACTION = "XTBAction";
+
+	public static final String VELOCITY_PARAM_XTB_CONTEXT = "XTBContext";
+
+	public static final String VELOCITY_PARAM_XTB_RESULT = "XTBResult";
 
 	public static final String VELOCITY_PARAM_ACTION = "action"; // from OpenSaml
 
@@ -65,9 +73,12 @@ public class VelocityUtil {
 		renderTemplate(velocityEngine, response, velocityTemplate, context);
 	}
 
-	// HTTPPostEncoder.postEncode copied, not flushing the stream to allow TX commit
-	// Alternative 1: HttpServletResponseWrapper with custom output catching the flush
-	// Alternative 2: Use @Transactional on SamlController split away from AppController
+	// HTTPPostEncoder.postEncode copied, not flushing the stream to allow TX commit.
+	// Using getWriter would have buffered with autoFlush=false, but opensaml flushes explicitly.
+	// v1.13.0:
+	// @Transactional boundary moved to service level separating load/save of SAML/OIDC federation state into own transactions.
+	// This allows also concurrent processing initiated with the same state (but still has a winner on the client).
+	// To make sure no clients receive data too early we also use a catchOutputStream/flushOutputStream on OidcTxFilter.
 	public static void renderTemplate(
 			VelocityEngine velocityEngine, HttpServletResponse response, String velocityTemplate,
 			VelocityContext context) {

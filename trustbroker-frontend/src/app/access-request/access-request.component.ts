@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -26,7 +26,7 @@ import { environment } from '../../environments/environment';
 	standalone: false
 })
 export class AccessRequestComponent implements OnInit {
-	private readonly baseUrl = environment.apiUrl;
+	private readonly apiBaseUrl = environment.apiUrl;
 	private sessionId: string;
 	private _state: string;
 	private _showContinueButton: boolean;
@@ -65,14 +65,14 @@ export class AccessRequestComponent implements OnInit {
 	}
 
 	initiateAccessRequest() {
-		window.location.href = `${this.baseUrl}accessrequest/initiate/${this.sessionId}`;
+		window.location.href = `${this.apiBaseUrl}accessrequest/initiate/${this.sessionId}`;
 	}
 
 	abortAccessRequest() {
-		window.location.href = `${this.baseUrl}accessrequest/abort/${this.sessionId}`;
+		window.location.href = `${this.apiBaseUrl}accessrequest/abort/${this.sessionId}`;
 	}
 
 	completeAccessRequest() {
-		window.location.href = `${this.baseUrl}accessrequest/complete/${this.sessionId}`;
+		window.location.href = `${this.apiBaseUrl}accessrequest/complete/${this.sessionId}`;
 	}
 }

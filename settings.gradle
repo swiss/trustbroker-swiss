@@ -10,6 +10,8 @@ ext {
 	// build promotion
 	buildName = System.env.BUILD_NAME
 	buildNumber = System.env.BUILD_NUMBER
+	repoUser = 'anonymous'
+	repoPass = 'anonymous'
 }
 
 dependencyResolutionManagement {

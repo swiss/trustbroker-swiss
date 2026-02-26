@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -437,7 +437,8 @@ class AppControllerTest {
 				)
 				.andExpect(status().isFound())
 				.andExpect(header().string(HttpHeaders.LOCATION, containsString(SkinnyHrd.SKINNY_HRD_HTML)))
-				.andExpect(header().string(HttpHeaders.LOCATION, containsString(authnRequest.getID())))
+				.andExpect(header().string(HttpHeaders.LOCATION,
+						containsString(ApiSupport.encodeUrlParameter(authnRequest.getID()))))
 				.andExpect(header().string(HttpHeaders.LOCATION, containsString(VERSION_INFO)));
 	}
 

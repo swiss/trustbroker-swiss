@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -77,6 +77,8 @@ import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.SloProtocol;
 import swiss.trustbroker.federation.xmlconfig.SloResponse;
 import swiss.trustbroker.federation.xmlconfig.SsoGroup;
+import swiss.trustbroker.federation.xmlconfig.SubjectName;
+import swiss.trustbroker.federation.xmlconfig.SubjectNameScope;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.mapping.dto.CustomQoa;
 import swiss.trustbroker.mapping.dto.QoaConfig;
@@ -98,7 +100,7 @@ public class SsoService {
 	@Data
 	@RequiredArgsConstructor(staticName = "of")
 	@AllArgsConstructor(staticName = "of")
-	@SuppressWarnings("java:S6548") // false positive - class has "named instance, not a singleton
+	@SuppressWarnings("java:S6548") // false positive - class has named instance, not a singleton
 	public static class SsoCookieNameParams {
 
 		public static final String XTB_COOKIE_PREFIX = "XTB_";
@@ -238,23 +240,58 @@ public class SsoService {
 	}
 
 	public Cookie generateCookie(StateData stateData) {
+		var cpIssuerId = stateData.getCpIssuer() != null ? stateData.getCpIssuer() : stateData.getCpResponse().getIssuerId();
+		if (cpIssuerId == null) {
+			throw new TechnicalException(String.format("Missing cpIssuer on stateDate=%s", stateData.getId()));
+		}
 		var isSecureTransport = trustBrokerProperties.isSecureBrowserHeaders();
-		var subjectNameId = stateData.getSubjectNameId();
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(cpIssuerId);
+		var ssoSubject = getSsoSubject(stateData, claimsParty.orElse(null));
 		var ssoState = stateData.getSsoState();
 		var sessionId = stateData.getId();
 		var sameSite = isSecureTransport ? calculateCookieSameSiteFlag(ssoState): null;
 		var sessionLifeTime = trustBrokerProperties.isUseSessionCookieForSso() ? null : ssoState.getMaxSessionTimeSecs();
 		var params = ssoState.isImplicitSsoGroup() ? getCookieSsoGroupName(ssoState.getSsoGroupName()) :
-				SsoCookieNameParams.of(ssoState.getSsoGroupName(), stateData.getCpIssuer(), subjectNameId);
-		return generateCookie(
-				params,
-				sessionId, sessionLifeTime, isSecureTransport, sameSite);
+				SsoCookieNameParams.of(ssoState.getSsoGroupName(), cpIssuerId, ssoSubject);
+		return generateCookie(params, sessionId, sessionLifeTime, isSecureTransport, sameSite);
+	}
+
+	public static String getSsoSubject(StateData stateData, ClaimsParty claimsParty) {
+		var ssoState = stateData.getSsoState();
+		if (ssoState != null && ssoState.getSubject() != null) {
+			return ssoState.getSubject();
+		}
+		var ssSubjectFromCpResponse = getSsoSubjectFromCpConfigOrState(stateData, claimsParty);
+		if (ssSubjectFromCpResponse != null) return ssSubjectFromCpResponse;
+		return stateData.getSubjectNameId();
+	}
+
+	private static String getSsoSubjectFromCpConfigOrState(StateData stateData, ClaimsParty claimsParty) {
+		var ssoSubjectClaim = getSsoSubjectNameClaim(claimsParty);
+		if (ssoSubjectClaim != null) {
+			var cpResponse = stateData.getCpResponse();
+			if (cpResponse != null) {
+				return cpResponse.getSsoSubjectFromCpResponse(ssoSubjectClaim);
+			}
+		}
+		return null;
+	}
+
+	private static String getSsoSubjectNameClaim(ClaimsParty claimsParty) {
+		var subjectNameMappings = claimsParty.getSubjectNameMappings();
+		if (subjectNameMappings != null) {
+			return subjectNameMappings.getSubjects().stream()
+									  .filter(subjectName -> subjectName.getScope().equals(SubjectNameScope.SSO))
+									  .map(SubjectName::getClaim)
+									  .findFirst().orElse(null);
+		}
+		return null;
 	}
 
 	String calculateCookieSameSiteFlag(SsoState ssoState) {
 		var ssoGroup = relyingPartySetupService.getSsoGroupConfig(ssoState.getSsoGroupName(), true);
 		// SSO group name could be the result of getImplicitSsoGroupName, which does not exist.
-		String sameSite = ssoGroup.isPresent() ? ssoGroup.get().getSessionCookieSameSite() : null;
+		var sameSite = ssoGroup.map(SsoGroup::getSessionCookieSameSite).orElse(null);
 		if (WebUtil.isSameSiteDynamic(sameSite)) {
 			var perimeterUri = WebUtil.getValidatedUri(trustBrokerProperties.getPerimeterUrl());
 			var isCrossSite = ssoState.getSsoParticipants().stream().anyMatch(
@@ -345,11 +382,6 @@ public class SsoService {
 		return validStates;
 	}
 
-	/**
-	 * @param nameParams
-	 * @param cookies
-	 * @return exact matches are first in the list
-	 */
 	private List<Cookie> findValidStateCookies(SsoCookieNameParams nameParams, Cookie[] cookies) {
 		List<Cookie> matchingCookies = new ArrayList<>();
 		if (cookies == null) {
@@ -374,7 +406,7 @@ public class SsoService {
 			}
 			// logging for other cookies would be too verbose
 		}
-		return matchingCookies;
+		return matchingCookies; // exact matches are first in list
 	}
 
 	private Optional<StateData> findValidStateForId(String sessionIdFromCookie, String actor) {
@@ -405,11 +437,6 @@ public class SsoService {
 			}
 		}
 		return result;
-	}
-
-	public String generateRelayState() {
-		// pure random we should use SamlUtil.generateRelayState with randomGenerator.generateIdentifier
-		return TraceSupport.getOwnTraceParentForSaml();
 	}
 
 	public boolean isRelyingPartyOkForSso(RelyingParty relyingParty, StateData stateData) {
@@ -628,6 +655,9 @@ public class SsoService {
 	}
 
 	private static List<String> getCpAssertedContextClassesFromState(StateData stateData) {
+		if (stateData == null) {
+			return Collections.emptyList();
+		}
 		var contextClasses = (stateData.getCpResponse() == null) ? null : stateData.getCpResponse().getContextClasses();
 		if (contextClasses == null) {
 			// avoid returning null
@@ -661,24 +691,18 @@ public class SsoService {
 
 	// AuthnRequest side decision
 	boolean isQoaLevelSufficient(ClaimsParty claimsParty, RelyingParty relyingParty,
-			List<String> requestQoas, Optional<String> knownQoa, String sessionId) {
+								 List<String> requestQoas, Optional<String> knownQoa, String sessionId, QoaConfig rpQoaConfig) {
 		var qoaSufficient = true; // assume we can login with SSO per default
 
 		// request based decision (including DEBUG logging for request side)
-		List<CustomQoa> rpQoas = qoaMappingService.extractQoaLevels(requestQoas, relyingParty.getQoaConfig());
+		var rpQoas = qoaMappingService.extractQoaLevels(requestQoas, rpQoaConfig);
 		var knowQoaLevel = qoaMappingService.extractQoaLevel(knownQoa.orElse(null), claimsParty.getQoaConfig());
 		if (!isQoaEnoughForSso(relyingParty, rpQoas, knowQoaLevel, knownQoa)) {
 			qoaSufficient = false;
 		}
-		// no required QoAs => treat as all possible QoAs
-		// state based decision (including INFO logging for )
-		else if (!requestQoas.isEmpty() && knownQoa.isPresent()) {
-			if (requestQoas.contains(knownQoa.get())) {
-				qoaSufficient = true;
-			}
-			else {
-				qoaSufficient = !stateQoaSmaller(claimsParty, knownQoa.get(), rpQoas, sessionId);
-			}
+		// state based decision, no required QoAs => treat as all possible QoAs
+		else if (!requestQoas.isEmpty() && knownQoa.isPresent() && !requestQoas.contains(knownQoa.get())) {
+			qoaSufficient = !stateQoaSmaller(claimsParty, knownQoa.get(), rpQoas, sessionId);
 		}
 
 		if (log.isInfoEnabled()) {
@@ -755,8 +779,7 @@ public class SsoService {
 
 	private SsoSessionOperation qoaLevelSufficient(ClaimsParty claimsParty, RelyingParty relyingParty,
 			List<String> requestedContextClasses, StateData stateData) {
-		var spStateData = stateData != null ? stateData.getSpStateData() : null;
-		var qoaConfiguration = qoaMappingService.getQoaConfiguration(spStateData, relyingParty);
+		var qoaConfiguration = qoaMappingService.getQoaConfiguration(stateData.getSpStateData(), relyingParty);
 		var authnQoas = extractValidQoasFromContextClasses(requestedContextClasses, qoaConfiguration);
 
 		if (authnQoas.isEmpty()) {
@@ -764,7 +787,7 @@ public class SsoService {
 			return SsoSessionOperation.JOIN;
 		}
 
-		var sessionQoa = Optional.ofNullable(stateData.getSsoState().getSsoQoa());
+		var sessionQoa = Optional.ofNullable(stateData.getSsoState() != null ? stateData.getSsoState().getSsoQoa() : null);
 		if (sessionQoa.isEmpty()) {
 			// should not happen as this is checked when the session is established
 			var contextClasses = getCpAssertedContextClassesFromState(stateData);
@@ -775,7 +798,7 @@ public class SsoService {
 			sessionQoa = findHighestQoaInState(contextClasses, claimsParty.getQoaConfig());
 		}
 
-		if (!isQoaLevelSufficient(claimsParty, relyingParty, authnQoas, sessionQoa, stateData.getId())) {
+		if (!isQoaLevelSufficient(claimsParty, relyingParty, authnQoas, sessionQoa, stateData.getId(), qoaConfiguration)) {
 			log.debug("For ssoSessionId={} sessionQoa={} is not sufficient for requestedQoas={} - STEPUP required for SSO",
 					stateData.getId(), sessionQoa, authnQoas);
 			return SsoSessionOperation.STEPUP;
@@ -897,7 +920,7 @@ public class SsoService {
 			}
 		}
 		log.debug("Participant={} triggered invalidation of ssoSessionId={}", participantId, stateData.getId());
-		stateCacheService.invalidate(stateData, this.getClass().getSimpleName());
+		stateCacheService.tryInvalidate(stateData, this.getClass().getSimpleName());
 		return result;
 	}
 
@@ -976,7 +999,7 @@ public class SsoService {
 		List<SsoParticipants> result = new ArrayList<>();
 		for (StateData stateData : states) {
 			if (!validateFingerprint(deviceId, stateData, FingerprintCheck.STRICT)) {
-				log.debug("Fingerprint did not match for state={}", stateData.getId());
+				log.debug("Fingerprint did not match state={}", stateData.getId());
 			}
 			else if (stateData.hasSsoState()) {
 				result.add(getSessionSsoParticipants(stateData));
@@ -1002,7 +1025,7 @@ public class SsoService {
 				}).collect(Collectors.toSet());
 		var result = SsoParticipants.builder()
 				.ssoGroupName(ssoState.getSsoGroupName())
-				.ssoSubject(stateData.getSubjectNameId())
+				.ssoSubject(ssoState.getSubject() != null ? ssoState.getSubject() : stateData.getSubjectNameId())
 				.participants(responseParticipants)
 				.expirationTime(lifecycle.getExpirationTime())
 				.ssoEstablishedTime(lifecycle.getSsoEstablishedTime())
@@ -1044,7 +1067,7 @@ public class SsoService {
 
 	private void establishSso(RelyingParty relyingParty, ClaimsParty claimsParty, StateData stateData, SsoGroup ssoGroup,
 			boolean implicitSsoGroup) {
-		updateSubjectNameIdInSession(stateData);
+		updateSubjectNameIdInSession(stateData, claimsParty);
 		if (!updateQoaInSession(relyingParty, claimsParty, stateData) && !implicitSsoGroup) {
 			if (stateData.isSsoEstablished()) {
 				log.info("Letting rpIssuerId={} join the ssoSessionId={} despite too low QOA",
@@ -1077,29 +1100,41 @@ public class SsoService {
 				stateData.getSpStateData().getId(), oidcSessionId);
 	}
 
-	static void updateSubjectNameIdInSession(StateData ssoStateData) {
-		var nameIdFromIdp = checkAndExtractNameId(ssoStateData);
+	static void updateSubjectNameIdInSession(StateData ssoStateData, ClaimsParty claimsParty) {
+		var nameIdFromSso = getSsoSubject(ssoStateData, claimsParty);
+		var nameIdFromIdp = checkAndExtractNameId(ssoStateData, nameIdFromSso, claimsParty);
 
-		log.debug("Set subject idpNameId={} from IDP response for ssoSessionId={} / subjectNameId={}", nameIdFromIdp,
-				ssoStateData.getId(), ssoStateData.getSubjectNameId());
+		log.debug("Set subject idpNameId={} ssoNameId={} from IDP response for ssoSessionId={} / subjectNameId={}", nameIdFromIdp,
+				nameIdFromSso, ssoStateData.getId(), ssoStateData.getSubjectNameId());
 		ssoStateData.setSubjectNameId(nameIdFromIdp);
+		var ssoState = ssoStateData.initializedSsoState();
+		ssoState.setSubject(nameIdFromSso);
 	}
 
-	private static String checkAndExtractNameId(StateData ssoStateData) {
+	@SuppressWarnings("java:S3516")
+	private static String checkAndExtractNameId(StateData ssoStateData, String nameIdFromSso, ClaimsParty claimsParty) {
 		if (ssoStateData.getCpResponse() == null) {
 			// this would be a bug
 			throw new TechnicalException(
-					String.format("Cannot set subjectNameId in ssoSessionId=%s due to missing CP response",ssoStateData.getId()));
+					String.format("Cannot set subjectNameId in ssoSessionId=%s due to missing CP response", ssoStateData.getId()));
 		}
+
 		var originalNameId = ssoStateData.getCpResponse().getOriginalNameId();
 		var mappedNameId = ssoStateData.getCpResponse().getMappedNameId();
 		if (ssoStateData.getSubjectNameId() != null &&
 				!ssoStateData.getSubjectNameId().equals(originalNameId) &&
 				!ssoStateData.getSubjectNameId().equals(mappedNameId)) {
+			// SsoState with Cp but different NameId
+			if (nameIdFromSso != null) {
+				var cpResponseNameId = getSsoSubjectFromCpConfigOrState(ssoStateData, claimsParty);
+				if (nameIdFromSso.equals(cpResponseNameId)) {
+					return originalNameId;
+				}
+			}
 			// this would be a bug, the match needs to be checked before
 			throw new TechnicalException(String.format(
-							"Cannot change in ssoSessionId=%s from subjectNameId=%s to originalNameId=%s",
-							ssoStateData.getId(), ssoStateData.getSubjectNameId(), originalNameId));
+					"Cannot change in ssoSessionId=%s from subjectNameId=%s to originalNameId=%s",
+					ssoStateData.getId(), ssoStateData.getSubjectNameId(), originalNameId));
 		}
 		return originalNameId;
 	}
@@ -1113,7 +1148,9 @@ public class SsoService {
 			return false;
 		}
 		// throws exception on subject change (would be a bug if this happens on OIDC side)
-		var subjectNameId = checkAndExtractNameId(ssoStateData);
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(ssoStateData.getCpIssuer());
+		var nameIdFromSso = getSsoSubject(ssoStateData, claimsParty.orElse(null));
+		var subjectNameId = checkAndExtractNameId(ssoStateData, nameIdFromSso, claimsParty.orElse(null));
 		log.debug("SSO join of OIDC participant oidcSessionId={} userPrincipal=\"{}\" to ssoSessionId={} subjectNameId={}",
 					oidcSessionId, userPrincipal, ssoStateData.getId(), subjectNameId);
 		return true;
@@ -1146,7 +1183,7 @@ public class SsoService {
 		}
 		log.info("Perform CP SSO for rpIssuer={} with ssoMinQoa={} based on sessionQoa={} applying cpKnownQoa={} diff={}",
 				relyingParty.getId(), getSsoMinQoaLevel(relyingParty), ssoState.getSsoQoa(), cpQoa, diff);
-		ssoState.setSsoQoa(cpQoa != null ? cpQoa.getName() : null);
+		ssoState.setSsoQoa(cpQoa.getName());
 		return true;
 	}
 
@@ -1186,16 +1223,22 @@ public class SsoService {
 	}
 
 	public SsoSessionOperation prepareRedirectForDeviceInfoAfterHrd(
-			Cookie[] cookies, StateData stateDataByAuthnReq, String claimUrn) {
+			Cookie[] cookies, StateData stateDataByAuthnReq, String claimsPartyId) {
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(
 				stateDataByAuthnReq.getRpIssuer(), stateDataByAuthnReq.getRpReferer());
-		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimUrn, stateDataByAuthnReq.getReferer());
-		var ssoState = findValidStateFromCookies(relyingParty, claimsParty, cookies);
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimsPartyId);
+		var ssoState = findValidStateFromCookies(relyingParty, claimsParty.orElse(null), cookies);
 		if (ssoState.isEmpty()) {
 			return SsoSessionOperation.IGNORE;
 		}
 		var ssoStateData = ssoState.get();
-		return skipCpAuthentication(claimsParty, relyingParty, stateDataByAuthnReq, ssoStateData);
+		var ret = skipCpAuthentication(claimsParty.orElse(null), relyingParty, stateDataByAuthnReq, ssoStateData);
+		// any SSO joining participant needs to act on the same cpIssuer as the initiating participant
+		if (ret.skipCpAuthentication) {
+			stateDataByAuthnReq.setIssuer(ssoStateData.getCpIssuer());
+			stateCacheService.save(stateDataByAuthnReq, "prepareRedirectForDeviceInfoAfterHrd");
+		}
+		return ret;
 	}
 
 	Function<Map<String, StateData>, Optional<StateData>> filterStates(RelyingParty relyingParty) {
@@ -1258,7 +1301,7 @@ public class SsoService {
 																				.getId(), ssoStateData.getId()));
 			}
 			else {
-				log.debug("Accepting ssoSessionId={} for implicit ssoGroupName={} as AuthnRequest state",
+				log.debug("Accepting ssoSessionId={} for implicit ssoGroupName={} as AuthnRequest state for copy",
 						stateDataByAuthnReq.getId(), stateDataByAuthnReq.getSsoState().getSsoGroupName());
 			}
 		}
@@ -1277,8 +1320,10 @@ public class SsoService {
 			ssoStateData.setCpResponse(stateDataByAuthnReq.getCpResponse().toBuilder().build());
 		}
 
-		// apply subject nameid of joining participant
-		updateSubjectNameIdInSession(ssoStateData);
+		// update /verify match
+		var claimsPartyId = ssoStateData.getCpIssuer() != null ? ssoStateData.getCpIssuer() : stateDataByAuthnReq.getCpIssuer();
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimsPartyId);
+		updateSubjectNameIdInSession(ssoStateData, claimsParty.orElse(null));
 
 		// these fields are set on the base object in AssertionConsumerService.saveState
 		ssoStateData.setForceAuthn(stateDataByAuthnReq.getForceAuthn());
@@ -1373,8 +1418,7 @@ public class SsoService {
 					logoutState.logoutSsoGroup = stateSsoGroup;
 				}
 				else if (!logoutState.logoutSsoGroup.equals(stateSsoGroup)) {
-					log.info(
-							"Not logging out ssoSessionId={} for RP {} as SSO group '{}' is not the one we log out from '{}'",
+					log.info("Not logging out ssoSessionId={} for RP {} as SSO group '{}' is not the one we log out from '{}'",
 							stateData.getId(), relyingParty.getId(), stateSsoGroup, logoutState.logoutSsoGroup);
 					return Optional.of(stateData);
 				}
@@ -1567,8 +1611,7 @@ public class SsoService {
 				.map(SsoSessionParticipant::getAssertionConsumerServiceUrl).toList();
 		// no match found, fallback to referer
 		if (acUrls.isEmpty()) {
-			log.debug("SSO session contains no acUrls for rpIssuerId={} - using referer={}",
-					acUrls, relyingParty.getId(), referer);
+			log.debug("SSO session contains no acUrls for rpIssuerId={} - using referer={}", relyingParty.getId(), referer);
 			return referer;
 		}
 		// normal case: single one is used:
@@ -1684,7 +1727,7 @@ public class SsoService {
 		var stateDataOpt = stateCacheService.findOptional(relayState, this.getClass().getSimpleName());
 		// state may already be gone when we receive a LogoutResponse, in that case just audit the ID received as RelayState
 		var sessionId = relayState != null ? relayState : "unknown";
-		var stateData = stateDataOpt.isPresent() ? stateDataOpt.get() : StateData.builder().id(sessionId).build();
+		var stateData = stateDataOpt.orElseGet(() -> StateData.builder().id(sessionId).build());
 		auditLogoutResponseFromRp(httpRequest, response, stateData);
 	}
 
@@ -1742,7 +1785,7 @@ public class SsoService {
 	}
 
 	/**
-	 * @param relyingParty
+	 * @param relyingParty configuration
 	 * @param referer optional
 	 * @param sloNotifications optional (else use empty set), from SSO session
 	 * @param nameId optional, from CpResponse

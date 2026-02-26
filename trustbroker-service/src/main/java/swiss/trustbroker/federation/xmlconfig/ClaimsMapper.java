@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -24,6 +24,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.Temporal;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -317,5 +319,23 @@ public enum ClaimsMapper {
 		}
 		unexpectedValue(value, mapperName);
 		return value;
+	}
+
+	public static List<String> tokenClaimToStringList(Object claimValue) {
+		if (claimValue == null) {
+			return new ArrayList<>();
+		}
+
+		if (claimValue instanceof Collection<?> collection) {
+			return collection.stream()
+							 .map(Object::toString)
+							 .collect(Collectors.toCollection(ArrayList::new));
+		}
+
+		if (claimValue instanceof String stringClaim) {
+			return new ArrayList<>(Collections.singletonList(stringClaim));
+		}
+
+		return new ArrayList<>(Collections.singletonList(claimValue.toString()));
 	}
 }

@@ -1,5 +1,5 @@
 <!--
- Copyright (C) 2024 trustbroker.swiss team BIT
+ Copyright (C) 2026 trustbroker.swiss team BIT
 
  This program is free software.
  You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -17,7 +17,11 @@
 		<h2 id="profileHeader">{{ "trustbroker.profile.title" | translate }}</h2>
 		<div>
 			<div id="selectionText">
-				<p [innerHTML]="'trustbroker.profile.subtitle' | translate | safeMarkup"></p>
+				@if (profileResponse && profileResponse.application) {
+					<p>{{ "trustbroker.profile.application.subtitle" | translate }} {{ profileResponse.application }}</p>
+				} @else {
+					<p [innerHTML]="'trustbroker.profile.subtitle' | translate | safeMarkup"></p>
+				}
 			</div>
 		</div>
 
@@ -25,18 +29,38 @@
 			@for (profile of profiles; track profile.id) {
 				<li>
 					<button (click)="onClick(profile.id)" [attr.aria-labelledby]="`${profile.name}-title`">
-						<span>{{ profile.unit }}</span>
+						@if (profile.unit) {
+							<span>{{ profile.unit }}</span>
+						}
 						<span class="name" [attr.id]="`${profile.name}-title`">{{ profile.name }}</span>
-						<span>{{ "trustbroker.profile.applications" | translate }}:</span>
-						<ul>
-							@let applications = profile.applications.split(",").sort();
-							@for (application of applications.slice(0, APPLICATIONS_PER_PROFILE); track application) {
-								<li>{{ application }}</li>
+						@if (profile.applications) {
+							<span>{{ "trustbroker.profile.applications" | translate }}:</span>
+							<ul>
+								@let applications = profile.applications.split(",").sort();
+								@for (application of applications.slice(0, APPLICATIONS_PER_PROFILE); track application) {
+									<li>{{ application }}</li>
+								}
+								@if (applications.length > APPLICATIONS_PER_PROFILE) {
+									<li>{{ "trustbroker.profile.additional-applications" | translate: { count: applications.length - APPLICATIONS_PER_PROFILE } }}</li>
+								}
+							</ul>
+						}
+						@if (profile.displayClaims) {
+							@for (entry of profile.displayClaims | keyvalue: compareOriginalOrder; track entry.key) {
+								@if (entry.value !== "") {
+									@if ("trustbroker.profile.additional." + entry.key | hasTranslation | async) {
+										<span>{{ "trustbroker.profile.additional." + entry.key | translate }}</span>
+									} @else {
+										<span>{{ entry.key }}</span>
+									}
+									<ul>
+										@for (item of profile.displayClaims[entry.key]; track item) {
+											<li>{{ item }}</li>
+										}
+									</ul>
+								}
 							}
-							@if (applications.length > APPLICATIONS_PER_PROFILE) {
-								<li>{{ "trustbroker.profile.additional-applications" | translate: { count: applications.length - APPLICATIONS_PER_PROFILE } }}</li>
-							}
-						</ul>
+						}
 					</button>
 				</li>
 			}

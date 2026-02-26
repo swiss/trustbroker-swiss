@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -19,12 +19,13 @@ import { Observable, from } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import { DeviceInfoResponse } from '../model/DeviceInfoResponse';
-import { EncodeUtil } from '../shared/encode-util';
+import { map } from 'rxjs/operators';
+import { Md5 } from 'ts-md5';
 
 @Injectable()
 export class DeviceInfoService {
-	private readonly baseUrl = environment.apiUrl;
-	private readonly deviceInfoUrl = `${this.baseUrl}device/info`;
+	private readonly apiBaseUrl = environment.apiUrl;
+	private readonly deviceInfoUrl = `${this.apiBaseUrl}device/info`;
 	private readonly permissionsNames = [
 		'accelerometer',
 		'ambient-light-sensor',
@@ -55,33 +56,29 @@ export class DeviceInfoService {
 	}
 
 	generateDeviceToken(): Observable<string> {
-		// these return just plain values wrapped in resolved Promises to unify handling
-		const fingerprint = this.fingerprintUserAgent().concat(this.fingerprintTimezone()).concat(this.fingerprintRenderingContext());
-		const part1 = Promise.all(fingerprint)
-			.catch(() => {
+		const fingerprint = [window.navigator.userAgent, String(new Date().getTimezoneOffset()), ...this.fingerprintRenderingContext()];
+
+		return this.generatePermissions().pipe(
+			map(permissions => {
+				const part1 = fingerprint;
+				const part2 = [...fingerprint, ...permissions];
 				// NOSONAR
-				// console.debug('[DeviceInfoService] Could not build fingerprint', ex);
-				return [''];
+				// console.debug('Device info token', { part1, part2});
+				return [part1, part2]
+					.map(eachPart => eachPart.join('|'))
+					.map(eachPartAsString => Md5.hashStr(eachPartAsString))
+					.join('.');
 			})
-			.then(values => this.hash(values.join('|')));
-		// these return actual Promises, result depending on document or iframe, that's why we send it as part2
-		const permissions = fingerprint.concat(this.fingerprintPermissions());
-		const part2 = Promise.all(permissions)
-			.catch(() => {
-				// NOSONAR
-				// console.debug('[DeviceInfoService] Could not build fingerprint', ex);
-				return [''];
-			})
-			.then(values => this.hash(values.join('|')));
-		return from(Promise.all([part1, part2]).then(values => values.join('.')));
+		);
 	}
 
-	private fingerprintUserAgent(): Promise<string>[] {
-		return [Promise.resolve(window.navigator.userAgent)];
-	}
-
-	private fingerprintTimezone(): Promise<string>[] {
-		return [Promise.resolve(String(new Date().getTimezoneOffset()))];
+	private generatePermissions(): Observable<string[]> {
+		const permissions = Promise.all(this.fingerprintPermissions()).catch(() => {
+			// NOSONAR
+			// console.debug('[DeviceInfoService] Could not build fingerprint', ex);
+			return [''];
+		});
+		return from(permissions);
 	}
 
 	private fingerprintPermissions(): Promise<string>[] {
@@ -113,23 +110,22 @@ export class DeviceInfoService {
 		);
 	}
 
-	private fingerprintRenderingContext(): Promise<string>[] {
+	private fingerprintRenderingContext(): string[] {
 		try {
-			const result: Promise<string>[] = [];
+			const result: string[] = [];
 			const canvas = this.createCanvas();
 			// Firefox logs a warning in the console if we test this, hence not enabled:
 			// var context2: WebGL2RenderingContext = canvas.getContext('webgl2');
 			// result.push(Promise.resolve(String(context2 != null)));
-			const context: WebGLRenderingContext = canvas.getContext('webgl');
-			result.push(Promise.resolve(String(context != null)));
+			const context: WebGLRenderingContext | null = canvas.getContext('webgl');
+			result.push(String(context != null));
 			if (context != null) {
-				result.push(Promise.resolve(String(context.VENDOR)));
-				result.push(Promise.resolve(String(context.RENDERER)));
-				result.push(Promise.resolve(String(context.SHADING_LANGUAGE_VERSION)));
+				result.push(String(context.VENDOR), String(context.RENDERER), String(context.SHADING_LANGUAGE_VERSION));
 				if (typeof context.getContextAttributes === 'function') {
-					result.push(Promise.resolve(String(context.getContextAttributes().antialias)));
+					const attributes = context.getContextAttributes();
+					result.push(attributes ? String(attributes.antialias) : 'noctxattr');
 				} else {
-					result.push(Promise.resolve('noctxattr'));
+					result.push('noctxattr');
 				}
 				// could add more here, see e.g. https://browserleaks.com/webgl
 			}
@@ -137,7 +133,7 @@ export class DeviceInfoService {
 		} catch (_ex) {
 			// NOSONAR
 			// console.debug('[DeviceInfoService] Could not fingerprint rendering context', _ex);
-			return [Promise.resolve('failedctx')];
+			return ['failedctx'];
 		}
 	}
 
@@ -158,36 +154,5 @@ export class DeviceInfoService {
 			observe: 'response',
 			responseType: 'text' as 'json'
 		});
-	}
-
-	private hash(value: string): Promise<string> {
-		// empty fingerprint is rejected when comparing on server side, so browser not support SHA256 are not SSO
-		try {
-			if (!window.crypto?.subtle) {
-				// NOSONAR
-				// console.debug('[DeviceInfoService] Could not hash fingerprint, window.crypto.subtle not available');
-				return Promise.resolve('');
-			}
-			// NOSONAR
-			// console.debug('[DeviceInfoService] Fingerprint before hashing: ', value);
-			// convert to UTF-8, hash, convert back
-			const data = new TextEncoder().encode(value);
-			return this.getSha256Hash(data);
-		} catch (_ex) {
-			// NOSONAR
-			// console.debug('[DeviceInfoService] Could not hash fingerprint', _ex);
-			return Promise.resolve('');
-		}
-	}
-
-	private getSha256Hash(data: ArrayBuffer): Promise<string> {
-		return window.crypto.subtle
-			.digest('SHA-256', data)
-			.catch(() => {
-				// NOSONAR
-				// console.debug('[DeviceInfoService] Could not calculate sha256 hash', ex);
-				return new ArrayBuffer(0);
-			})
-			.then(result => EncodeUtil.base64UrlEncodeNoPadding(EncodeUtil.arrayBufferToString(result)));
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -35,11 +35,11 @@ export class SafeMarkupPipe implements PipeTransform {
 	transform(text: string | null): SafeHtml {
 		// Replace markdown with HTML before sanitizing:
 		// \r\n \r \n => <br/>
-		let result = text?.replace(/\r\n|\r|\n|<br\s*\/?>/g, '<br/>');
+		let result = text?.replace(/\r\n|\r|\n|<br\s*\/?>/g, '<br/>') || null;
 		// [label](url) [label](target|url) => <a target="..." href="...">...</a>
 		// eslint complains about the \| escape
 		// eslint-disable-next-line no-useless-escape
-		result = result?.replace(/\[([^\]]+)\]\((?:([a-zA-Z0-9_]+)\|)?(([^\)]+))\)/g, '<a target="$2" href="$3">$1</a>');
+		result = result?.replace(/\[([^\]]+)\]\((?:([a-zA-Z0-9_]+)\|)?(([^\)]+))\)/g, '<a target="$2" href="$3">$1</a>') || null;
 		// sanitize result:
 		result = this.sanitizer.sanitize(SecurityContext.HTML, result);
 		// NOSONAR
@@ -47,6 +47,6 @@ export class SafeMarkupPipe implements PipeTransform {
 		//	console.debug('[SafeMarkupPipe] Original:', text);
 		//	console.debug('[SafeMarkupPipe] Cleaned:', result);
 		// }
-		return result;
+		return result || '';
 	}
 }

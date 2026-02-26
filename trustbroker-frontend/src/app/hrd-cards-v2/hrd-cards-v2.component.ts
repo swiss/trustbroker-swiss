@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -34,7 +34,7 @@ import { Overlay } from '@angular/cdk/overlay';
 	standalone: false
 })
 export class HrdCardsV2Component {
-	baseUrl: string = environment.apiUrl;
+	apiBaseUrl: string = environment.apiUrl;
 
 	idpObjects = input.required<IdpObjects>();
 	theme$ = this.themeService.theme$;
@@ -53,11 +53,12 @@ export class HrdCardsV2Component {
 		private readonly overlay: Overlay
 	) {
 		effect(() => {
-			if (this.idpObjects().tiles?.length === 1 && !this.idpObjects().tiles[0].disabled) {
-				this.onCardClick(this.idpObjects().tiles[0]);
+			const tiles = this.idpObjects().tiles || [];
+			if (tiles.length === 1 && !tiles[0].disabled) {
+				this.onCardClick(tiles[0]);
 			} else {
 				// disabled tiles are also displayed in help
-				this.idpObjectService.addIdpObjects(this.idpObjects().tiles);
+				this.idpObjectService.addIdpObjects(tiles);
 			}
 		});
 	}
@@ -77,14 +78,14 @@ export class HrdCardsV2Component {
 						return;
 					}
 					// document.write for error page does not work here
-					const url = response.url.replace(/^.*(\/failure\/.*$)/, '$1');
+					const url = response.url!.replace(/^.*(\/failure\/.*$)/, '$1');
 					if (url !== response.url) {
 						void this.router.navigate([url]);
 						return;
 					}
-					window.document.write(response.body);
+					window.document.write(response.body!);
 					if (document.forms.length > 0) {
-						document.forms.item(0).submit();
+						document.forms[0].submit();
 					} else {
 						// not a SAML form, e.g. AccessRequest
 						// NOSONAR

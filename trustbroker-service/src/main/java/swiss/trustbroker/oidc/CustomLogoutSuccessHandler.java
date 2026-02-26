@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -65,10 +65,6 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 		var clientId = OidcSessionSupport.getOidcClientId(request, relyingPartyDefinitions, properties.getNetwork());
 		var originalRedirectUrl = OidcSessionSupport.getRedirectUri(request);
 		var stateParam = OidcSessionSupport.getStateParam(request);
-		var redirectUrl = originalRedirectUrl;
-		if (redirectUrl != null && stateParam != null) {
-			redirectUrl = WebUtil.appendQueryParameters(redirectUrl,  Map.of("state", stateParam));
-		}
 
 		// Find session details
 		var userPrincipal = OidcSessionSupport.getSamlPrincipalFromAuthentication(authentication, request);
@@ -80,14 +76,19 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 		var userPrincipalName = userPrincipal != null ? userPrincipal.getName() : null;
 		authorizationService.deleteAuthorizationByClientId(clientId, userPrincipalName);
 
-		if (originalRedirectUrl != null &&
-				!OidcConfigurationUtil.isRedirectUrlValid(originalRedirectUrl, clientId, OidcUtil.LOGOUT_REDIRECT_URI,
+		var redirectUrl = originalRedirectUrl;
+		if (redirectUrl != null &&
+				!OidcConfigurationUtil.isRedirectUrlValid(redirectUrl, clientId, OidcUtil.LOGOUT_REDIRECT_URI,
 						relyingPartyDefinitions, registeredClientRepository)) {
 			log.debug("Sending HTTP FORBIDDEN for OIDC clientId={} ssoSessionId={} due to invalid redirectUrl={}",
-					clientId, ssoSessionId, originalRedirectUrl);
+					clientId, ssoSessionId, redirectUrl);
 			response.setStatus(HttpStatus.SC_FORBIDDEN);
+			redirectUrl = "FORBIDDEN:" + redirectUrl; // indicate validation issue in log
 		}
 		else {
+			if (redirectUrl != null && stateParam != null) {
+				redirectUrl = WebUtil.appendQueryParameters(redirectUrl,  Map.of(OidcUtil.OIDC_STATE_ID, stateParam));
+			}
 			renderResponse(clientId, redirectUrl, ssoSessionId, oidcSessionId, request, response);
 		}
 
@@ -103,6 +104,7 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 		}
 	}
 
+	// must be called with redirectUrl validated with OidcConfigurationUtil.isRedirectUrlValid
 	private void renderResponse(String clientId, String redirectUrl, String ssoSessionId, String oidcSessionId,
 			HttpServletRequest request, HttpServletResponse response) throws IOException {
 		var realmName = OidcUtil.getRealmFromRequestUrl(request.getRequestURI());
@@ -145,6 +147,8 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 		log.debug("Discarding SSO cookie={} for OIDC domain", expiredCookie.getName());
 	}
 
+	@SuppressWarnings("javasecurity:S5146")
+	// must be called with redirectUrl validated with OidcConfigurationUtil.isRedirectUrlValid
 	private static void handleRedirectResponse(String redirectUrl, HttpServletResponse response) throws IOException {
 		// Logout always succeeds even though we cannot find client_id or redirect_uri
 		// or even when an id_token_hint has been faked (no benefit in that, see below).

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,6 +16,7 @@
 package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
@@ -28,7 +29,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * This class allows configuring policies per CP/RP as opposed to SecurityChecks on a global level.
- *
+ * <br/>
  * Breaking changes:
  * <ul>
  *     <li>Specification alignment: With 1.10.0 <code>requireSignedLogoutRequest</code> is applied to incoming LogoutRequests as
@@ -55,13 +56,11 @@ public class SecurityPolicies implements Serializable {
 	private Boolean requireSignedAuthnRequest = Boolean.TRUE;
 
 	/**
-	 * Allow to disable signature check for incoming LogoutRequests.
+	 * Allow to disable signature check for incoming LogoutRequests. If not set, falls back to <code>requireSignedAuthnRequest</code>.
 	 * <br/>
-	 * Default: true
 	 */
 	@XmlAttribute(name = "requireSignedLogoutRequest")
-	@Builder.Default
-	private Boolean requireSignedLogoutRequest = Boolean.TRUE;
+	private Boolean requireSignedLogoutRequest;
 
 	/**
 	 * Allow to disable signature check for outgoing SLO notification LogoutRequests.
@@ -188,4 +187,31 @@ public class SecurityPolicies implements Serializable {
 	@XmlAttribute(name = "forceAuthn")
 	private Boolean forceAuthn;
 
+	/**
+	 * Require signed assertion in WS-Trust ISSUE.
+	 * <br/>
+	 * Default: fallback to default (global default is true)
+	 * @since 1.13.0
+	 * @deprecated Transition feature
+	 */
+	@Deprecated(since = "1.13.0", forRemoval = true)
+	@XmlAttribute(name = "wsTrustIssueRequireSignedAssertion")
+	private Boolean wsTrustIssueRequireSignedAssertion;
+
+	/**
+	 * Require signed request in WS-Trust ISSUE.
+	 * <br/>
+	 * Default: fallback to default
+	 * @since 1.13.0
+	 */
+	@XmlAttribute(name = "wsTrustIssueRequireSignedRequest")
+	private Boolean wsTrustIssueRequireSignedRequest;
+
+	public boolean isWsTrustIssueRequireSignedAssertion(boolean globalDefault) {
+		return Objects.requireNonNullElse(wsTrustIssueRequireSignedAssertion, globalDefault);
+	}
+
+	public boolean isWsTrustIssueRequireSignedRequest(boolean globalDefault) {
+		return Objects.requireNonNullElse(wsTrustIssueRequireSignedRequest, globalDefault);
+	}
 }

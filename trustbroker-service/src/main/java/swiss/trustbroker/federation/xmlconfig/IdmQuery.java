@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -103,6 +103,12 @@ public class IdmQuery implements Serializable, IdmRequest {
 	 */
 	@XmlElement(name = "AppFilter")
 	private String appFilter;
+
+	/**
+	 * Sub resource parameter for the IDM (baseDN in case of LDAP).
+	 */
+	@XmlElement(name = "SubResource")
+	private String subResource;
 
 	/**
 	 * User details selection identifies the IDM attributes passed through to the RP side.

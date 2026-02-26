@@ -21,7 +21,6 @@ dn: ou=app2,dc=apps,dc=trustbroker,dc=swiss
 objectClass: organizationalUnit
 ou: app2
 
-
 # Organization tree (UNUSED)
 
 dn: ou=org1,dc=trustbroker,dc=swiss
@@ -35,7 +34,6 @@ ou: org2
 dn: ou=org3,dc=trustbroker,dc=swiss
 objectClass: organizationalUnit
 ou: org3
-
 
 # User tree
 dn: dc=users,dc=trustbroker,dc=swiss
@@ -51,6 +49,13 @@ dc: users
 # Get all data for 1st user from public test ldap service:
 # ldapsearch -x -H ldap://localhost:1389 -b dc=trustbroker,dc=swiss '(&(app=*)(|(uid=max1)(adminGlobalId=max1-global-id-2)))'
 
+dn: cn=admin,dc=trustbroker,dc=swiss
+objectClass: inetOrgPerson
+uid: admin
+cn: Admin
+sn: Admin
+userPassword: secret
+
 dn: cn=max1-app1,dc=users,dc=trustbroker,dc=swiss
 objectClass: customPerson
 cn: max1-app1
@@ -65,6 +70,8 @@ org: org2
 memberOf: app1-admin-org2
 memberOf: app1-tester-org2
 memberOf: app1-tester-org1
+adminMemberOf: org1\app1-tester-org1
+adminMemberOf: org2\app1-tester-org2
 
 dn: cn=max1-app1-ext,dc=users,dc=trustbroker,dc=swiss
 objectClass: customPerson
@@ -79,6 +86,8 @@ org: org1
 org: org3
 memberOf: app1-admin-org1
 memberOf: app1-guest-org3
+adminMemberOf: org1\app1-admin-org1
+adminMemberOf: org3\app1-guest-org3
 
 dn: cn=max1-app2-ext,dc=users,dc=trustbroker,dc=swiss
 objectClass: customPerson
@@ -91,6 +100,18 @@ adminglobalId: p-999887
 app: app2
 org: org1
 memberOf: app2-guest-org1
+
+dn: cn=max2-app1-ext,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+cn: max1-app2-ext
+uid: max2
+sn: Monde
+givenName: Maxine
+mail: maxine.monde@trustbroker.swiss
+adminglobalId: p-999887
+app: app1
+org: org2
+memberOf: app1-guest-org2
 
 # single non-redundant 2nd user with multiple orgs and authorizations
 dn: cn=max2,dc=users,dc=trustbroker,dc=swiss
@@ -107,3 +128,16 @@ org: org1
 org: org3
 memberOf: app1-admin-org1
 memberOf: app1-guest-org3
+adminMemberOf: org1\app1-admin-org1
+
+# no organization for user
+dn: cn=max3-app2-ext,dc=users,dc=trustbroker,dc=swiss
+objectClass: customPerson
+cn: max3-app2-ext
+uid: max3
+sn: Monde
+givenName: Maxine
+mail: maxine.monde@trustbroker.swiss
+adminglobalId: p-999887
+app: app2
+memberOf: app2-guest-org1

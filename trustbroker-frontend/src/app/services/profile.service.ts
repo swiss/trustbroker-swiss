@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -25,20 +25,20 @@ import { ProfileResponse } from './profile-response';
 	providedIn: 'root'
 })
 export class ProfileService {
-	private readonly baseUrl = environment.apiUrl;
+	private readonly apiBaseUrl = environment.apiUrl;
 
 	constructor(private readonly http: HttpClient) {}
 
 	getProfiles(id: string): Observable<ProfileResponse> {
 		const headers = new Headers();
 		headers.append('XTB-ProfileId', id);
-		return this.http.get<ProfileResponse>(`${this.baseUrl}hrd/profiles`, {
+		return this.http.get<ProfileResponse>(`${this.apiBaseUrl}hrd/profiles`, {
 			headers: new HttpHeaders().set('XTB-ProfileId', id)
 		});
 	}
 
 	sendSelectedProfile(profileRequest: ProfileRequest): Observable<HttpResponse<string>> {
-		return this.http.post<string>(`${this.baseUrl}hrd/profile`, profileRequest, {
+		return this.http.post<string>(`${this.apiBaseUrl}hrd/profile`, profileRequest, {
 			headers: new HttpHeaders().set('Accept', 'text/html'),
 			observe: 'response',
 			responseType: 'text' as 'json'

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -133,16 +133,16 @@ class QoaMappingUtilTest {
 		var configQoa = new QoaConfig(qoa, "12345");
 		Map<String, Integer> globalMapping = givenGlobalQoa().getMapping();
 
-		QoaMappingUtil.isKnownQoaLevels(requestContextClasses, configQoa, globalMapping, null);
+		QoaMappingUtil.validateQoaLevelsKnown(requestContextClasses, configQoa, globalMapping, null);
 
 		// qoa is in Global and order matches the config
 		requestContextClasses.add(SamlTestBase.Qoa.KERBEROS.getName());
-		QoaMappingUtil.isKnownQoaLevels(requestContextClasses, configQoa, globalMapping, null);
+		QoaMappingUtil.validateQoaLevelsKnown(requestContextClasses, configQoa, globalMapping, null);
 
 		// qoa is in global but no matching config order
 		requestContextClasses.add(SamlTestBase.Qoa.SOFTWARE_PKI.getName());
 		assertThrows(RequestDeniedException.class, () ->
-				QoaMappingUtil.isKnownQoaLevels(requestContextClasses, configQoa, globalMapping, null)
+				QoaMappingUtil.validateQoaLevelsKnown(requestContextClasses, configQoa, globalMapping, null)
 		);
 	}
 

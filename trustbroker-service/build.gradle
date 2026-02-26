@@ -38,10 +38,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+	runtimeOnly 'org.postgresql:postgresql'
 
 	// for version issues in Java 11 see
 	// https://stackoverflow.com/questions/51485137/how-do-you-invoke-schemagen-in-java-11#answer-51502196
-	schemaGen "org.glassfish.jaxb:jaxb-jxc"
+	schemaGen 'org.glassfish.jaxb:jaxb-jxc'
 
 	// workaround for funny classloader problem in embedded tomcat running our own servlet filetrs
 	implementation 'ch.qos.logback:logback-classic'

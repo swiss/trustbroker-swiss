@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -34,6 +34,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 class CollectionUtilTest {
+
+	private record TestData(String id, String value) {
+
+	}
 
 	@Test
 	void asCollection() {
@@ -169,6 +173,25 @@ class CollectionUtilTest {
 				{ Collections.emptyList(), "[]" },
 				{ List.of("a", "bc", "d"), "[a, bc, d]" },
 				{ Set.of("a"), "[a]" }
+		};
+	}
+
+	@ParameterizedTest
+	@MethodSource
+	void distinctById(List<TestData> data, List<TestData> expected) {
+		var result = data.stream().filter(CollectionUtil.distinctById(TestData::id)).toList();
+		assertThat(result, is(expected));
+	}
+
+	static Object[][] distinctById() {
+		var one =  new TestData("key1", "val1");
+		var two =  new TestData("key2", "val2");
+		var three =  new TestData("key1", "val1"); // identical
+		var four =  new TestData("key2", "val1"); // identical by ID only
+		return new Object[][] {
+				{ List.of(), List.of() },
+				{ List.of(one, two), List.of(one, two) },
+				{ List.of(one, two, three, four), List.of(one, two) }
 		};
 	}
 

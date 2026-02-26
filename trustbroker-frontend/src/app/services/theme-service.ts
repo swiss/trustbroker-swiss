@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -49,7 +49,7 @@ export class ThemeService {
 		// Defaults until we get the information from the server.
 		// Allow all themes to avoid initially showing a wrong default theme. This would still happen if the cookie has a different name.
 		this.themeCookie.name = 'THEME';
-		this.themeCookie.defaultValue = ThemeService.toCookie(ThemeService.defaultTheme.name);
+		this.themeCookie.defaultValue = ThemeService.toCookie(ThemeService.defaultTheme.name)!;
 		this.themeCookie.values = ['default', 'light', 'dark'];
 		this.buttons = [HeaderButton.HELP_PANEL, HeaderButton.LANGUAGE_SHORT];
 		this.features = [GuiFeature.HEADER, GuiFeature.FOOTER];
@@ -78,12 +78,12 @@ export class ThemeService {
 	}
 
 	// light -> xtb-light
-	private static fromCookie(theme: string): string {
+	private static fromCookie(theme: string): string | null {
 		return ThemeService.isThemeSet(theme) ? `xtb-${theme}` : null;
 	}
 
 	// xtb-light -> light
-	private static toCookie(theme: string): string {
+	private static toCookie(theme: string): string | null {
 		return ThemeService.isThemeSet(theme) ? theme?.split(ThemeService.variantSeparator)[1] : null;
 	}
 
@@ -145,13 +145,13 @@ export class ThemeService {
 			const converted = ThemeService.fromCookie(themeFromCookie);
 			// NOSONAR
 			// console.debug('[ThemeService] Using theme from cookie:', themeFromCookie, converted);
-			if (ThemeService.isThemeSet(converted)) {
+			if (converted && ThemeService.isThemeSet(converted)) {
 				return converted;
 			}
 		}
 		if (ThemeService.defaultTheme.hasThemeSelector) {
 			const themeFromWindow = this.preferredThemeVariant();
-			if (ThemeService.isThemeSet(themeFromWindow)) {
+			if (themeFromWindow && ThemeService.isThemeSet(themeFromWindow)) {
 				// NOSONAR
 				// console.debug('[ThemeService] Using preferred theme variant from window:', themeFromWindow);
 				return themeFromWindow;
@@ -187,7 +187,7 @@ export class ThemeService {
 		return false;
 	}
 
-	private preferredThemeVariant() {
+	private preferredThemeVariant(): string | null {
 		for (const key of this.themeCookie.values) {
 			const preferTheme = window.matchMedia(`(prefers-color-scheme: ${key})`);
 			if (preferTheme.matches) {
@@ -232,9 +232,13 @@ export class ThemeService {
 			// console.debug('[ThemeService] Skip setting cookie based on default parameters');
 			return;
 		}
-		theme = ThemeService.toCookie(theme);
+		const themeCookieValue = ThemeService.toCookie(theme);
 		// NOSONAR
 		// console.debug('[ThemeService] Setting theme cookie:', this.themeCookie.name, '=', theme, 'on path', this.themeCookie.path, 'and domain', this.themeCookie.domain);
-		this.cookieService.set(this.themeCookie, theme);
+		if (themeCookieValue) {
+			this.cookieService.set(this.themeCookie, themeCookieValue);
+		} else {
+			console.error(`Failed to update theme cookie due to invalid theme: ${theme}`);
+		}
 	}
 }

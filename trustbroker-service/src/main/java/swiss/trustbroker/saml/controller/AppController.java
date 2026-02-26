@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,6 +15,8 @@
 
 package swiss.trustbroker.saml.controller;
 
+import java.util.List;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.opensaml.messaging.context.MessageContext;
@@ -27,10 +29,10 @@ import org.opensaml.saml.saml2.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
@@ -43,7 +45,6 @@ import swiss.trustbroker.saml.dto.ResponseData;
 import swiss.trustbroker.saml.service.ArtifactResolutionService;
 import swiss.trustbroker.saml.service.AuthenticationService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
-import swiss.trustbroker.saml.service.SamlOutputService;
 import swiss.trustbroker.sso.service.SsoService;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.SamlValidator;
@@ -70,7 +71,7 @@ public class AppController extends AbstractSamlController {
 
 	private final ArtifactResolutionService artifactResolutionService;
 
-	private final SamlOutputService samlOutputService;
+	private final List<OutputService> outputServices;
 
 	@Autowired
 	public AppController(
@@ -82,7 +83,7 @@ public class AppController extends AbstractSamlController {
 			SsoService ssoService,
 			ArtifactResolutionService artifactResolutionService,
 			AuthenticationService authenticationService,
-			SamlOutputService samlOutputService) {
+			List<OutputService> outputServices) {
 		super(trustBrokerProperties, samlValidator);
 		this.relyingPartyService = relyingPartyService;
 		this.federationMetadataService = federationMetadataService;
@@ -90,7 +91,7 @@ public class AppController extends AbstractSamlController {
 		this.ssoService = ssoService;
 		this.artifactResolutionService = artifactResolutionService;
 		this.authenticationService = authenticationService;
-		this.samlOutputService = samlOutputService;
+		this.outputServices = outputServices;
 	}
 
 	/**
@@ -103,7 +104,6 @@ public class AppController extends AbstractSamlController {
 	@PostMapping(path = { ApiSupport.SAML_API, ApiSupport.ADFS_ENTRY_URL,
 			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH, ApiSupport.XTB_LEGACY_ENTRY_URL },
 			consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-	@Transactional
 	public String handleIncomingPostMessages(HttpServletRequest request, HttpServletResponse response) {
 		return handleIncomingMessage(request, response, SamlBinding.POST);
 	}
@@ -117,7 +117,6 @@ public class AppController extends AbstractSamlController {
 	 */
 	@GetMapping(path = { ApiSupport.SAML_API, ApiSupport.ADFS_ENTRY_URL,
 			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH, ApiSupport.XTB_LEGACY_ENTRY_URL })
-	@Transactional
 	public String handleIncomingGetMessages(HttpServletRequest request, HttpServletResponse response) {
 		return handleIncomingMessage(request, response, SamlBinding.REDIRECT);
 	}
@@ -133,7 +132,6 @@ public class AppController extends AbstractSamlController {
 	@PostMapping(path = { ApiSupport.SAML_API, ApiSupport.ADFS_ENTRY_URL,
 			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH, ApiSupport.XTB_LEGACY_ENTRY_URL },
 			consumes = { MediaType.TEXT_XML_VALUE, WebUtil.MEDIA_TYPE_SOAP_12 })
-	@Transactional
 	public String handleIncomingSoapMessages(HttpServletRequest request, HttpServletResponse response) {
 		return handleIncomingMessage(request, response, SamlBinding.SOAP);
 	}
@@ -196,13 +194,14 @@ public class AppController extends AbstractSamlController {
 		validateBindingForMessage(message, signatureContext.getBinding());
 
 		if (message instanceof AuthnRequest authnRequest) {
-			var redirectUrl = authenticationService.handleAuthnRequest(samlOutputService, authnRequest, request, response,
-					signatureContext);
+			var relayState = SAMLBindingSupport.getRelayState(messageContext);
+			var redirectUrl = authenticationService.handleAuthnRequest(outputServices, authnRequest, relayState,
+					request, response, signatureContext);
 			return WebSupport.getViewRedirectResponse(redirectUrl);
 		}
 		else if (message instanceof Response samlResponse) {
 			var relayState = OpenSamlUtil.extractRelayStateAsSessionId(messageContext);
-			var redirectUrl =  authenticationService.handleSamlResponse(samlOutputService,
+			var redirectUrl =  authenticationService.handleSamlResponse(outputServices,
 					ResponseData.of(samlResponse, relayState, signatureContext), request, response);
 			return WebSupport.getViewRedirectResponse(redirectUrl);
 		}
@@ -211,8 +210,8 @@ public class AppController extends AbstractSamlController {
 			ssoService.handleLogoutResponse(logoutResponse, relayState, request);
 		}
 		else if (message instanceof LogoutRequest logoutRequest) {
-			var requestRelayState = SAMLBindingSupport.getRelayState(messageContext);
-			relyingPartyService.handleLogoutRequest(samlOutputService, logoutRequest, requestRelayState,
+			var relayState = SAMLBindingSupport.getRelayState(messageContext);
+			relyingPartyService.handleLogoutRequest(outputServices, logoutRequest, relayState,
 					request, response, signatureContext);
 		}
 		else {
@@ -255,7 +254,6 @@ public class AppController extends AbstractSamlController {
 
 	// Use @Endpoint instead? Would require tweaking interceptor chain (see WsTrustEndpoint etc. via Spring EndpointMapping)
 	@PostMapping(path = ApiSupport.ARP_URL)
-	@Transactional
 	public void resolveArtifact(HttpServletRequest request, HttpServletResponse response) {
 		validateBinding(SamlBinding.ARTIFACT);
 		artifactResolutionService.resolveArtifact(request, response);

@@ -26,10 +26,10 @@
 				var elements = uiElements[i].split(",");
 				var cpId = encodeURIComponent(elements[0]);
 				var cpId2 = cpId; // atob(elements[0]); // MSIE10 or above
-				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?session=" + requestId;
+				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?sid=" + requestId;
 				var longTitle = jsEscape(decodeURI(elements[1]));
 				var shortTitle = encodeURIComponent(elements[2].toUpperCase());
-				var shortColor = decodeURI(elements[3]);
+				var shortColor = encodeURIComponent(decodeURI(elements[3]));
 				var cpName = jsEscape(decodeURI(elements[4]));
 				cont += '<div class="skinnyCard skinnyCardList" id="' + cpId2 + '" onclick="hrdSelect(\'' + cpLocation + "')\">";
 				cont += '	<div class="skinnyButton" style="background-color:#' + shortColor + '">';

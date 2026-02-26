@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -17,6 +17,7 @@ package swiss.trustbroker.oidc.tx;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.servlet.Filter;
@@ -30,22 +31,17 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsUtils;
-import swiss.trustbroker.common.exception.StandardErrorCode;
-import swiss.trustbroker.common.tracing.TraceSupport;
-import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.StringUtil;
-import swiss.trustbroker.common.util.UrlAcceptor;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.CorsPolicies;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
-import swiss.trustbroker.oidc.OidcExceptionHelper;
 import swiss.trustbroker.oidc.OidcFrameAncestorHandler;
 import swiss.trustbroker.oidc.session.HttpExchangeSupport;
-import swiss.trustbroker.oidc.session.OidcSessionSupport;
-import swiss.trustbroker.oidc.session.TomcatSessionManager;
+import swiss.trustbroker.script.service.ScriptService;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.CorsSupport;
 import swiss.trustbroker.util.WebSupport;
@@ -64,9 +60,11 @@ public class OidcTxFilter implements Filter {
 
 	private final TrustBrokerProperties properties;
 
-	private final TomcatSessionManager tomcatSessionManager;
-
 	private final ApiSupport apiSupport;
+
+	private final ScriptService scriptService;
+
+	private final SessionTxWrapper sessionTxWrapper;
 
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -74,6 +72,7 @@ public class OidcTxFilter implements Filter {
 		// original
 		var httpRequest = (HttpServletRequest) request;
 		var httpResponse = (HttpServletResponse) response;
+		var path = httpRequest.getRequestURI();
 
 		// wrapped to manipulate request/response data
 		var wrappedRequest = new OidcTxRequestWrapper(httpRequest);
@@ -82,46 +81,49 @@ public class OidcTxFilter implements Filter {
 				apiSupport, frameAncestorHandler);
 
 		try {
-			// transaction start
-			HttpExchangeSupport.begin(httpRequest, httpResponse);
-			tomcatSessionManager.load(wrappedRequest);
+			// web exchange begin (potentially business transactional)
+			HttpExchangeSupport.begin(httpRequest, wrappedResponse);
+			catchOutputStream(httpRequest, wrappedResponse);
 
 			// prepare HTTP security headers
-			var path = httpRequest.getRequestURI();
 			validateAndSetSecurityHeaders(httpRequest, wrappedResponse, path);
 
-			// let spring-security handle if we did not already send a redirect
+			// stateless spring-security redirect handling
 			if (CorsUtils.isPreFlightRequest(httpRequest)) {
-				log.debug("Security headers handled for PREFLIGHT on path path={}", path);
+				log.debug("HTTP security headers handled for OPTIONS/PREFLIGHT on path path={}", path);
 			}
-			else if (handleOidcPromptNone(httpRequest, wrappedResponse)) {
-				log.debug("Aborting processing with prompt=none on path={}", path);
-			}
+			// stateless assert of pre-emptive output stream flushing
 			else if (response.isCommitted()) {
-				log.info("Aborting processing on already committed web stream on path={}", path);
+				log.info("HTTP request committed on path={}", path);
 			}
-			// configuration handling: Support cors headers without preflight and handle Issuer
+			// stateless configuration handling (support cors headers without preflight and handle issuer)
 			else if (ApiSupport.isOidcConfigPath(path) && properties.getOidc().isUseKeycloakIssuerId()) {
 				wrappedResponse.catchOutputStream();
 				chain.doFilter(wrappedRequest, wrappedResponse);
+				handlePenTestRequest();
 				patchOpenIdConfiguration(path, wrappedResponse);
 			}
-			else {
-				// stop here to check on requests, responses, sessions
-				OidcSessionSupport.checkSessionOnFederationRedirect(path, httpRequest);
-				chain.doFilter(wrappedRequest, wrappedResponse);
+			// stateful OIDC federation handling including acr_values and response_mode post-processing
+			else if (ApiSupport.isOidcSessionPath(path)) {
+				sessionTxWrapper.doFilter(wrappedRequest, wrappedResponse, chain);
+				handlePenTestRequest();
 			}
-
-			// post-processing
-			if (ApiSupport.isOidcSessionPath(path)) {
-				FragmentUtil.checkAndRememberFragmentMode(wrappedRequest);
-				OidcSessionSupport.rememberAcrValues(wrappedRequest);
+			// stateless resources or SAML handling
+			else {
+				chain.doFilter(wrappedRequest, wrappedResponse);
+				handlePenTestRequest();
 			}
 		}
+		catch (CannotAcquireLockException ex) {
+			if (!ApiSupport.isReadyOnlyAccess(path)) {
+				throw ex;
+			}
+			// state change failure not security relevant, so just ignore
+			log.warn("Try saving ready-only session failed: {}", ex.getMessage());
+		}
 		finally {
-			// transaction end
-			tomcatSessionManager.save();
 			HttpExchangeSupport.end();
+			flushOutputStream(wrappedResponse);
 		}
 	}
 
@@ -134,40 +136,43 @@ public class OidcTxFilter implements Filter {
 				.robotsTag();
 
 		// validate if we know this client or at least the called URL seems unproblematic
-		if (ApiSupport.isOidcCheck3pCookie(path)) {
-			validateRequestAndAddCorsHeaders(httpRequest, path, wrappedResponse);
-			var perimeter = WebUtil.getValidOrigin(httpRequest.getRequestURL().toString());
+		// Web resources (before SAML as this is within ApiPath)
+		if (ApiSupport.isWebResourcePath(path)) {
 			wrappedResponse.headerBuilder()
-					.oidc3pCookieOptions(WebUtil.getOriginOrReferer(httpRequest), perimeter);
+						   .defaultCsp()
+						   .defaultFrameOptions();
 		}
+		// OIDC rp side
 		else if (ApiSupport.isOidcSessionPath(path)) {
 			validateRequestAndAddCorsHeaders(httpRequest, path, wrappedResponse);
 			wrappedResponse.headerBuilder()
-					.oidcCspFrameOptions(WebSupport.getOwnOrigins(properties));
+						   .oidcCspFrameOptions(WebSupport.getOwnOrigins(properties));
 		}
-		else if (ApiSupport.isSamlPath(path)) {
+		// SAML and APIS that lead to SAML responses
+		else if (ApiSupport.isSamlPath(path) || ApiSupport.isApiPath(path)) {
 			wrappedResponse.headerBuilder()
-					.samlCsp()
-					.defaultFrameOptions();
+						   .samlCsp()
+						   .defaultFrameOptions();
 		}
+		// SPA
 		else if (ApiSupport.isFrontendPath(path)) {
 			wrappedResponse.headerBuilder()
-					.frontendCsp()
-					.defaultFrameOptions();
+						   .frontendCsp()
+						   .defaultFrameOptions();
 		}
+		// keycloak compat
+		else if (ApiSupport.isOidcCheck3pCookie(path)) {
+			validateRequestAndAddCorsHeaders(httpRequest, path, wrappedResponse);
+			var perimeter = WebUtil.getValidOrigin(httpRequest.getRequestURL().toString());
+			wrappedResponse.headerBuilder()
+						   .oidc3pCookieOptions(WebUtil.getOriginOrReferer(httpRequest), perimeter);
+		}
+		// fallback
 		else {
 			wrappedResponse.headerBuilder()
-					.defaultCsp()
-					.defaultFrameOptions();
+						   .defaultCsp()
+						   .defaultFrameOptions();
 		}
-	}
-
-	private static String getKeycloakRealm(String path) {
-		if (path.startsWith(ApiSupport.KEYCLOAK_REALMS)) {
-			var pathElements = path.split("/");
-			return pathElements.length >= 3 ? pathElements[2] : null;
-		}
-		return null;
 	}
 
 	private void validateRequestAndAddCorsHeaders(HttpServletRequest request, String path, OidcTxResponseWrapper response) {
@@ -180,8 +185,18 @@ public class OidcTxFilter implements Filter {
 		// Observed OIDC clients doing OPTIONS pre-flight requests on the openid-configuration so allow '*' there too.
 		var oidcClient = relyingPartyDefinitions.getOidcClientByPredicate(cl -> cl.isTrustedOrigin(origin));
 		if (oidcClient.isPresent() || ApiSupport.isOidcConfigPath(path)) {
+			List<String> allowedOrigins = new ArrayList<>();
+			allowedOrigins.add(properties.getPerimeterUrl()); // validated origin plus SAML perimeter
+			if (oidcClient.isEmpty()) {
+				log.warn("No OIDC client with matching ACUrl for origin=\"{}\" called on path=\"{}\" - origin not trusted",
+						StringUtil.clean(origin), StringUtil.clean(path));
+			}
+			else {
+				allowedOrigins.add(origin);
+				OidcTxUtil.validateKeycloakRealm(path, oidcClient.get(), origin);
+			}
 			var corsPolicies = CorsPolicies.builder()
-					.allowedOrigins(List.of(origin, properties.getPerimeterUrl())) // validated origin plus SAML perimeter
+					.allowedOrigins(allowedOrigins)
 					.allowedMethods(properties.getCors().getAllowedMethods())
 					.allowedHeaders(properties.getCors().getAllowedHeaders())
 					.build();
@@ -189,9 +204,29 @@ public class OidcTxFilter implements Filter {
 		}
 	}
 
+	// buffer some responses to make sure frameworks to not write to client before TX commit (TX are on OIDC and SAML federation)
+	private void catchOutputStream(HttpServletRequest httpRequest, OidcTxResponseWrapper wrappedResponse) {
+		var path = httpRequest.getRequestURI();
+		// optimize (do not cache assets and other resources)
+		if (ApiSupport.isSamlPath(path) || ApiSupport.isOidcSessionPath(path)
+				|| WebSupport.penTestingModeEnabled(httpRequest, properties)) {
+			wrappedResponse.catchOutputStream();
+			var penTestMarker = properties.getPublicPenTestCookie();
+			if (penTestMarker != null) {
+				var scenario = WebUtil.getAny(penTestMarker, httpRequest);
+				HttpExchangeSupport.setRunningPenTestScenario(scenario);
+			}
+		}
+	}
+
+	// flush buffered data after TX commit
+	private void flushOutputStream(OidcTxResponseWrapper wrappedResponse) throws IOException {
+		wrappedResponse.flushOutputStream();
+	}
+
 	// Support OIDC clients connecting to Keycloak validating the issuer ID containing /realms/X
 	private void patchOpenIdConfiguration(String path, OidcTxResponseWrapper response) throws IOException {
-		var realmName = getKeycloakRealm(path);
+		var realmName = OidcTxUtil.getKeycloakRealm(path);
 		var config = response.getBody();
 		if (realmName != null && config != null) {
 			var issuer = properties.getOidc().getIssuer();
@@ -210,39 +245,16 @@ public class OidcTxFilter implements Filter {
 							ApiSupport.PROTOCOL_OPENIDCONNECT + ApiSupport.OIDC_TOKEN + ApiSupport.OIDC_REVOKE)
 					.getBytes(StandardCharsets.UTF_8);
 			log.debug("Patching back .well-known response urls with realm={}", realmName);
+			// replace on output stream, discarding original body
+			response.setContentLengthLong(config.length);
+			response.flushOutputStream(config);
 		}
-		response.patchOutputStream(config);
 	}
 
-	private boolean handleOidcPromptNone(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		if (OidcUtil.isOidcPromptNone(request)) {
-			var clientId = OidcSessionSupport.getOidcClientId(request, relyingPartyDefinitions);
-			var session = HttpExchangeSupport.getRunningHttpSession();
-			var principal = OidcSessionSupport.getAuthenticatedPrincipal(session);
-			if (principal != null) {
-				log.debug("prompt=none ignored, clientId={} already logged in as principal={}", clientId, principal.getName());
-				return false;
-			}
-			var client = relyingPartyDefinitions.getOidcClientConfigById(clientId, properties);
-			var redirectUri = OidcUtil.getRedirectUriFromRequest(request);
-			if (client.isEmpty() || redirectUri == null) {
-				log.warn("prompt=none ignored, clientId={} not define dor no redirect_uri", clientId);
-				return false;
-			}
-			var acl = client.get().getRedirectUris();
-			if (acl != null && UrlAcceptor.isRedirectUrlOkForAccess(redirectUri, acl.getAcNetUrls())) {
-				var state = StringUtil.clean(request.getParameter(OidcUtil.OIDC_STATE_ID));
-				var traceId = TraceSupport.getOwnTraceParent();
-				var errorPage = apiSupport.getErrorPageUrl(StandardErrorCode.REQUEST_DENIED.getLabel(), traceId);
-				var redirectUrl = OidcExceptionHelper.getOidcErrorLocation(redirectUri,
-						"login_required", "no session on prompt=none", errorPage,
-						properties.getOidc().getIssuer(), state);
-				log.debug("No authenticated OIDC session on prompt=none, redirecting to redirectUrl={}", redirectUrl);
-				response.sendRedirect(redirectUrl);
-				return true;
-			}
+	private void handlePenTestRequest() {
+		if (HttpExchangeSupport.isRunningPenTestScenario()) {
+			scriptService.processOnMessage();
 		}
-		return false;
 	}
 
 }

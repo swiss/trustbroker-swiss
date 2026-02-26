@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -27,7 +27,6 @@ import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
 
 import lombok.AllArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -36,16 +35,18 @@ import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.config.annotation.WsConfigurerAdapter;
+import org.springframework.ws.config.annotation.WsConfigurer;
 import org.springframework.ws.server.EndpointInterceptor;
+import org.springframework.ws.server.endpoint.adapter.method.MethodArgumentResolver;
+import org.springframework.ws.server.endpoint.adapter.method.MethodReturnValueHandler;
 import org.springframework.ws.soap.SoapMessageFactory;
 import org.springframework.ws.soap.SoapVersion;
 import org.springframework.ws.soap.saaj.SaajSoapMessageFactory;
 import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
 import org.springframework.ws.soap.security.wss4j2.support.CryptoFactoryBean;
+import org.springframework.ws.soap.server.SoapEndpointInterceptor;
 import org.springframework.ws.soap.server.endpoint.SoapFaultDefinition;
 import org.springframework.ws.soap.server.endpoint.SoapFaultMappingExceptionResolver;
 import org.springframework.ws.transport.http.MessageDispatcherServlet;
@@ -53,7 +54,6 @@ import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CredentialUtil;
 import swiss.trustbroker.common.util.WSSConstants;
 import swiss.trustbroker.config.TrustBrokerProperties;
-import swiss.trustbroker.config.dto.WsTrustConfig;
 import swiss.trustbroker.exception.GlobalExceptionHandler;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.wstrust.exception.DetailSoapFaultDefinitionExceptionResolver;
@@ -65,7 +65,7 @@ import swiss.trustbroker.wstrust.service.DualProtocolSaajSoapMessageFactory;
 @Configuration
 @Slf4j
 @AllArgsConstructor
-public class WebServiceConfiguration extends WsConfigurerAdapter {
+public class WebServiceConfiguration implements WsConfigurer {
 
 	private final ResourceLoader resourceLoader;
 
@@ -73,7 +73,7 @@ public class WebServiceConfiguration extends WsConfigurerAdapter {
 
 	@Bean
 	public static Transformer transformer() throws TransformerConfigurationException {
-		TransformerFactory factory = TransformerFactory.newInstance();
+		var factory = TransformerFactory.newInstance();
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
 		return factory.newTransformer();
@@ -103,8 +103,8 @@ public class WebServiceConfiguration extends WsConfigurerAdapter {
 	}
 
 	@Bean
-	public SoapMessageFactory messageFactory(@Qualifier("1.1") SaajSoapMessageFactory messageFactory11,
-			@Qualifier("1.2") SaajSoapMessageFactory messageFactory12) {
+	public SoapMessageFactory messageFactory(@Qualifier("messageFactory11") SaajSoapMessageFactory messageFactory11,
+			@Qualifier("messageFactory12") SaajSoapMessageFactory messageFactory12) {
 		var soapVersion = trustBrokerProperties.getWstrust().getSoapVersion();
 		return switch (soapVersion) {
 			case SOAP_1_1 -> messageFactory11;
@@ -114,7 +114,6 @@ public class WebServiceConfiguration extends WsConfigurerAdapter {
 	}
 
 	@Bean
-	@Qualifier("1.1")
 	public SaajSoapMessageFactory messageFactory11() {
 		var messageFactory = new SaajSoapMessageFactory();
 		messageFactory.setSoapVersion(SoapVersion.SOAP_11);
@@ -122,25 +121,44 @@ public class WebServiceConfiguration extends WsConfigurerAdapter {
 	}
 
 	@Bean
-	@Qualifier("1.2")
 	public SaajSoapMessageFactory messageFactory12() {
 		var messageFactory = new SaajSoapMessageFactory();
 		messageFactory.setSoapVersion(SoapVersion.SOAP_12);
 		return messageFactory;
 	}
 
-	@SneakyThrows
+	@Bean
+	public SoapEndpointInterceptor endpointInterceptor(Transformer transformer) {
+		return new CustomEndpointInterceptor(trustBrokerProperties, transformer);
+	}
+
 	@Override
 	public void addInterceptors(List<EndpointInterceptor> interceptors) {
-		interceptors.add(new CustomEndpointInterceptor(trustBrokerProperties, transformer()));
-		interceptors.add(securityInterceptor());
-		super.addInterceptors(interceptors);
+		try {
+			interceptors.add(endpointInterceptor(transformer()));
+			interceptors.add(securityInterceptor());
+		}
+		catch (Exception ex) {
+			var msg = String.format("Failed to add interceptor: %s", ex.getMessage());
+			log.error(msg, ex);
+			throw new TechnicalException(msg, ex);
+		}
+	}
+
+	@Override
+	public void addArgumentResolvers(List<MethodArgumentResolver> argumentResolvers) {
+		// not needed
+	}
+
+	@Override
+	public void addReturnValueHandlers(List<MethodReturnValueHandler> returnValueHandlers) {
+		// not needed
 	}
 
 	@Bean
 	public Wss4jSecurityInterceptor securityInterceptor() throws Exception {
 
-		Wss4jSecurityInterceptor securityInterceptor = new Wss4jSecurityInterceptor();
+		var securityInterceptor = new Wss4jSecurityInterceptor();
 		securityInterceptor.setValidateResponse(true);
 		// Set response security header config
 		var securementActions = WSSConstants.TIMESTAMP;
@@ -196,30 +214,29 @@ public class WebServiceConfiguration extends WsConfigurerAdapter {
 		var wsTrustConfig = trustBrokerProperties.getWstrust();
 		var cert = wsTrustConfig.getCert();
 		if (cert == null) {
-			throw new TechnicalException("Missing trustbroker.config.wstrust.cert");
+			throw new IllegalStateException("Missing trustbroker.config.wstrust.cert");
 		}
 		var absolutePath = new File(cert).getAbsolutePath();
 		var resource = resourceLoader.getResource("file:" + absolutePath);
 		if (!resource.exists()) {
-			throw new TechnicalException(
+			throw new IllegalStateException(
 					String.format("Resource for signature validation not found at %s", resource.getDescription()));
 		}
-		CryptoFactoryBean cryptoFactoryBean = new CryptoFactoryBean();
+		var cryptoFactoryBean = new CryptoFactoryBean();
 		cryptoFactoryBean.setKeyStoreLocation(resource);
-		String password = CredentialUtil.processPassword(wsTrustConfig.getPassword());
+		var password = CredentialUtil.processPassword(wsTrustConfig.getPassword());
 		cryptoFactoryBean.setKeyStorePassword(password);
 		return cryptoFactoryBean;
 	}
 
 	@Bean
 	public SoapFaultMappingExceptionResolver exceptionResolver(GlobalExceptionHandler globalExceptionHandler) {
-		SoapFaultMappingExceptionResolver exceptionResolver = new DetailSoapFaultDefinitionExceptionResolver(globalExceptionHandler);
-
-		SoapFaultDefinition faultDefinition = new SoapFaultDefinition();
+		var exceptionResolver = new DetailSoapFaultDefinitionExceptionResolver(globalExceptionHandler);
+		var faultDefinition = new SoapFaultDefinition();
 		faultDefinition.setFaultCode(SoapFaultDefinition.SERVER);
 		exceptionResolver.setDefaultFault(faultDefinition);
 
-		Properties errorMappings = new Properties();
+		var errorMappings = new Properties();
 		errorMappings.setProperty(Exception.class.getName(), SoapFaultDefinition.SERVER.toString());
 		errorMappings.setProperty(ServiceFaultException.class.getName(), SoapFaultDefinition.SERVER.toString());
 		exceptionResolver.setExceptionMappings(errorMappings);

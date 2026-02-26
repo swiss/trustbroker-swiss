@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,9 +15,15 @@
 
 package swiss.trustbroker.api.profileselection.dto;
 
+import java.util.List;
+
 public interface ProfileSelectionProperties {
 
 	String getProfileSelectionMode();
+
+	String getProfileSelector();
+
+	String getDisplayName();
 
 	boolean isProfileSelectionEnabled();
 
@@ -39,4 +45,5 @@ public interface ProfileSelectionProperties {
 
 	String getFilterRoleConfiguration();
 
+	List<String> getDisplayClaims();
 }

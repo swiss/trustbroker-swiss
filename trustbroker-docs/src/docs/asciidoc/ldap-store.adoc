@@ -1,0 +1,130 @@
+= LDAP Store
+
+The LDAP store is a component in the open-source to retrieve attributes from an LDAP server.
+
+It allows chained queries so that an attribute from any previous query can be used in the following one.
+
+If no claim selection are configured in the IDMQuery for the LDAP Store, all attributes will be fetched.
+
+Known limitations:
+
+- this plugin can only connect to one LDAP server
+
+== Configuration
+
+=== Parameters
+[cols="2,4,1,1,1,2"]
+|===
+| Parameter | Comment | Location | Type | Values | Example
+
+| ``spring.ldap.urls``
+| url to connect to the LDAP server
+| application.yml
+| String
+| *
+| ldaps://localhost:636
+
+| ``spring.ldap.base``
+| base DN
+| application.yml
+| String
+| *
+| dc=trustbroker,dc=swiss
+
+
+| ``spring.ldap.usename``
+| username used to query the LDAP server
+| application.yml
+| String
+| *
+| uid=admin,ou=system
+
+| ``spring.ldap.password``
+| password used to query the LDAP server
+| application.yml
+| String
+| *
+| password
+
+| ``trustbroker.config.ldap.enabled``
+| Enables LDAP Plugin
+| application.yml
+| Boolean
+| true / false
+| false
+
+
+
+| ``appFilter``
+| Query filter for LDAP Query
+| ProfileRP
+| String
+| *
+| (&amp;(app=app1)(\|(uid=${IDM:QueryName:uid})(mail=${mail}))
+
+| ``subResource``
+| Search base for LDAP Query
+| ProfileRP
+| String
+| *
+| dc=users
+
+| ``attributes selection``
+| Attributes to retrieve from the LDAP
+| ProfileRP
+| XML UserDetailsSelection.Definition
+| Values must exist in the LDAP's Person
+| mail, givenName, uid
+
+| ``store``
+| Selection of store for the IDM Query
+| ProfileRP
+| XML IDMLookup.IDMQuery
+| LDAP
+| LDAP
+
+|===
+
+=== Chained query
+To use chained query configure the LDAP's "AppFilter" with the claim of a previous IDM query (example: `IDM:<query_name>:<definition_name>` as in `IDM:IDENTITY:uid`).
+
+
+
+== Identity Selection
+
+When the LDAP plugin retrieves multiple identities from the store, an Identity Selection can be triggered.
+
+Additional information can be displayed to the user, to help choosing the Identity.
+Any additional information can be used (most probably LDAP attributes).
+
+=== Parameters
+In the SetupRP, section ``ProfileSelection``.
+[cols="2,3,1,1,2"]
+|===
+| Parameter | Meaning | Type | Values | Example
+
+| enabled
+| enables the Profile Selection
+| Boolean
+| true / false
+| true
+
+| handler
+| needs to be explicitly specified to pick the LDAP Identity Selection handler
+| String
+| LDAP
+| LDAP
+
+| profileSelector
+| claim to look for multiple identities. Has to be an LDAP claim, and unique.
+| String
+| mail, uid, ..
+| mail
+
+| additionalInfo
+| additional attributes to display to the user on Identity Selection
+| List of Strings
+| memberof, uid, ..
+| memberof,uid,org
+
+|===

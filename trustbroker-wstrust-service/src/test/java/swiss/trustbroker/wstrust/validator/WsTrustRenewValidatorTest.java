@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -36,11 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.opensaml.core.xml.util.XMLObjectSupport;
-import org.opensaml.saml.saml2.core.Assertion;
-import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.soap.wssecurity.BinarySecurityToken;
-import org.opensaml.soap.wstrust.RenewTarget;
-import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,13 +44,10 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import swiss.trustbroker.common.exception.RequestDeniedException;
-import swiss.trustbroker.common.saml.util.OpenSamlUtil;
-import swiss.trustbroker.common.saml.util.SamlFactory;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.common.util.WSSConstants;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
-import swiss.trustbroker.config.dto.SsoSessionIdPolicy;
 import swiss.trustbroker.config.dto.WsTrustConfig;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
@@ -62,6 +55,7 @@ import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sso.service.SsoService;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 import swiss.trustbroker.wstrust.dto.SoapMessageHeader;
+import swiss.trustbroker.wstrust.util.WsTrustTestUtil;
 import swiss.trustbroker.wstrust.util.WsTrustUtil;
 
 @ExtendWith(SpringExtension.class)
@@ -70,20 +64,6 @@ import swiss.trustbroker.wstrust.util.WsTrustUtil;
 		WsTrustRenewValidator.class
 })
 class WsTrustRenewValidatorTest {
-
-	private static final String SSO_SESSION_ID = SsoSessionIdPolicy.SSO_PREFIX + "1";
-
-	private static final String RP_ISSUER_ID = "rp1";
-
-	private static final String ASSERTION_ID = "assertion1";
-
-	private static final String XTB_ISSUER_ID = "xtb:issuer";
-
-	private static final Instant NOW = Instant.ofEpochMilli(1000000L);
-
-	private static final int SUBJECT_VALID_SECS = 10;
-
-	private static final int CONDITION_VALID_SECS = 20;
 
 	@MockitoBean
 	private SsoService ssoService;
@@ -135,7 +115,7 @@ class WsTrustRenewValidatorTest {
 	@Test
 	void findValidSsoSession() {
 		var stateData = mockSsoSession(true);
-		var assertion = givenAssertion();
+		var assertion = WsTrustTestUtil.givenAssertion();
 
 		var ssoSession = wsTrustRenewValidator.findValidSsoSession(assertion);
 
@@ -148,7 +128,7 @@ class WsTrustRenewValidatorTest {
 	void noValidSsoSessionNotRequired() {
 		wsTrustConfig.setRenewRequiresSsoSession(false);
 		mockSsoSession(false);
-		var assertion = givenAssertion();
+		var assertion = WsTrustTestUtil.givenAssertion();
 
 		var ssoSession = wsTrustRenewValidator.findValidSsoSession(assertion);
 
@@ -159,7 +139,7 @@ class WsTrustRenewValidatorTest {
 	void noValidSsoSessionRequired() {
 		wsTrustConfig.setRenewRequiresSsoSession(true);
 		mockSsoSession(false);
-		var assertion = givenAssertion();
+		var assertion = WsTrustTestUtil.givenAssertion();
 
 		assertThrows(RequestDeniedException.class, () -> wsTrustRenewValidator.findValidSsoSession(assertion));
 	}
@@ -219,13 +199,13 @@ class WsTrustRenewValidatorTest {
 		// If true requires a SoapMessage signed with private key for RelyingParty.SignerTrustStore:
 		wsTrustConfig.setRenewRequireSignedRequests(false);
 		var relyingParty = givenRelyingParty();
-		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(RP_ISSUER_ID, null)).thenReturn(relyingParty);
+		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(WsTrustTestUtil.RP_ISSUER_ID, null)).thenReturn(relyingParty);
 		var securityToken = givenSecurityToken();
-		var assertion = givenAssertion();
+		var assertion = WsTrustTestUtil.givenAssertion();
 		SamlTestBase.signSamlObject(assertion);
-		var rst = givenRstRequest(assertion);
+		var rst = WsTrustTestUtil.givenRenewRstRequest(assertion);
 		mockSsoSession(true);
-		when(trustBrokerProperties.getIssuer()).thenReturn(XTB_ISSUER_ID);
+		when(trustBrokerProperties.getIssuer()).thenReturn(WsTrustTestUtil.XTB_ISSUER_ID);
 		when(clock.instant()).thenReturn(now);
 		var requestHeader = new SoapMessageHeader();
 		requestHeader.setSecurityToken(securityToken);
@@ -239,23 +219,23 @@ class WsTrustRenewValidatorTest {
 
 			assertThat(result.getValidatedAssertion(), is(assertion));
 			assertThat(result.isRecomputeAttributes(), is(false));
-			assertThat(result.getIssuerId(), is(RP_ISSUER_ID));
-			assertThat(result.getRecipientId(), is(RP_ISSUER_ID));
+			assertThat(result.getIssuerId(), is(WsTrustTestUtil.RP_ISSUER_ID));
+			assertThat(result.getRecipientId(), is(WsTrustTestUtil.RP_ISSUER_ID));
 			assertThat(result.isUseAssertionLifetime(), is(true));
-			assertThat(result.getSessionIndex(), is(SSO_SESSION_ID));
+			assertThat(result.getSessionIndex(), is(WsTrustTestUtil.SSO_SESSION_ID));
 		}
 	}
 
 	static Object[][] validate() {
 		return new Object[][] {
-				{ NOW, null, false },
-				{ NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC), null, false },
-				{ NOW.plusSeconds(10_000L), 10_000L, false },
-				{ NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + SUBJECT_VALID_SECS - 1), null, false },
-				{ NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + SUBJECT_VALID_SECS), null, true },
+				{ WsTrustTestUtil.NOW, null, false },
+				{ WsTrustTestUtil.NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC), null, false },
+				{ WsTrustTestUtil.NOW.plusSeconds(10_000L), 10_000L, false },
+				{ WsTrustTestUtil.NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + WsTrustTestUtil.SUBJECT_VALID_SECS - 1), null, false },
+				{ WsTrustTestUtil.NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + WsTrustTestUtil.SUBJECT_VALID_SECS), null, true },
 				// SUBJECT_VALID_SECS < CONDITION_VALID_SECS
-				{ NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + CONDITION_VALID_SECS - 1), null, true },
-				{ NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + CONDITION_VALID_SECS), null, true }
+				{ WsTrustTestUtil.NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + WsTrustTestUtil.CONDITION_VALID_SECS - 1), null, true },
+				{ WsTrustTestUtil.NOW.plusSeconds(SecurityChecks.RENEW_TOLERANCE_NOT_AFTER_SEC + WsTrustTestUtil.CONDITION_VALID_SECS), null, true }
 		};
 	}
 
@@ -280,14 +260,14 @@ class WsTrustRenewValidatorTest {
 	private RelyingParty givenRelyingParty() {
 		var trustCredentials = SamlTestBase.dummyCredentials(SamlTestBase.X509_RSAENC_P12);
 		return RelyingParty.builder()
-						   .id(RP_ISSUER_ID)
+						   .id(WsTrustTestUtil.RP_ISSUER_ID)
 						   .rpTrustCredentials(trustCredentials)
 						   .build();
 	}
 
 	private StateData mockSsoSession(boolean present) {
 		var stateData = givenStateData();
-		when(ssoService.findValidSsoSessionForSessionIndexes(List.of(SSO_SESSION_ID)))
+		when(ssoService.findValidSsoSessionForSessionIndexes(List.of(WsTrustTestUtil.SSO_SESSION_ID)))
 				.thenReturn(present ? Optional.of(givenStateData()) : Optional.empty());
 		return stateData;
 	}
@@ -295,34 +275,8 @@ class WsTrustRenewValidatorTest {
 	private static StateData givenStateData() {
 		return StateData.builder()
 						.id("id1")
-						.ssoSessionId(SSO_SESSION_ID)
+						.ssoSessionId(WsTrustTestUtil.SSO_SESSION_ID)
 						.build();
-	}
-
-	private static Assertion givenAssertion() {
-		var assertion = (Assertion) XMLObjectSupport.buildXMLObject(Assertion.DEFAULT_ELEMENT_NAME);
-		assertion.setID(ASSERTION_ID);
-		assertion.setIssuer(SamlFactory.createIssuer(XTB_ISSUER_ID));
-		assertion.setSubject(SamlFactory.createSubject(
-				SamlFactory.createNameId("subj1", null, null), "req1", RP_ISSUER_ID, SUBJECT_VALID_SECS, NOW)
-		);
-		var conditions = SamlFactory.createConditions(RP_ISSUER_ID, CONDITION_VALID_SECS, NOW);
-		assertion.setConditions(conditions);
-		assertion.setIssueInstant(NOW);
-		var authnStatement = OpenSamlUtil.buildSamlObject(AuthnStatement.class);
-		authnStatement.setSessionIndex(SSO_SESSION_ID);
-		assertion.getAuthnStatements()
-				 .add(authnStatement);
-		return assertion;
-	}
-
-	private RequestSecurityToken givenRstRequest(Assertion assertion) {
-		var rst = (RequestSecurityToken) XMLObjectSupport.buildXMLObject(RequestSecurityToken.ELEMENT_NAME);
-		var renewTarget = (RenewTarget) XMLObjectSupport.buildXMLObject(RenewTarget.ELEMENT_NAME);
-		renewTarget.setUnknownXMLObject(assertion);
-		rst.getUnknownXMLObjects()
-		   .add(renewTarget);
-		return rst;
 	}
 
 }

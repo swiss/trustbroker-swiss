@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -48,6 +48,7 @@ import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.config.dto.StateCacheProperties;
 import swiss.trustbroker.config.dto.Support;
+import swiss.trustbroker.config.dto.WsFedConfig;
 import swiss.trustbroker.config.dto.WsTrustConfig;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 
@@ -211,6 +212,12 @@ public class TrustBrokerProperties {
 	 * WS-Trust protocol configuration.
 	 */
 	private WsTrustConfig wstrust = new WsTrustConfig();
+
+	/**
+	 * WS-Fed protocol configuration.
+	 * @since 1.13.0
+	 */
+	private WsFedConfig enabled = new WsFedConfig();
 
 	/**
 	 * SAML protocol configuration.
@@ -460,6 +467,12 @@ public class TrustBrokerProperties {
 	 * Autologin cookie that can be used for CP filtering in HRD.
 	 */
 	private String publicAutoLoginCookie;
+
+	/**
+	 * PEN testing cookie that can be used to implement penetration testing scenarios on the OnMessage hook.
+	 * If not configured, the OnMessage hook is disabled.
+	 */
+	private String publicPenTestCookie;
 
 	/**
 	 * Network configuration.

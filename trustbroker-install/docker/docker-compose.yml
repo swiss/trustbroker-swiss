@@ -7,10 +7,26 @@ networks:
     external: false
 
 services:
+  postgresql:
+    container_name: postgresql
+    restart: on-failure
+    image: docker.io/library/postgres:18
+    volumes:
+      - ./postgresql:/var/lib/postgresql
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=tbss16
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=${STATECACHE_PASS}
+    networks:
+      - trustbroker-network
+
   mariadb:
     container_name: mariadb
     restart: on-failure
-    image: docker.io/library/mariadb:10.7.6
+    image: docker.io/library/mariadb:12-ubi
     volumes:
       - ./mariadb:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
@@ -42,12 +58,12 @@ services:
 
   ldap:
     container_name: ldap
-    image: bitnami/openldap
+    image: osixia/openldap:stable
     ports:
       - '1389:1389'
       - '1636:1636'
     environment:
-      #- BITNAMI_DEBUG=true
+      - BITNAMI_DEBUG=true
       - LDAP_ROOT=dc=trustbroker,dc=swiss
       - LDAP_ADMIN_USERNAME=admin
       - LDAP_ADMIN_PASSWORD=secret
@@ -58,13 +74,26 @@ services:
       - ./ldap_init/ldif:/ldif_init:ro
       #- openldap_data:/bitnami/openldap
 
+  # http://localhost:8099
+  # loginDN: cn=admin,dc=trustbroker,dc=swiss  password: secret
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      - PHPLDAPADMIN_HTTPS=false
+      - PHPLDAPADMIN_LDAP_HOSTS=ldap://ldap:1389
+    ports:
+      - '8099:80'
+    depends_on:
+      - ldap
+
   trustbroker:
     container_name: trustbroker
     image: ghcr.io/trustbroker-swiss/trustbroker-application:latest
     user: "${UID}:${GID}"
     depends_on:
       - gitea
-      - mariadb
+      - postgresql
       - ldap
     volumes:
       - ./ssh:/etc/trustbroker/keys:ro
@@ -79,17 +108,30 @@ services:
       - CONFIG_BRANCH=main
       - SPRING_PROFILES_ACTIVE=DEMO
       - PKI_PASSPHRASE=${PKI_PASSPHRASE}
-      - SPRING_FLYWAY_URL=jdbc:mariadb://mariadb:3306
+      - SPRING_FLYWAY_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_FLYWAY_LOCATIONS=classpath:db/migration/postgresql
+      - SPRING_FLYWAY_SCHEMAS=tbss16
+      - SPRING_FLYWAY_URL=jdbc:postgresql://postgresql:5432/tbss16
       - SPRING_FLYWAY_USER=root
       - SPRING_FLYWAY_PASSWORD=${STATECACHE_PASS}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/tbss16?currentSchema=tbss16
       - SPRING_DATASOURCE_USERNAME=trustbroker
       - SPRING_DATASOURCE_PASSWORD=${STATECACHE_PASS}
+      #
+      # martiadb support
+      #- SPRING_FLYWAY_DRIVER_CLASS_NAME=org.mariadb.jdbc.Driver
+      #- SPRING_FLYWAY_LOCATIONS=classpath:db/migration/mariadb
+      #- SPRING_FLYWAY_URL=jdbc:mariadb://mariadb:5432
+      #- SPRING_DATASOURCE_URL=jdbc:mariadb://mariadb:5432/tbss16
+      #
       # Debug SSH startup in case of connectivity problem with external git repo
       #- LOGGING_LEVEL_ROOT=DEBUG
+      #
       # When running behind an enterprise proxy inject a HTTPS or SSH proxy (HTTP not supported)
       #- HTTPS_PROXY=http://proxy.company.com:1234
       #- SSH_PROXY_HOST=proxy.company.com
       #- SSH_PROXY_PORT=1234
+      #
       # When running on HTTP relax cookie polices
       - TRUSTBROKER_CONFIG_SECUREBROWSERHEADERS=false
     networks:

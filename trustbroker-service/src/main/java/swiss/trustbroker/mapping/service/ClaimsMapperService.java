@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -75,9 +75,9 @@ public class ClaimsMapperService {
 	private void applyConfigFilter(CpResponse cpResponse, ResponseParameters params, RelyingParty relyingParty) {
 		// filter CP claims on RP side (CP side already done)
 		var claimsSelection = relyingParty.getClaimsSelection();
-		var cpAttributesDefs = relyingPartySetupService
+		var rpAttributeDefs = relyingPartySetupService
 				.getRelyingPartyByIssuerIdOrReferrer(params.getRpIssuerId(), params.getRpReferer()).getAttributesDefinitions();
-		var cpAttributes = filterAndCreateCpDefinitions(cpResponse.getAttributes(), cpAttributesDefs, claimsSelection, cpResponse.getIssuer());
+		var cpAttributes = filterAndCreateCpDefinitions(cpResponse.getAttributes(), rpAttributeDefs, claimsSelection, cpResponse.getIssuer());
 
 		// filter IDM claims on RP side
 		var userQueries = relyingParty.getIdmLookup();
@@ -126,10 +126,10 @@ public class ClaimsMapperService {
 		}
 	}
 
-	static Map<Definition, List<String>> filterAndCreateCpDefinitions(
+	public static Map<Definition, List<String>> filterAndCreateCpDefinitions(
 			Map<Definition, List<String>> attributes, Collection<Definition> confAttributes, AttributesSelection claimsSelection, String issuer) {
 		if (attributes == null) {
-			throw new TechnicalException(String.format("Missing IDP response attributes for cpIssuer=%s", issuer));
+			throw new TechnicalException(String.format("Missing IDP response attributes for issuer=%s", issuer));
 		}
 
 		List<Definition> claimsForSource = AttributeFilterUtil.getClaimsForSource(claimsSelection, ClaimSource.CP.name());

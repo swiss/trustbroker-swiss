@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -33,7 +33,12 @@ public enum StandardErrorCode implements ErrorCode {
 	 * RP/CP QoA requirement not met by CP response.
 	 * @since 1.11.0
 	 */
-	NO_AUTHN_CONTEXT("noauthncontext");
+	NO_AUTHN_CONTEXT("noauthncontext"),
+	/**
+	 * Signature validation failed.
+	 * @since 1.13.0
+	 */
+	SIGNATURE_NOT_OK("signaturenok");
 
 	private final String label;
 

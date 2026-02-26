@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -57,13 +57,13 @@ export class HrdCardsContainerComponent {
 	}
 
 	private processHttpResponse(resp: HttpResponse<string>): Observable<IdpObjects> {
-		const url = resp.url.replace(/^.*(\/failure\/.*$)/, '$1');
+		const url = resp.url!.replace(/^.*(\/failure\/.*$)/, '$1');
 		if (url !== resp.url) {
 			// NOSONAR
 			// console.info('[HrdCardsContainerComponent] tiles lookup failed', resp.url);
 			void this.router.navigate([url]).then(() => of({}));
 			return of({});
 		}
-		return of(JSON.parse(resp.body) as IdpObjects);
+		return of(JSON.parse(resp.body!) as IdpObjects);
 	}
 }

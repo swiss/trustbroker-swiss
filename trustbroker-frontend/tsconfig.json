@@ -5,7 +5,7 @@
     "outDir": "./out-tsc/app",
     /* as in empty angular application */
     "strict": false,
-//    "strictNullChecks": true,
+    "strictNullChecks": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,

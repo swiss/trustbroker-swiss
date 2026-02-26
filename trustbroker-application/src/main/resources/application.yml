@@ -24,7 +24,7 @@ spring:
       max-lifetime: 1800000 # maximum connection lifetime in the pool after close (default: 1800000ms = 30min, mariadb has 60min)
       # as keepalive-time is > idle-timeout we only actively probe sessiondb on the unused idle ones
       keepalive-time: 600000 # less than max-lifetime using connection-test-query to probe the DB (default: 0ms == disabled)
-      connection-test-query: select 1 from dual # probe DB according to keepalive-time
+      connection-test-query: select 1 # probe DB according to keepalive-time
   jpa:
     open-in-view: false
     hibernate:
@@ -42,13 +42,14 @@ spring:
     baselineOnMigrate: true # force upgrading XTB schema even though the database is not empty
     placeholders:
       databaseName: ${spring.flyway.schemas}
+      databaseUser: ${spring.datasource.username}
+      databasePassword: ${spring.datasource.password}
   task:
     scheduling:
       pool:
         size: 2
   #ldap:
   #  urls: ldap://localhost:1389
-  #  base: dc=trustbroker,dc=swiss
   #  username: cn=admin,dc=trustbroker,dc=swiss
   #  password: secret
 
@@ -381,8 +382,8 @@ trustbroker:
         - namespace: urn:oasis:names:tc:SAML:2.0:status
     # WSTrust is supported for clients sending our own assertions in the SOAP security header of an RST request to get a new one
     wstrust:
-      enabled: true
-      issueEnabled: true
+      enabled: false
+      issueEnabled: false
       renewEnabled: false
       renewRequireSignedRequests: true
       renewRequiresSsoSession: true
@@ -398,10 +399,14 @@ trustbroker:
         - Timestamp
         - Assertion
 
+    # WSFed authentication is disabled by default
+    #wsfed:
+    #  enabled: true
+
     # XTB LDAP sub-system disabled by default
     #ldap:
     #  enabled: true
-    #  searchBase: dc=users
+    #  undefined: UNDEF
 
     attributes:
       # required attributes without predefined standard namespaces:

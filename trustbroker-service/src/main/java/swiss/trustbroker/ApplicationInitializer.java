@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -147,7 +147,7 @@ public class ApplicationInitializer {
 		relyingPartyDefinitions.loadAccessRequestConfigurations();
 
 		// OIDC registry populate
-		appConfigService.checkAndUpdateOidcRegistry(relyingPartySetup);
+		appConfigService.checkAndUpdateOidcRegistry(relyingPartySetup, claimsProviderSetup);
 
 		// load scripts, this MUST be last as the refresh will swap the script registry, and we are not transactional here
 		scriptService.activateRefresh();

@@ -24,7 +24,7 @@
 			for (var i = 0; i < uiElements.length; i++) {
 				var elements = uiElements[i].split(",");
 				var cpId = encodeURIComponent(elements[0]);
-				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?session=" + requestId;
+				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?sid=" + requestId;
 				var longTitle = jsEscape(decodeURI(elements[1]));
 				var shortTitle = encodeURIComponent(elements[2].toUpperCase());
 				cont += '<div class="skinnyCard skinnyCardList" onclick="hrdSelect(\'' + cpLocation + "')\">";

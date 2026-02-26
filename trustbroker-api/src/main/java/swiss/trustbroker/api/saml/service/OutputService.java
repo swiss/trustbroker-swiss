@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -30,12 +30,19 @@ import swiss.trustbroker.api.saml.dto.EncodingParameters;
  */
 public interface OutputService {
 
-	public <T extends RequestAbstractType> void sendRequest(T request,
+
+	/**
+	 * @param encodingParameters
+	 * @return True if this output service applies to the given parameters.
+	 */
+	boolean applies(EncodingParameters encodingParameters);
+
+	<T extends RequestAbstractType> void sendRequest(T request,
 			Credential credential, String relayState, String endpoint,
 			HttpServletResponse httpServletResponse, EncodingParameters encodingParameters,
 			DestinationType destinationType);
 
-	public <T extends StatusResponseType> void sendResponse(T response,
+	<T extends StatusResponseType> void sendResponse(T response,
 			Credential credential, String requestRelayState, String endpoint,
 			HttpServletResponse httpServletResponse, EncodingParameters encodingParameters,
 			DestinationType destinationType);

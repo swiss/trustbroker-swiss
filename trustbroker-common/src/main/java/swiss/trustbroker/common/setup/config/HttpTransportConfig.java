@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -32,7 +32,7 @@ public class HttpTransportConfig implements TransportConfigCallback {
 	private final String accessToken;
 
 	public HttpTransportConfig(String accessToken) {
-		var tokenCache = new File(accessToken);
+		var tokenCache = accessTokenFile(accessToken);
 		if (tokenCache.exists()) {
 			try {
 				this.accessToken = Files.readString(tokenCache.toPath()).strip();
@@ -63,6 +63,17 @@ public class HttpTransportConfig implements TransportConfigCallback {
 			httpTransport.setCredentialsProvider(provider);
 			// proxy settings from java via https.proxyHost/Port or socksProxyHost/Port out of the box
 		}
+	}
+
+	// WSL2 support resolving HOME
+	private File accessTokenFile(String accessToken) {
+		final var homeVar = "HOME";
+		final var prefix = "${" + homeVar + "}";
+		if (accessToken != null && accessToken.startsWith(prefix)) {
+			var home = BootstrapProperties.getFromSysPropsOrEnv(homeVar, null, true);
+			accessToken = accessToken.replace(prefix, home);
+		}
+		return new File(accessToken);
 	}
 
 }

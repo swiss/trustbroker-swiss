@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -23,7 +23,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,7 +58,7 @@ public class SsoController extends AbstractSamlController {
 	}
 
 	// Return the list of participants in a particular SSO group
-	@GetMapping(path = "/api/v1/sso/participants/{ssoGroupName}")
+	@GetMapping(path = ApiSupport.SSO_PARTICIPANTS_URL + "/{ssoGroupName}")
 	@ResponseBody
 	public List<SsoParticipants> getSsoParticipantsForGroup(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable(name = "ssoGroupName") String ssoGroupName) {
@@ -70,7 +69,7 @@ public class SsoController extends AbstractSamlController {
 	}
 
 	// Return the list of participants in all SSO groups
-	@GetMapping(path = "/api/v1/sso/participants")
+	@GetMapping(path = ApiSupport.SSO_PARTICIPANTS_URL)
 	@ResponseBody
 	public List<SsoParticipants> getSsoParticipants(HttpServletRequest request, HttpServletResponse response) {
 		return getSsoParticipants(request);
@@ -83,9 +82,8 @@ public class SsoController extends AbstractSamlController {
 
 	// Perform logout only if there is a single active SSO group
 	// returns the active list if more than one group is active or if the logout failed
-	@DeleteMapping(path = "/api/v1/sso/rp/{rpId}")
+	@DeleteMapping(path = ApiSupport.SSO_RP_URL + "/{rpId}")
 	@ResponseBody
-	@Transactional
 	public List<SsoParticipants> logoutSsoParticipantIfOnlyGroup(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable(name = "rpId") String rpId) {
 		var relyingPartyId = ApiSupport.decodeUrlParameter(rpId);
@@ -100,8 +98,7 @@ public class SsoController extends AbstractSamlController {
 	}
 
 	// Selected a single SSO participant or group for logout
-	@DeleteMapping(path = "/api/v1/sso/group/{ssoGroupName}/{rpId}/{cpId}/{subjectNameId}")
-	@Transactional
+	@DeleteMapping(path = ApiSupport.SSO_GROUP_URL + "/{ssoGroupName}/{rpId}/{cpId}/{subjectNameId}")
 	public void logoutSsoParticipant(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable(name = "ssoGroupName") String ssoGroupName, @PathVariable(name = "rpId") String rpId,
 			@PathVariable(name = "cpId") String cpId, @PathVariable(name = "subjectNameId") String subjId) {

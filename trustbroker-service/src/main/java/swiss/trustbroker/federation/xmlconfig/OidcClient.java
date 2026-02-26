@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -17,6 +17,7 @@ package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -33,7 +34,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.opensaml.security.credential.Credential;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import swiss.trustbroker.common.util.UrlAcceptor;
-import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.oidc.OidcSecurityConfiguration;
 
@@ -150,6 +150,22 @@ public class OidcClient implements Serializable {
 	private Scopes scopes;
 
 	/**
+	 * OIDC allowed audience in TokenExchange.
+	 * <br/>
+	 * @since 1.13.0
+	 */
+	@XmlElement(name = "Audiences")
+	private Set<String> audiences;
+
+	/**
+	 * OIDC allowed resources in TokenExchange.
+	 * <br/>
+	 * @since 1.13.0
+	 */
+	@XmlElement(name = "Resources")
+	private Set<String> resources;
+
+	/**
 	 * Response mode to be requested from CP.
 	 * <br/>
 	 * Default: form_post
@@ -202,11 +218,8 @@ public class OidcClient implements Serializable {
 									 .anyMatch(u -> UrlAcceptor.isRedirectUrlOkForAccess(u, redirectUris.getAcNetUrls()));
 	}
 
-	// Best effort accepting Origin not considering port or protocol details against redirects URIs from config.
-	// We might match a bit too much in the DEV localhost configuration but that's ok.
 	public boolean isTrustedOrigin(String origin) {
-		var host = WebUtil.getUrlHost(origin);
-		return host != null && redirectUris != null && redirectUris.findFirst(String::contains, host).isPresent();
+		return redirectUris != null && UrlAcceptor.isTrustedOrigin(origin, redirectUris.getOriginSet());
 	}
 
 	public boolean isSameRealm(String incomingRealm) {

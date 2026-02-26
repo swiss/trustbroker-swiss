@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -75,4 +75,32 @@ public class IdmAttributeUtil {
 		return new ArrayList<>(idmQuery.getAttributeSelection());
 	}
 
+	public static Map<String, List<Object>> getAttributesFromUserDetails(Map<Definition, List<String>> userDetails) {
+		Map<String, List<Object>> attributes = new HashMap<>();
+		for (Map.Entry<Definition, List<String>> entry : userDetails.entrySet()) {
+			var definition = entry.getKey();
+			var name = definition.getNamespaceUri() != null ? definition.getNamespaceUri() : definition.getName();
+			if (attributes.containsKey(name)) {
+				var differentValues = differentValues(attributes.get(name), entry.getValue());
+				if (!differentValues.isEmpty()) {
+					attributes.get(name).addAll(differentValues);
+				}
+			}
+			else if (name != null || entry.getValue() != null) {
+				List<Object> value = new ArrayList<>(entry.getValue());
+				attributes.put(name, value);
+			}
+		}
+		return attributes;
+	}
+
+	private static List<Object> differentValues(List<Object> objects, List<String> values) {
+		List<Object> result = new ArrayList<>();
+		for (var value : values) {
+			if (!objects.contains(value)) {
+				result.add(value);
+			}
+		}
+		return result;
+	}
 }

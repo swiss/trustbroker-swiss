@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -275,5 +275,25 @@ public class JwtUtil {
 		log.debug("Decrypted JWT Authentication Tag: {}", parse.getAuthTag());
 
 		return parse;
+	}
+
+	public static Map<String, String> getCnfValueFromHeader(Map<String, Object> jwkHeader) {
+		var jwk =  jwkHeader.get(OidcUtil.OIDC_HEADER_JWK);
+		if (!(jwk instanceof Map<?,?>)) {
+			throw new TechnicalException("Invalid DPoP JWK header");
+		}
+
+		try {
+			@SuppressWarnings("unchecked")
+			var map = (Map<String, Object>) jwk;
+			var pasedJwk = JWK.parse(map);
+			var thumbprint = pasedJwk.computeThumbprint();
+			var jkt = thumbprint.toString();
+			return Map.of(OidcUtil.OIDC_TOKEN_JKT, jkt);
+
+		}
+		catch (ParseException | JOSEException e) {
+			throw new TechnicalException("Could not parse DPoP JWK header", e);
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -86,6 +86,7 @@ import { HrdBannerComponent } from './hrd-banner/hrd-banner.component';
 import { HasTranslationPipe } from './pipes/has-translation.pipe';
 import { ThemeSelectorComponent } from './theme-selector/theme-selector';
 import { ApiService } from './services/api.service';
+import { environment } from '../environments/environment';
 
 export class MissingTranslationHelper implements MissingTranslationHandler {
 	handle(params: MissingTranslationHandlerParams): string {
@@ -112,8 +113,8 @@ class LangHttpInterceptor implements HttpInterceptor {
 		}
 
 		const matchResult = /\/assets\/i18n\/(?<lang>.{2}).json$/.exec(req.url);
-		if (matchResult?.groups['lang']) {
-			return next.handle(req.clone({ url: `/api/v1/hrd/translations/${matchResult.groups['lang']}` }));
+		if (matchResult?.groups?.['lang']) {
+			return next.handle(req.clone({ url: `${environment.apiUrl}ui/translations/${matchResult.groups['lang']}` }));
 		}
 
 		return next.handle(req);

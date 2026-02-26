@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,6 +15,9 @@
 
 package swiss.trustbroker.api.profileselection.dto;
 
+import java.util.List;
+import java.util.Map;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -29,5 +32,7 @@ public class Profile {
 	private final String unit;
 
 	private final String applications;
+
+	private final Map<String, List<String>> displayClaims;
 
 }

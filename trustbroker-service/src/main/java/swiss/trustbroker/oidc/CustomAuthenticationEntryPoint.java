@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -31,7 +31,6 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
-import swiss.trustbroker.oidc.session.HttpExchangeSupport;
 import swiss.trustbroker.oidc.session.OidcSessionSupport;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.WebSupport;
@@ -54,8 +53,11 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 		checkClientKnown(clientId, request); // we have an Oidc.Client
 		checkRelyingPartyKnown(clientId, request); // we have an enabled RelyingParty
 
-		// OIDC /introspect requires an authorized client (self or delegated)
-		checkHttpSessionRequired(request);
+		// fallback handling for /introspect just in case we accidentally end up in real federated login
+		if (ApiSupport.isIntrospectRequest(request.getRequestURI())) {
+			response.getOutputStream().println("{\"active\":false}"); // may be nicer via OAuth2TokenIntrospection builder
+			return;
+		}
 
 		// let spring-sec handle client authentication otherwise except for unauthenticated /authorize
 		if (!ApiSupport.isOidcAuthPath(request.getRequestURI())) {
@@ -92,19 +94,6 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 					request.getMethod(), request.getRequestURI(),
 					headers, params,
 					WebSupport.getClientHint(request, trustBrokerProperties.getNetwork())), "Missing client_id");
-		}
-	}
-
-	private void checkHttpSessionRequired(HttpServletRequest request) {
-		// Implement rfc7662 unauthorized client.
-		// Switch to OAuth2AuthorizationService.findByToken instead of HTTP session as soon as tokens live longer than sessions.
-		// Required when HTTP sessions are invalidated after /authorize and /token, /introspect, /userinfo etc.
-		var isIntrospect = request.getRequestURI().contains(ApiSupport.OIDC_INTROSPECT);
-		if (isIntrospect && HttpExchangeSupport.getRunningHttpSession() == null) {
-			throw OidcExceptionHelper.createOidcException(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, String.format(
-					"Accessing endpoint=%s requires authentication and OIDC session was not found for client %s",
-					request.getRequestURI(),
-					WebSupport.getClientHint(request, trustBrokerProperties.getNetwork())), "Session required");
 		}
 	}
 

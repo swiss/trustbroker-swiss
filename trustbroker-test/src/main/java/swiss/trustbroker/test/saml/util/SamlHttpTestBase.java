@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -30,6 +30,7 @@ public interface SamlHttpTestBase {
 
 	static String extractHtmlFormValue(String bodyStr, String formFieldName) {
 		// hidden form field with name="SAMLRequest" value="base64" hopefully nobody changes the order
+		// (we deal with our own / OpenSAML forms only)
 		// otherwise we need jsoup to parse HTML properly because this is really a bit crude
 		int startNV = bodyStr.indexOf(formFieldName);
 		if (startNV >= 0) {

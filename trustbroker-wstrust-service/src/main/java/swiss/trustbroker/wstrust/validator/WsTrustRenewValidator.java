@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -105,7 +105,7 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 			// (e.g. client using same wss4j configuration for ISSUE and RENEW)
 			log.info("RSTR with requestType='{}' validating ignored header assertionID='{}'",
 					REQUEST_TYPE, headerAssertion.getID());
-			validateAssertion(headerAssertion, null, Optional.empty());
+			validateAssertion(headerAssertion, null, Optional.empty(), true, null, null, null);
 		}
 		var childObjects = requestSecurityToken.getUnknownXMLObjects();
 		log.debug("RSTR RENEW request - assertion is in RenewTarget");
@@ -127,7 +127,7 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 																	   .expectedRecipient(expectedRecipient)
 																	   .renew(true)
 																	   .build();
-		validateAssertion(assertion, expectedValues, signerTrustCredentials);
+		validateAssertion(assertion, expectedValues, signerTrustCredentials, true, null, null, null);
 		validateSecurityToken(requestHeader.getSecurityToken(), relyingParty);
 		return WsTrustValidationResult.builder()
 									  .requestType(REQUEST_TYPE)

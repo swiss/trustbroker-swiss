@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -55,6 +55,8 @@ class ApiSupportTest {
 
 	private static final String REQUEST_ID = "7350babf-1431-4049-969b-34ba06f076d2";
 
+	private static final String REQUEST_ID_ENCODED = Base64Util.urlEncode(REQUEST_ID);
+
 	private static final String VERSION_INFO = "XTB/9.8.7.654321@TEST";
 
 	private ApiSupport apiSupport;
@@ -89,7 +91,6 @@ class ApiSupportTest {
 	void testDecodeUrlParameter() {
 		assertThat(ApiSupport.decodeUrlParameter(ISSUER_1_ENCODED), is(ISSUER_1_ID));
 	}
-
 
 	@Test
 	void testDecodeNullParameter() {
@@ -205,13 +206,13 @@ class ApiSupportTest {
 	@Test
 	void testGetAccessRequestInitiateApi() {
 		assertThat(apiSupport.getAccessRequestInitiateApi(REQUEST_ID),
-				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_INITIATE + '/' + REQUEST_ID));
+				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_INITIATE_API + '/' + REQUEST_ID));
 	}
 
 	@Test
 	void testGetAccessRequestCompleteApi() {
 		assertThat(apiSupport.getAccessRequestCompleteApi(REQUEST_ID),
-				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_COMPLETE + '/' + REQUEST_ID));
+				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_COMPLETE_API + '/' + REQUEST_ID));
 	}
 
 	@ParameterizedTest
@@ -219,26 +220,26 @@ class ApiSupportTest {
 	void testGetAccessRequestCompleteApiWithAccessRequestBase(String baseUrl) {
 		setupApi(baseUrl, PERIMETER_URL, OIDC_PERIMETER_URL);
 		assertThat(apiSupport.getAccessRequestCompleteApi(REQUEST_ID),
-				is(PERIMETER_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_COMPLETE + '/' + REQUEST_ID));
+				is(PERIMETER_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_COMPLETE_API + '/' + REQUEST_ID));
 	}
 
 	@Test
 	void testGetAccessRequestAbortApi() {
 		assertThat(apiSupport.getAccessRequestAbortApi(REQUEST_ID),
-				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_ABORT + '/' + REQUEST_ID));
+				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.ACCESS_REQUEST_ABORT_API + '/' + REQUEST_ID));
 	}
 
 	@Test
 	void testGetHrdCpApi() {
 		assertThat(apiSupport.getHrdCpApi(ISSUER_1_ID, REQUEST_ID),
 				is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.HRD_CP_API + '/' + ISSUER_1_ENCODED + '?' +
-						ApiSupport.HRD_ID_PARAM + '=' + REQUEST_ID));
+						ApiSupport.HRD_SID_PARAM + '=' + REQUEST_ID_ENCODED));
 	}
 
 	@Test
 	void testGetHrdRpApi() {
 		assertThat(apiSupport.getHrdRpApi(ISSUER_1_ID, REQUEST_ID), is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.HRD_RP_API +
-				'/' + ISSUER_1_ENCODED + ApiSupport.HRD_TILES_POSTFIX + '?' + ApiSupport.HRD_ID_PARAM + '=' + REQUEST_ID));
+				'/' + ISSUER_1_ENCODED + ApiSupport.HRD_TILES_POSTFIX + '?' + ApiSupport.HRD_SID_PARAM + '=' + REQUEST_ID_ENCODED));
 	}
 
 	@Test
@@ -301,8 +302,9 @@ class ApiSupportTest {
 
 	@Test
 	void testGetSkinnyHrd() {
-		var result = apiSupport.getSkinnyHrd("ct=content1", "rq=request1", "/skinny");
-		assertThat(result, is(BASE_URL + "/skinny?rq=request1&ct=content1&" + VERSION_INFO ));
+		var result = apiSupport.getSkinnyHrd("content1", "request1", "/skinny");
+		// requestId is Base64 URL encoded
+		assertThat(result, is(BASE_URL + "/skinny?cmVxdWVzdDE&content1&" + VERSION_INFO ));
 	}
 
 	@Test
@@ -336,14 +338,16 @@ class ApiSupportTest {
 
 	@ParameterizedTest
 	@CsvSource(value = {
-			"null,false",
-			"/,false",
-			ApiSupport.FRONTEND_CONTEXT + ",false",
-			ApiSupport.API_CONTEXT + ",true",
-			ApiSupport.API_CONTEXT + "/foo,true"
+			"null,false,false",
+			"/,false,false",
+			ApiSupport.FRONTEND_CONTEXT + ",false,false",
+			ApiSupport.API_CONTEXT + ",true,false",
+			ApiSupport.WEB_RESOURCE_PATH + ",true,true",
+			ApiSupport.API_CONTEXT + "/foo,true,false"
 	}, nullValues = "null")
-	void testIsApiPath(String path, boolean expected) {
-		assertThat(ApiSupport.isApiPath(path), is(expected));
+	void testIsApiPath(String path, boolean expectedApiPath, boolean expectedWebResourcePath) {
+		assertThat(ApiSupport.isApiPath(path), is(expectedApiPath));
+		assertThat(ApiSupport.isWebResourcePath(path), is(expectedWebResourcePath));
 	}
 
 	@ParameterizedTest
@@ -364,7 +368,9 @@ class ApiSupportTest {
 			"null,false",
 			"/,false",
 			ApiSupport.FRONTEND_CONTEXT + ",false",
-			ApiSupport.API_CONTEXT + ",true",
+			ApiSupport.API_CONTEXT + ",false",
+			ApiSupport.SAML_API + ",true",
+			ApiSupport.WSTRUST_API + ",true",
 			ApiSupport.ADFS_ENTRY_URL + ",true",
 			ApiSupport.XTB_LEGACY_ENTRY_URL + ",true"
 	}, nullValues = "null")
@@ -388,6 +394,16 @@ class ApiSupportTest {
 	}, nullValues = "null")
 	void testIsInternalUrl(String url, boolean expected) {
 		assertThat(apiSupport.isInternalUrl(url), is(expected));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"/userinfo,true",
+			"/token/introspect,true",
+			"/introspect/token,false",
+	})
+	void testOidcReadyOnlyAccess(String path, boolean expectedReadOnly) {
+		assertThat(ApiSupport.isReadyOnlyAccess(path), is(expectedReadOnly));
 	}
 
 }

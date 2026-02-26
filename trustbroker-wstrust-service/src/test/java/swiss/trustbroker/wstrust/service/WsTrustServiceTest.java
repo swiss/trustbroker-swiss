@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -56,10 +56,12 @@ import org.opensaml.soap.wstrust.TokenType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.audit.service.AuditService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
+import swiss.trustbroker.common.saml.util.CoreAttributeInitializer;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.common.saml.util.CredentialReader;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
@@ -91,6 +93,7 @@ import swiss.trustbroker.wstrust.validator.WsTrustRenewValidator;
 // LATER: separate validator tests, at least WsTrustRenewValidator
 @SpringBootTest
 @ContextConfiguration(classes = { WsTrustService.class, WsTrustIssueValidator.class, WsTrustRenewValidator.class })
+@TestPropertySource(properties="trustbroker.config.wstrust.enabled=true")
 class WsTrustServiceTest {
 
 	private static final String SAMPLE_RST_REQUEST_XMLSOAP_ADDRESSING = """
@@ -166,6 +169,7 @@ class WsTrustServiceTest {
 	@BeforeAll
 	static void setupAll() {
 		SamlInitializer.initSamlSubSystem();
+		new CoreAttributeInitializer().init();
 	}
 
 	@BeforeEach
@@ -252,7 +256,7 @@ class WsTrustServiceTest {
 		var ex = assertThrows(RequestDeniedException.class, () -> {
 			wsTrustService.processSecurityToken(requestSecTokenType, requestHeader);
 		});
-		assertThat(ex.getInternalMessage(), containsString("Assertion.ID missing"));
+		assertThat(ex.getInternalMessage(), containsString("Assertion in RSTR with assertionID='null' missing Issuer"));
 	}
 
 	@ParameterizedTest

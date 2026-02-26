@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -95,5 +95,18 @@ public class ConfigUtil {
 					value.getClass().getName(), resultClass.getName(), value);
 		}
 		return defaultValue;
+	}
+
+	public static String getGlobalAnnouncementAppName(String applicationName) {
+		if (applicationName == null) {
+			return "None";
+		}
+		String[] appNameElements = applicationName.split("-");
+		int length = appNameElements.length;
+		return appNameElements[length - 1];
+	}
+
+	public static String removeIdSpecChar(String id) {
+		return id.replace("-", "").toUpperCase();
 	}
 }

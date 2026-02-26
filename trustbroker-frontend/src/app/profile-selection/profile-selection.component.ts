@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,6 +16,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Params, Router } from '@angular/router';
+import { KeyValue } from '@angular/common';
 
 import { Profile } from '../model/Profile';
 import { ProfileService } from '../services/profile.service';
@@ -58,12 +59,17 @@ export class ProfileSelectionComponent implements OnInit {
 		});
 	}
 
+	// This comparator disables sorting and preserves original key order
+	compareOriginalOrder(_a: KeyValue<string, unknown>, _b: KeyValue<string, unknown>): number {
+		return 0;
+	}
+
 	onClick(profileId: string) {
 		const input: ProfileRequest = this.createProfileRequest(this.stateId, profileId);
 		this.profileService.sendSelectedProfile(input).subscribe({
 			next: resp => {
 				// Access Request GET URL from automatically followed redirect, document.write does not work here
-				let url = resp.url.replace(/^.*(\/accessrequest\/.*$)/, '$1');
+				let url = resp.url!.replace(/^.*(\/accessrequest\/.*$)/, '$1');
 				if (url !== resp.url) {
 					void this.router.navigate([url]);
 					return;
@@ -74,9 +80,9 @@ export class ProfileSelectionComponent implements OnInit {
 					void this.router.navigate([url]);
 					return;
 				}
-				window.document.write(resp.body);
+				window.document.write(resp.body!);
 				if (document.forms.length > 0) {
-					document.forms.item(0).submit();
+					document.forms[0].submit();
 				} else {
 					void this.router.navigate(['/failure']);
 				}

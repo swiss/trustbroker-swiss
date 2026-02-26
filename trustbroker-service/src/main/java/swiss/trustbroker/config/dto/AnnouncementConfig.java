@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,6 +15,7 @@
 
 package swiss.trustbroker.config.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -82,6 +83,12 @@ public class AnnouncementConfig {
 	private String truststorePassword;
 
 	/**
+	 * Global Announcement application name
+	 * @since 1.13.0
+	 */
+	private String globalApplicationName;
+
+	/**
 	 * A list of application names:
 	 * <ul>
 	 *     <li>Global announcements are shown to all users on every federated login</li>
@@ -101,4 +108,12 @@ public class AnnouncementConfig {
  	 */
 	private Map<String, Object> attributes;
 
+	public List<String> getApplicationNames() {
+		if (globalApplicationName == null || applicationNames.contains(globalApplicationName)) {
+			return applicationNames;
+		}
+		List<String> result = new ArrayList<>(applicationNames);
+		result.add(globalApplicationName);
+		return result;
+	}
 }

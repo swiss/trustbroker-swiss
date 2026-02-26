@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -34,7 +34,9 @@ public enum SamlBinding {
 	POST(SAMLConstants.SAML2_POST_BINDING_URI, List.of(REDIRECT)),
 	// Response is never sent as REDIRECT (length restrictions), ARTIFACT is better than POST
 	ARTIFACT(SAMLConstants.SAML2_ARTIFACT_BINDING_URI, List.of(POST, REDIRECT)),
-	SOAP(SAMLConstants.SAML2_SOAP11_BINDING_URI, Collections.emptyList());
+	SOAP(SAMLConstants.SAML2_SOAP11_BINDING_URI, Collections.emptyList()),
+	// WS-FED is not SAML of course, but handled the same way:
+	WS_FED("http://docs.oasis-open.org/wsfed/federation/v1.2/federation.xsd", Collections.emptyList());
 
 	private final String bindingUri;
 

@@ -91,7 +91,7 @@ public class OidcExceptionHelper {
 
 	private static final String SPRING_ERROR_PAGE = ApiSupport.ERROR_PAGE_URL + "?error";
 
-	private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1";
+	public static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1";
 
 	// Spring authentication server error patterns
 

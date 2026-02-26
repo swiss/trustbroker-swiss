@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -37,7 +37,7 @@ public interface AnnouncementService {
 	boolean isRpAppAccessible(Announcement announcement);
 
 	List<Announcement> getAnnouncementsForApplication(RelyingPartyConfig relyingPartyConfig,
-			AnnouncementsRpData announcementsRpData, String appName);
+			AnnouncementsRpData announcementsRpData, String appName, Set<String> idpIds);
 
 	public List<Announcement> getGlobalAnnouncements();
 

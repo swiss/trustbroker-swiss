@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -750,6 +750,17 @@ class OpenSamlUtilTest {
 		ex = assertThrows(RequestDeniedException.class,
 				() -> OpenSamlUtil.checkResponseLimitations(response, "test"));
 		assertThat(ex.getInternalMessage(), containsString("extension"));
+	}
+
+	@Test
+	void patchXmlObject() {
+		var issuer = "testIssuer";
+		var authnRequest = SamlFactory.createRequest(AuthnRequest.class, issuer);
+		var xml = OpenSamlUtil.samlObjectToString(authnRequest);
+		var newIssuer = "newIssuer";
+		var patchedXml = xml.replace(issuer, newIssuer);
+		var patchedAuthnRequest = (AuthnRequest) SamlIoUtil.getXmlObjectFromString(patchedXml);
+		assertThat(patchedAuthnRequest.getIssuer().getValue(), is(newIssuer));
 	}
 
 	private EncryptedAssertion givenEncryptedAssertion(Assertion assertion) {

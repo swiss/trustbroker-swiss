@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -90,9 +90,28 @@ class OidcUtilTest {
 
 	@Test
 	void testClientIdFromBasicAuth() {
-		var authHeader = "Basic Y2xpZW50SUQ6c2VjcmV0Cg==";
+		var authHeader = "Basic Y2xpZW50SUQ6c2VjcmV0Cg=="; // base64("clientID:secret")
 		var clId = OidcUtil.getClientIdFromAuthorizationHeader(authHeader);
 		assertThat(clId, equalTo("clientID"));
+	}
+
+	@Test
+	void testClientIdFromAuthorizationEmptyBasicAuth() {
+		var authHeader = "Basic Og=="; // base64(":")
+		assertThrows(RequestDeniedException.class, () -> OidcUtil.getClientIdFromAuthorizationHeader(authHeader));
+	}
+
+	@Test
+	void testClientIdFromAuthorizationInvalidEncodingBasicAuth() {
+		var authHeader = "Basic dXNlcjpwd2"; // base64("user:pwd") truncated
+		assertThrows(TechnicalException.class, () -> OidcUtil.getClientIdFromAuthorizationHeader(authHeader));
+	}
+
+	@Test
+	void testClientIdFromAuthorizationEmptyPasswordBasicAuth() {
+		var authHeader = "Basic dXNlcg=="; // base64("user")
+		var clId = OidcUtil.getClientIdFromAuthorizationHeader(authHeader);
+		assertThat(clId, is("user"));
 	}
 
 	@Test
@@ -123,7 +142,7 @@ class OidcUtilTest {
 	@Test
 	void testParseJwtClaimsEmpty() {
 		var emptyResult = new JWTClaimsSet.Builder().build();
-		assertThat(OidcUtil.parseJwtClaims(null), is(emptyResult));
+		assertThat(OidcUtil.parseJwtClaims((String)null), is(emptyResult));
 		assertThat(OidcUtil.parseJwtClaims(""), is(emptyResult));
 	}
 

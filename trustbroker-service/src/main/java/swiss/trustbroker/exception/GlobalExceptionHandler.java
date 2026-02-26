@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,6 +15,7 @@
 
 package swiss.trustbroker.exception;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -168,6 +169,11 @@ public class GlobalExceptionHandler {
 		}
 		else if (ex instanceof BeanCreationException bex && bex.getCause() instanceof TrustBrokerException) {
 			logException(bex.getCause(), networkConfig); // handle exceptions in constructors, @PostConstruct etc unwrapped
+		}
+		else if (ex instanceof FileNotFoundException fex) {
+			// sufficient if we know which file is missing
+			var level = fex.getMessage().contains("static/index.html") ? Level.INFO : Level.ERROR;
+			logException(fex, "-", false, networkConfig, level);
 		}
 		else if (ex instanceof Exception eex) {
 			// we see 'java.lang.NullPointerException: null' without stack traces but the message is there

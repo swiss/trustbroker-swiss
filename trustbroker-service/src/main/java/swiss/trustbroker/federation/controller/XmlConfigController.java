@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -21,10 +21,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 import swiss.trustbroker.federation.dto.ConfigStatusData;
 import swiss.trustbroker.federation.service.SchemaDefinitionService;
 import swiss.trustbroker.federation.service.XmlConfigStatusService;
@@ -33,7 +32,7 @@ import swiss.trustbroker.util.ApiSupport;
 /**
  * Controller for the config API.
  */
-@Controller
+@RestController
 @Slf4j
 @AllArgsConstructor
 public class XmlConfigController {
@@ -43,7 +42,6 @@ public class XmlConfigController {
 	private final XmlConfigStatusService configStatusService;
 
 	@GetMapping(path = ApiSupport.CONFIG_SCHEMAS_API + "/{schema}")
-	@ResponseBody
 	public void getSchema(@PathVariable(name = "schema", required = true) String schema, HttpServletResponse response)
 			throws IOException {
 		var data = schemaDefinitionService.getSchema(schema);
@@ -52,7 +50,6 @@ public class XmlConfigController {
 	}
 
 	@GetMapping(path = ApiSupport.CONFIG_STATUS_API)
-	@ResponseBody
 	public ConfigStatusData getConfigStatus() {
 		return configStatusService.getConfigStatus();
 	}

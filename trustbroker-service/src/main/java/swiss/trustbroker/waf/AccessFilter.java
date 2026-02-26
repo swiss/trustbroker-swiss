@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -72,6 +72,8 @@ public class AccessFilter implements Filter {
 				+ "/app|/app/.*"
 				// APIs (/adfs/ls included below)
 				+ "|/api/v1/.*"
+				// Web resources
+				+ "|/resource/v1/.*"
 				// configured endpoints:
 				+ "|" + perimeterPathsRegex
 				// default SAML endpoints

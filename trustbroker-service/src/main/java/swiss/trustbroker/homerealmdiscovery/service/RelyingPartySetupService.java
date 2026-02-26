@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -95,6 +95,7 @@ public class RelyingPartySetupService {
 				log.debug("Found multiple RP setups using issuerId={} referrer={}: {}",
 						relyingParty.get().getId(), refererUrl, CollectionUtil.toLogString(relyingParties));
 			}
+			log.warn("Deprecated match of rpIssuerId={} by refererUrl={}", relyingParty.get().getId(), refererUrl);
 			return relyingParty;
 		}
 		return Optional.empty();
@@ -271,7 +272,7 @@ public class RelyingPartySetupService {
 		return relyingParty.getAcWhitelist().findFirst(String::contains, referrerId).isPresent();
 	}
 
-	private List<RelyingParty> getRelyingPartiesByAcsUrlMatch(String refererId) {
+	public List<RelyingParty> getRelyingPartiesByAcsUrlMatch(String refererId) {
 		return relyingPartiesMapping.getRelyingPartySetup().getRelyingParties().stream().filter(
 				relyingParty -> acsUrlListContainsReferrer(relyingParty, refererId)
 		).toList();
@@ -341,9 +342,12 @@ public class RelyingPartySetupService {
 		return claimsParty.orElse(null);
 	}
 
-	public String getHomeName(ClaimsParty claimsParty, List<Assertion> assertions, CpResponse cpResponseDTO) {
+	public String getHomeNameChecked(ClaimsParty claimsParty, List<Assertion> assertions, CpResponse cpResponseDTO) {
 		OpenSamlUtil.checkAssertionsLimitations(assertions, Collections.emptyList(), "HomeRealm selection");
+		return getHomeName(claimsParty, cpResponseDTO);
+	}
 
+	public static String getHomeName(ClaimsParty claimsParty, CpResponse cpResponseDTO) {
 		var configHomeName = "";
 		var messageHomeName = "";
 
@@ -355,7 +359,7 @@ public class RelyingPartySetupService {
 		}
 		if (!configHomeName.isEmpty() && !messageHomeName.isEmpty() && !configHomeName.equals(messageHomeName)) {
 			log.debug("CP Attribute='{}' with AttributeValue='{}' does not match SetupCP.ClaimsParty.HomeName='{}' "
-					+ "Using {} from CP response", CoreAttributeName.HOME_NAME.getNamespaceUri(),
+							+ "Using {} from CP response", CoreAttributeName.HOME_NAME.getNamespaceUri(),
 					messageHomeName, configHomeName, CoreAttributeName.HOME_NAME.getName());
 		}
 
@@ -376,6 +380,7 @@ public class RelyingPartySetupService {
 		for (String id : refererIds) {
 			claimsParty = getClaimsProviderSetupByIssuerId(id);
 			if (claimsParty.isPresent()) {
+				log.warn("Deprecated match of cpIssuerId={} by refererUrl={}", claimsParty.get().getId(), refererUrl);
 				break;
 			}
 		}

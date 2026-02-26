@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -23,8 +23,8 @@ describe('OrderIdpObjectsPipe', () => {
 		expect(pipe).toBeTruthy();
 	});
 
-	it('returns undefined on undefined', () => {
-		expect(pipe.transform(undefined)).toBeUndefined();
+	it('returns empty on undefined', () => {
+		expect(pipe.transform(undefined)).toEqual([]);
 	});
 
 	it('returns [] on []', () => {
@@ -85,7 +85,7 @@ describe('OrderIdpObjectsPipe', () => {
 		image: 'Tile_SAML-Mock.svg',
 		name: 'saml-mock-1',
 		shortcut: '',
-		color: null,
+		color: 'blue',
 		disabled: undefined,
 		order: undefined
 	};

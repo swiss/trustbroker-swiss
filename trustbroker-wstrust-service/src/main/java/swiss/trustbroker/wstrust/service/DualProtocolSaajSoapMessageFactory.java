@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -45,8 +45,8 @@ public class DualProtocolSaajSoapMessageFactory implements SoapMessageFactory {
 
 	private ThreadLocal<WsTrustConfig.SoapVersionConfig> soapVersionCache;
 
-	public DualProtocolSaajSoapMessageFactory(@Qualifier("1.1") SaajSoapMessageFactory messageFactorySoap11,
-			@Qualifier("1.2") SaajSoapMessageFactory messageFactorySoap12) {
+	public DualProtocolSaajSoapMessageFactory(@Qualifier("wsTrustSoapClient11") SaajSoapMessageFactory messageFactorySoap11,
+			@Qualifier("wsTrustSoapClient12") SaajSoapMessageFactory messageFactorySoap12) {
 		this.messageFactorySoap11 = messageFactorySoap11;
 		this.messageFactorySoap12 = messageFactorySoap12;
 		soapVersionCache = new ThreadLocal<>();

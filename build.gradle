@@ -1,7 +1,7 @@
 buildscript {
 	ext {
 		top = ''
-		buildVersion = '1.12.0'
+		buildVersion = '1.13.0'
 		buildTimestamp = null
 		// build promotion
 		buildName = System.env.BUILD_NAME
@@ -18,7 +18,7 @@ buildscript {
 plugins {
 	id 'base'
 	// https://central.sonatype.com/artifact/org.springframework.boot/spring-boot/versions
-	id 'org.springframework.boot' version '3.5.6' apply false
+	id 'org.springframework.boot' version '3.5.7' apply false
 	// https://plugins.gradle.org/plugin/org.ajoberstar.grgit
 	id 'org.ajoberstar.grgit' version '4.1.1' apply true
 	// https://plugins.gradle.org/plugin/org.unbroken-dome.test-sets
@@ -114,6 +114,8 @@ subprojects {
 				// https://central.sonatype.com/artifact/org.mariadb.jdbc/mariadb-java-client/versions
 				// https://mariadb.com/kb/en/mariadb-connector-j-release-notes/
 				dependency 'org.mariadb.jdbc:mariadb-java-client:3.4.2'
+				// https://central.sonatype.com/artifact/org.postgresql/postgresql/versions
+				dependency 'org.postgresql:postgresql:42.7.8'
 
 				// script support
 				// dependency 'org.codehaus.groovy:groovy-all' is too much for security so reduce to the max
@@ -125,7 +127,7 @@ subprojects {
 
 				// OIDC support (JSON parsing) - trustbroker-api needs the version
 				// https://central.sonatype.com/artifact/com.nimbusds/nimbus-jose-jwt/9.37.3/versions
-				dependency 'com.nimbusds:nimbus-jose-jwt:9.43'
+				dependency 'com.nimbusds:nimbus-jose-jwt:9.47'
 
 				// JCE provider
 				// https://www.bouncycastle.org/latest_releases.html

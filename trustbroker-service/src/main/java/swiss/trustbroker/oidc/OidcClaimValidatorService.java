@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -13,10 +13,14 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-package swiss.trustbroker.oidc.client.service;
+package swiss.trustbroker.oidc;
 
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import lombok.AllArgsConstructor;
@@ -25,8 +29,12 @@ import org.springframework.stereotype.Service;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcClass;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.federation.xmlconfig.QoaComparison;
+import swiss.trustbroker.mapping.dto.QoaConfig;
+import swiss.trustbroker.mapping.util.QoaMappingUtil;
 
 /**
  * Service for validating claims from an OIDC CP.
@@ -37,7 +45,7 @@ import swiss.trustbroker.federation.xmlconfig.OidcClient;
 @Service
 @AllArgsConstructor
 @Slf4j
-class OidcClaimValidatorService {
+public class OidcClaimValidatorService {
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
@@ -59,20 +67,7 @@ class OidcClaimValidatorService {
 							OidcUtil.OIDC_ISSUER, issuer, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
 							claimsParty.getId(), client.getId(), expectedIssuer, expectedIssuerSource));
 		}
-		var audience = claims.getAudience();
-		if (!audience.contains(client.getId())) {
-			throw new RequestDeniedException(
-					String.format("Wrong audience %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
-							OidcUtil.OIDC_AUDIENCE, audience, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
-							claimsParty.getId(), client.getId()));
-		}
-		var authorizedParty = claims.getClaim(OidcUtil.OIDC_AUTHORIZED_PARTY);
-		if (authorizedParty != null && !authorizedParty.equals(client.getId())) {
-			throw new RequestDeniedException(
-					String.format("Wrong authorized party %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
-							OidcUtil.OIDC_AUTHORIZED_PARTY, authorizedParty, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
-							claimsParty.getId(), client.getId()));
-		}
+		validateSubAudAzp(claims, claimsParty.getId(), client);
 		var now =  clock.millis();
 		var expirationTime = claims.getExpirationTime();
 		if (!validNotOnOrAfter(expirationTime, now)) {
@@ -93,13 +88,6 @@ class OidcClaimValidatorService {
 			throw new RequestDeniedException(
 					String.format("OIDC %s valid not before %s=%s from cpIssuerId=%s for client=%s",
 							OidcUtil.TOKEN_RESPONSE_ID_TOKEN, OidcUtil.OIDC_NOT_BEFORE, notBefore,
-							claimsParty.getId(), client.getId()));
-		}
-		var subject = claims.getSubject();
-		if (subject == null) {
-			throw new RequestDeniedException(
-					String.format("Missing subject claim %s in OIDC %s from cpIssuerId=%s for client=%s ",
-							OidcUtil.OIDC_SUBJECT, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
 							claimsParty.getId(), client.getId()));
 		}
 		if (requestedNonce == null) {
@@ -124,6 +112,69 @@ class OidcClaimValidatorService {
 					OidcUtil.OIDC_JWT_ID, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
 					claimsParty.getId(), client.getId());
 		}
+	}
+
+	public static void validateSubAudAzp(JWTClaimsSet claims, String counterPartyId, OidcClient client) {
+		var subject = claims.getSubject();
+		if (subject == null) {
+			throw new RequestDeniedException(
+					String.format("Missing subject claim %s in OIDC %s from cpIssuerId=%s for client=%s ",
+							OidcUtil.OIDC_SUBJECT, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
+							counterPartyId, client.getId()));
+		}
+		var audience = claims.getAudience();
+		if (!audience.contains(client.getId())) {
+			throw new RequestDeniedException(
+					String.format("Wrong audience %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
+							OidcUtil.OIDC_AUDIENCE, audience, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
+							counterPartyId, client.getId()));
+		}
+		var authorizedParty = claims.getClaim(OidcUtil.OIDC_AUTHORIZED_PARTY);
+		if (authorizedParty != null && !authorizedParty.equals(client.getId())) {
+			throw new RequestDeniedException(
+					String.format("Wrong authorized party %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
+							OidcUtil.OIDC_AUTHORIZED_PARTY, authorizedParty, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
+							counterPartyId, client.getId()));
+		}
+	}
+
+	public static List<String> validateAcrs(JWTClaimsSet claims, ClaimsParty claimsParty, OidcClient client, TrustBrokerProperties trustBrokerProperties) {
+		var acrs = claims.getClaim(OidcUtil.OIDC_ACR);
+		if (acrs == null) {
+			return Collections.emptyList();
+		}
+
+		List<String> acrStringList = getAcrStringList(acrs);
+
+		var cpQoa = client.getQoa() != null ? client.getQoa() : claimsParty.getQoa();
+		if (cpQoa == null) {
+			log.debug("Missing Qoa config for issuer={} - skipping Qoa validation", claimsParty.getId());
+			return acrStringList;
+		}
+		var configQoa = new QoaConfig(cpQoa, claimsParty.getId());
+		QoaComparison comparison = configQoa.config().getComparison() != null ? configQoa.config().getComparison() : QoaComparison.EXACT;
+		var expectedClasses = cpQoa.getClasses().stream()
+								   .map(AcClass::getContextClass)
+								   .toList();
+
+		for (String acr : acrStringList) {
+			QoaMappingUtil.validateContextClass(comparison, expectedClasses, configQoa, acr, configQoa, claimsParty.getId(), trustBrokerProperties.getQoaMap(), !cpQoa.getEnforce());
+		}
+
+		return acrStringList;
+	}
+
+	private static List<String> getAcrStringList(Object acrs) {
+		List<String> acrStringList = new ArrayList<>();
+		if (acrs instanceof Collection<?> acrList) {
+			acrStringList = ((Collection<?>) acrList).stream()
+													 .map(String::valueOf)
+													 .toList();
+		}
+		else if (acrs instanceof String acr) {
+			acrStringList = Collections.singletonList(acr);
+		}
+		return acrStringList;
 	}
 
 	boolean validNotBefore(Date check, long now) {

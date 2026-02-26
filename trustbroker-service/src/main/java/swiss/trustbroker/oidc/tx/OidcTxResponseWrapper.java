@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,6 +16,7 @@
 package swiss.trustbroker.oidc.tx;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 
 import jakarta.servlet.ServletOutputStream;
@@ -48,6 +49,8 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 
 	private InMemoryServletOutputStream output = null;
 
+	private PrintWriter writer = null;
+
 	private final OidcFrameAncestorHandler frameAncestorHandler;
 
 	private final HeaderBuilder headerBuilder;
@@ -64,19 +67,6 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 		this.apiSupport = apiSupport;
 		this.frameAncestorHandler = oidcFrameAncestorHandler;
 		this.headerBuilder = HeaderBuilder.of(request, this, trustBrokerProperties, frameAncestorHandler);
-	}
-
-	public void catchOutputStream() {
-		output = new InMemoryServletOutputStream();
-	}
-
-	public byte[] getBody() {
-		return output.getData();
-	}
-
-	public void patchOutputStream(byte[] body) throws IOException {
-		output = null;
-		getOutputStream().write(body);
 	}
 
 	@Override
@@ -118,6 +108,18 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 	}
 
 	@Override
+	public PrintWriter getWriter() throws IOException {
+		if (writer != null) {
+			return writer;
+		}
+		if (output != null) {
+			writer = new PrintWriter(output); // encoding handled by caller and container
+			return writer;
+		}
+		return super.getWriter();
+	}
+
+	@Override
 	public void sendRedirect(String location) throws IOException {
 		// should not happen so let the web container do whatever it does (ignoring as well)
 		if (location == null) {
@@ -153,6 +155,42 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 		}
 
 		super.sendRedirect(location);
+	}
+
+	@Override
+	public void flushBuffer() throws IOException {
+		if (output != null) {
+			log.info("HTTP flushBuffer skipped, client needs to wait");
+		}
+		else {
+			super.flushBuffer();
+			log.info("HTTP flushBuffer executed, client can proceed");
+		}
+	}
+
+	public void catchOutputStream() {
+		if (output == null) {
+			output = new InMemoryServletOutputStream();
+		}
+	}
+
+	public byte[] getBody() {
+		return output != null ? output.getData() : null;
+	}
+
+	public void flushOutputStream() throws IOException {
+		if (writer != null) {
+			writer.flush();
+		}
+		flushOutputStream(getBody());
+	}
+
+	public void flushOutputStream(byte[] body) throws IOException {
+		writer = null;
+		output = null;
+		if (body != null) {
+			super.getOutputStream().write(body);
+		}
 	}
 
 	// handle acr on top of spring-security

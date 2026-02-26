@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -18,8 +18,10 @@ package swiss.trustbroker.federation.xmlconfig;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiPredicate;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -32,6 +34,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.WebUtil;
 
 /**
@@ -72,6 +75,9 @@ public class AcWhitelist implements Serializable {
 	@XmlTransient
 	private List<String> origins;
 
+	@XmlTransient
+	private Set<String> originSet;
+
 	/**
 	 * Allowed frame ancestors for iframes.
 	 * <br/>
@@ -83,19 +89,20 @@ public class AcWhitelist implements Serializable {
 	private List<String> frameAncestors;
 
 	public AcWhitelist() {
-		this(null, null, null, null, null, null);
+		this(null, null, null, null, null, null, null);
 	}
 
 	public AcWhitelist(List<String> acUrls) {
-		this(null, acUrls, null, null, null, null);
+		this(null, acUrls, null, null, null, null,null);
 	}
 
 	public AcWhitelist(Boolean useDefault, List<String> acUrls, List<URI> acNetUrls, List<String> redirectUrls,
-			List<String> origins,
+			List<String> origins, Set<String> originSet,
 			List<String> frameAncestors) {
 		this.useDefault = useDefault;
 		this.acNetUrls = acNetUrls;
 		this.origins = origins;
+		this.originSet = originSet;
 		this.redirectUrls = redirectUrls;
 		setAcUrls(acUrls);
 		this.frameAncestors = frameAncestors;
@@ -135,6 +142,7 @@ public class AcWhitelist implements Serializable {
 				}
 			}
 		}
+		this.originSet = new HashSet<>(this.origins);
 	}
 
 	public List<String> getFrameAncestorsWithFallback() {
@@ -152,10 +160,19 @@ public class AcWhitelist implements Serializable {
 	}
 
 	public Optional<String> findFirst(BiPredicate<String, String> matcher, String checkUrl) {
-		if (CollectionUtils.isEmpty(acUrls)) {
-			return Optional.empty();
-		}
-		return acUrls.stream().filter(acUrl -> matcher.test(acUrl, checkUrl)).findFirst();
+		return CollectionUtil.findSingleValueByPredicate(acUrls, acUrl -> matcher.test(acUrl, checkUrl));
 	}
 
+	public Optional<String> findEqualWithDefault(String checkUrl) {
+		Optional<String> consumer;
+		if (checkUrl == null) {
+			consumer = getDefault();
+			log.debug("Missing ACUrl - using default='{}'", consumer.orElse(null));
+		}
+		else {
+			consumer = findFirst(String::equals, checkUrl);
+			log.debug("url='{}' matched whitelist entry ACUrl='{}'", checkUrl, consumer.orElse(null));
+		}
+		return consumer;
+	}
 }

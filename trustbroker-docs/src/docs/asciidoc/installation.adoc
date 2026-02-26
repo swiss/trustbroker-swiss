@@ -14,8 +14,12 @@ The setup will provide these endpoints:
 |===
 | Container | Endpoints | Remarks
 
-| ``mariadb`` providing session and token storage.
-| mysql --protocol=tcp --host=localhost --port=3306 --user=root --password=secret
+| ``postgresql`` providing session and token storage.
+| docker exec -it postgresql psql --host=localhost --port=5432 --dbname=TBSS16 --username=root --password
+| Investigate storage: show databases; use TBSS16; show tables; desc TB_AUTH_SESSION_CACHE;
+
+| ``mariadb`` providing session and token storage as alternative to postgresql.
+| docker exec -it mariadb mysql --protocol=tcp --host=localhost --port=3306 --database=TBSS16 --user=root --password=secret
 | Investigate storage: show databases; use TBSS16; show tables; desc TB_AUTH_SESSION_CACHE;
 
 | ``gitea`` providing a gitops repository storage to play around with (optional, you can use your repo server).
@@ -44,7 +48,7 @@ TLS engineering:
 
 - Server: Please refer to https://docs.spring.io/spring-boot/docs/current/reference/html/application-properties.html#application-properties.server.server.ssl.enabled
 - Server: Staying on http within a secure infrastructure you can do TLS on load-balancers or ingress controllers.
-- Clients: You can in general map a JKS into the containers ``/usr/lib/jvm/zulu17-ca/lib/security/cacerts``
+- Clients: You can in general map a JKS into the containers ``/usr/lib/jvm/zulu21-ca/lib/security/cacerts``
 - SAM artifact resolution client: You can engineer ``keystore/outgoing-tls-trust/truststore.p12``, PKCS12 recommended.
 
 When switching to server TLS you can discard the

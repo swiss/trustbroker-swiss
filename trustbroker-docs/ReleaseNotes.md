@@ -2,11 +2,53 @@
 
 # 1.14.0
 
+### Dependency upgrades
+
+- Backend:
+  - JDK 21.0.10
+  - Spring Boot 3.5.7
+  - Spring Cloud 2025.0.1
+  - nimbus-jose-jwt 9.48
+  - JGit 7.5.0.202512021534-r
+  - CXF 4.2.0
+  - commons-text 1.15.0
+  - commons-lang3 3.20.0
+  - commons-io 2.21.0
+  - mariadb-java-client 3.5.7
+  - PostgreSQL 42.7.10
+  - Groovy 4.0.30
+  - Bouncy Castle 1.83
+- Frontend:
+  - Angular 20.3.17
+  - Oblique 14.2.1
+  - npm 11.8.0
+
 ### Features
 - UI:
   - Removal of the old tile-based HRD.
+    CSS files in config may need to be adapted due to this!
+  - Removal of old skinny HRD templates including the one with image support.
+  - New notice page for CPs on HRD.
 
-## 1.13.0
+### Improvements
+- OIDC:
+  - Improvements for grant type token exchange.
+- Attributes:
+  - Option to make individual attributes mandatory.
+- Cookies:
+  - Same site now also considers Sec-Fetch-Site.
+- UI:
+  - Remove unused fonts.scss.
+
+### Bugfixes
+-OIDC:
+ - Fix handling of missing userinfo endpoint in CP.
+- WSTrust:
+  - Accept RST ISSUE envelope signed by assertion issuer.
+
+# Released Versions
+
+## 1.13.0.20260306T105516Z
 
 ### Dependency upgrades
 
@@ -34,6 +76,9 @@
   - Option to only accept signed JWT response from backchannel userinfo call.
 - SAML:
   - SecutityPolicies.requireSignedLogoutRequest now defaults to requireSignedAuthnRequest.
+- WSTrust:
+  - The protocol is now disabled by default.
+  - Additional config options to apply IP and network based restrictions.
 - DB:
   - Improve transaction boundaries for DB state access.
 - IDM:
@@ -42,6 +87,7 @@
   - Allow picking another claim than the subject from CP response to allow SSO using SubjectName with scope=SSO.
 - LDAP:
   - Improved profile selection support.
+  - Switched to osixia/openldap:stable image.
 - UI:
   - Support banners without entry in application.yml.
   - Support HTML tags in banner subtitle too.
@@ -58,10 +104,11 @@
   - Fix join via OIDC of session established via SAML.
 - WSTrust:
   - Recipient in Issue RSTR was set to issuer in 1.12.0, revert to 1.11.0 behavior.
+  - Fixed signature validation of RST ISSUE.
 - Scripting:
   - If scripts abort the flow in BeforeIdm hook, JIT provisioning and other processing is aborted.
-
-# Released Versions
+- UI:
+  - Fixed injection issue.
 
 ## 1.12.0.20260129T105917Z
 

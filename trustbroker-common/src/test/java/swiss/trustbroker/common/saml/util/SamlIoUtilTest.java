@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -30,6 +30,7 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Response;
 import swiss.trustbroker.common.util.WebUtil;
@@ -115,4 +116,16 @@ class SamlIoUtilTest {
 		assertThat(response, containsString('&' + SamlIoUtil.SAML_REDIRECT_SIGNATURE + '='));
 	}
 
+	@Test
+	void patchXmlObject() throws Exception {
+		var issuer = "testIssuer";
+		var authnRequest = SamlFactory.createRequest(AuthnRequest.class, issuer);
+		var marshaller = XMLObjectSupport.getMarshaller(authnRequest);
+		marshaller.marshall(authnRequest);
+		var xml = SamlIoUtil.xmlObjectToString(authnRequest);
+		var newIssuer = "newIssuer";
+		var patchedXml = xml.replace(issuer, newIssuer);
+		var patchedAuthnRequest = (AuthnRequest) SamlIoUtil.getXmlObjectFromString(patchedXml);
+		assertThat(patchedAuthnRequest.getIssuer().getValue(), is(newIssuer));
+	}
 }

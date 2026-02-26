@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -30,7 +30,7 @@ import { IdpObject, compareByOrder } from '../model/IdpObject';
 export class BucketizeIdpObjectsPipe implements PipeTransform {
 	transform(objects: IdpObject[] | undefined, maxBuckets?: number): IdpObject[][] {
 		if (objects === undefined) {
-			return undefined;
+			return [];
 		}
 		const cardsByCategory: Record<number, IdpObject[]> = objects.reduce((acc, each) => {
 			const sanitizedOrder = each.order === undefined || each.order <= 0 ? 999 : each.order;

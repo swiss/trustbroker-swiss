@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -20,6 +20,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.SubjectName;
+import swiss.trustbroker.federation.xmlconfig.SubjectNameScope;
 import swiss.trustbroker.saml.dto.ClaimSource;
 import swiss.trustbroker.saml.dto.CpResponse;
 import swiss.trustbroker.saml.util.ClaimSourceUtil;
@@ -56,11 +57,16 @@ class SubjectNameMapper {
 
 		var nameIdClaim = subjectMapping.getClaim();
 		var nameIdSource = subjectMapping.getSource();
+		var subjectScope = subjectMapping.getScope();
 		var claimSource = "";
 		String nameId = null;
 
 		if (nameIdClaim == null) {
 			log.debug("SubjectName mapping claim not set for={}", counterParty.getId());
+			return false;
+		}
+
+		if (subjectScope != null && !SubjectNameScope.RESPONSE.equals(subjectScope)) {
 			return false;
 		}
 

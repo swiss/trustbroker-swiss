@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -53,6 +53,11 @@ public class SamlOutputService implements OutputService {
 	private final ArtifactCacheService artifactCacheService;
 
 	private final VelocityEngine velocityEngine;
+
+	@Override
+	public boolean applies(EncodingParameters encodingParameters) {
+		return encodingParameters.useSamlBinding();
+	}
 
 	@Override
 	public <T extends RequestAbstractType> void sendRequest(T request,

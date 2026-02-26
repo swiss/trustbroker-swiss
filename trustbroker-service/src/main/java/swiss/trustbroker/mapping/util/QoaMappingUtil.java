@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -87,7 +87,7 @@ public class QoaMappingUtil {
 		return isValid;
 	}
 
-	static boolean validateQoaComparison(QoaConfig cpQoaConf, QoaComparison comparison, Set<Integer> expectedQoaOrders,
+	public static boolean validateQoaComparison(QoaConfig cpQoaConf, QoaComparison comparison, Set<Integer> expectedQoaOrders,
 			Set<Integer> actualQoas) {
 
 		if (CollectionUtils.isEmpty(expectedQoaOrders)) {
@@ -164,11 +164,11 @@ public class QoaMappingUtil {
 			log.debug("Missing Qoa Comparison issuer={}", configQoa.issuerId());
 		}
 
-		isKnownQoaLevels(requestContextClasses, configQoa, globalMapping, false);
+		validateQoaLevelsKnown(requestContextClasses, configQoa, globalMapping, false);
 	}
 
-	static void isKnownQoaLevels(List<String> requestContextClasses, QoaConfig configQoa, Map<String, Integer> globalMapping,
-			Boolean outbound) {
+	public static void validateQoaLevelsKnown(List<String> requestContextClasses, QoaConfig configQoa, Map<String, Integer> globalMapping,
+											  Boolean outbound) {
 
 		for (var contextClass : requestContextClasses) {
 

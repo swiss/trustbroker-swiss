@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -227,7 +227,12 @@ public class TomcatSessionManager extends ManagerBase {
 							log.error("Could not find OIDC token for sessionId={}", sessionId);
 							return null;
 						}
-						sessionId = token.getToken().getClaim(OidcUtil.OIDC_SID).toString();
+						var claim = token.getToken().getClaim(OidcUtil.OIDC_SID);
+						if (claim == null) {
+							log.error("Could not find OIDC claim SID in claims={}", token.getToken().getClaims());
+							return null;
+						}
+						sessionId = claim.toString();
 						stateData = stateCacheService.findOptionalResilient(sessionId, NAME);
 					}
 				}

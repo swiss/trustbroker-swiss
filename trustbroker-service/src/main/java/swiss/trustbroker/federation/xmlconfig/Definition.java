@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -246,6 +246,14 @@ public class Definition implements Serializable, AttributeName {
 		return oidcNames != null ? Arrays.asList(oidcNames.split(LIST_ATTRIBUTE_DELIMITER)) : Collections.emptyList();
 	}
 
+	// returns a copy with the given source unless that source is already set (to avoid modification of global Definition objects)
+	public Definition withSource(String newSource) {
+		if (Objects.equals(source, newSource)) {
+			return this;
+		}
+		return toBuilder().source(newSource).build();
+	}
+
 	@Override
 	@JsonIgnore
 	public List<String> getOidcNameList() {
@@ -319,4 +327,18 @@ public class Definition implements Serializable, AttributeName {
 		return Boolean.TRUE.equals(provisioningId);
 	}
 
+	@JsonIgnore
+	public String[] getOidcClaimNames() {
+		String[] names = null;
+		if (oidcNames != null) {
+			names = new String[]{ oidcNames };
+			if (oidcNames.contains(",")) {
+				names = oidcNames.split(",");
+			}
+		}
+		else {
+			names = new String[]{ name };
+		}
+		return names;
+	}
 }

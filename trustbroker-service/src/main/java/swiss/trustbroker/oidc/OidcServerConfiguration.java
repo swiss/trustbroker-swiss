@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -67,10 +67,14 @@ import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.exception.GlobalExceptionHandler;
+import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
+import swiss.trustbroker.mapping.service.QoaMappingService;
 import swiss.trustbroker.metrics.service.MetricsService;
+import swiss.trustbroker.oidc.cache.service.OidcMetadataCacheService;
 import swiss.trustbroker.oidc.jackson.ObjectMapperFactory;
 import swiss.trustbroker.oidc.pkce.PublicClientRefreshTokenAuthenticationConverter;
 import swiss.trustbroker.oidc.pkce.PublicClientRefreshTokenAuthenticationProvider;
+import swiss.trustbroker.saml.service.RelyingPartyService;
 import swiss.trustbroker.script.service.ScriptService;
 
 @Configuration
@@ -99,6 +103,14 @@ public class OidcServerConfiguration {
 	private final ObjectMapper objectMapper;
 
 	private final OidcEncryptionKeystoreService encryptionKeystoreService;
+
+	private final OidcMetadataCacheService oidcMetadataCacheService;
+
+	private final RelyingPartyService relyingPartyService;
+
+	private final RelyingPartySetupService relyingPartySetupService;
+
+	private final QoaMappingService qoaMappingService;
 
 	// no in-memory session tracking
 	// note: this bean needs to be in the bean registry, see OAuth2AuthorizationServerConfigurer
@@ -136,6 +148,8 @@ public class OidcServerConfiguration {
 
 		// mandatory /token endpoint
 		authServerConfigurer.tokenEndpoint(tokenEndpoint -> tokenEndpoint
+				.authenticationProvider(new CustomOAuth2TokenExchangeAuthenticationProvider(registeredClientRepository, authorizationService, oidcMetadataCacheService, relyingPartyDefinitions, trustBrokerProperties, jwkSource, relyingPartyService, relyingPartySetupService, qoaMappingService))
+				.accessTokenRequestConverter(new CustomOAuth2TokenExchangeAuthenticationConverter())
 				.errorResponseHandler(new CustomFailureHandler(
 						"token", relyingPartyDefinitions, trustBrokerProperties)));
 

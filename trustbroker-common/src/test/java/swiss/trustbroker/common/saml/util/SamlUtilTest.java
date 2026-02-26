@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -22,6 +22,8 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 
 import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -58,4 +60,14 @@ class SamlUtilTest {
 		assertThat(relayState.length(), is(77));
 	}
 
+	@Test
+	void getValuesForAttribute() {
+		var assertion = OpenSamlUtil.buildAssertionObject();
+		var name = "name";
+		var value = "value";
+		var attribute = SamlFactory.createAttribute(name, value, null);
+		assertion.getAttributeStatements().add(SamlFactory.createAttributeStatement(List.of(attribute)));
+		assertThat(SamlUtil.getValuesForAttribute(assertion, name), is(List.of(value)));
+		assertThat(SamlUtil.getValuesForAttribute(assertion, "unknown"), is(Collections.emptyList()));
+	}
 }

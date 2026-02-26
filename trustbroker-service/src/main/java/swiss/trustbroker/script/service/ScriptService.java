@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -31,13 +31,16 @@ import javax.script.Compilable;
 import javax.script.CompiledScript;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
+import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.WSTrustObject;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -90,6 +93,8 @@ public class ScriptService {
 
 	private static final String SCRIPT_TYPE_ON_WS_TRUST_RESPONSE = "OnWsTrustResponse"; // validation hook
 
+	private static final String SCRIPT_TYPE_ON_WS_TRUST_ASSERTION = "OnWsTrustAssertion"; // validation / correction hook
+
 	private static final String SCRIPT_TYPE_OIDC_ON_TOKEN = "OnToken"; // OIDC claims enrichment
 
 	private static final String SCRIPT_TYPE_OIDC_ON_USERINFO = "OnUserInfo"; // OIDC claims reducer
@@ -108,6 +113,10 @@ public class ScriptService {
 	private static final String BEAN_SAML_RESPONSE = "SAMLResponse"; // CP Response / response to RP
 
 	private static final String BEAN_SAML_REQUEST = "SAMLRequest"; // RP AuthRequest in opensaml dom API
+
+	private static final String BEAN_ASSERTIONS = "Assertions"; // List<Assertion> in opensaml dom API
+
+	private static final String BEAN_WS_TRUST_REQUEST = "WsTrustRequest"; // RST
 
 	private static final String BEAN_WS_TRUST_RESPONSE = "WsTrustResponse"; // RSTR / RSTRC
 
@@ -252,6 +261,23 @@ public class ScriptService {
 		processAllSamlScripts(hook, scripts, cpResponse, response, null, null);
 	}
 
+	public void processOnMessage() {
+		var hook = "OnMessage";
+		var script = resolveScript("PenTestScenarios.groovy");
+		processAllOidcScripts(hook, List.of(script), null);
+	}
+
+	public boolean processRpWsTrustOnAssertion(RequestSecurityToken request,
+			List<Assertion> assertions, String requestIssuer, String referrer) {
+		var hook = SCRIPT_TYPE_ON_WS_TRUST_ASSERTION;
+		var scripts = getScriptsByType(requestIssuer, referrer, hook, true);
+		var result = false;
+		for (var script : scripts) {
+			result |= processOnRstAssertion(hook, script, request, assertions);
+		}
+		return result;
+	}
+
 	public void processWsTrustOnResponse(CpResponse cpResponse, WSTrustObject wsTrustResponse,
 										 String requestIssuer, String referrer) {
 		var hook = SCRIPT_TYPE_ON_WS_TRUST_RESPONSE;
@@ -275,6 +301,17 @@ public class ScriptService {
 		for (var script : scripts) {
 			processOnRequest(hook, script, null, samlRequest);
 		}
+	}
+
+	public boolean processCpWsTrustOnAssertion(RequestSecurityToken request, List<Assertion> assertions, String requestIssuer,
+			String referrer) {
+		var hook = SCRIPT_TYPE_ON_WS_TRUST_ASSERTION;
+		var scripts = getScriptsByType(requestIssuer, referrer, hook, false);
+		var result = false;
+		for (var script : scripts) {
+			result |= processOnRstAssertion(hook, script, request, assertions);
+		}
+		return result;
 	}
 
 	// OIDC script hooks
@@ -328,9 +365,36 @@ public class ScriptService {
 		catch (TrustBrokerException te) {
 			throw te;
 		}
-		catch (Exception e) {
-			throw new TechnicalException(String.format("Failed to process script '%s'.  Details: %s", script.getKey(), e), e);
+		catch (ScriptException se) {
+			handleScriptException(script, se);
 		}
+		catch (Exception e) {
+			handleException(script, e);
+		}
+	}
+
+	private boolean processOnRstAssertion(String hookType, Pair<String, CompiledScript> script, RequestSecurityToken request,
+			List<Assertion> assertions) throws TechnicalException {
+		var bindings = bindRstAssertionBeans(hookType, request, assertions);
+		try {
+			if (log.isTraceEnabled()) {
+				log.trace("Executing step={} script={} using {}={} {}={}",
+						hookType, script.getKey(),
+						BEAN_HTTP_REQUEST, TraceSupport.getOwnTraceParent(),
+						BEAN_ASSERTIONS, assertions.isEmpty() ? null : OpenSamlUtil.samlObjectToString(assertions.get(0)));
+			}
+			script.getValue().eval(bindings);
+		}
+		catch (TrustBrokerException te) {
+			throw te;
+		}
+		catch (ScriptException se) {
+			handleScriptException(script, se);
+		}
+		catch (Exception e) {
+			handleException(script, e);
+		}
+		return true;
 	}
 
 	// On unit testing it's not very relevant which hook it is
@@ -359,9 +423,24 @@ public class ScriptService {
 		catch (TrustBrokerException te) {
 			throw te;
 		}
-		catch (Exception e) {
-			throw new TechnicalException(String.format("Failed to evaluate script='%s'.  Details: %s", script.getKey(), e), e);
+		catch (ScriptException se) {
+			handleScriptException(script, se);
 		}
+		catch (Exception e) {
+			handleException(script, e);
+		}
+	}
+
+	private static void handleScriptException(Pair<String, CompiledScript> script, ScriptException se) {
+		if (se.getCause() instanceof TrustBrokerException te) {
+			throw te;
+		}
+		throw new TechnicalException(
+				String.format("Failed to process script '%s'. ScriptException: %s", script.getKey(), se), se);
+	}
+
+	private static void handleException(Pair<String, CompiledScript> script, Exception e) {
+		throw new TechnicalException(String.format("Failed to process script='%s'. Details: %s", script.getKey(), e), e);
 	}
 
 	public List<Object> processValueConversion(String attributeName, List<Object> values) throws TechnicalException {
@@ -396,6 +475,18 @@ public class ScriptService {
 		return bindings;
 	}
 
+	private Bindings bindRstAssertionBeans(String hookType, RequestSecurityToken request, List<Assertion> assertions) {
+		var bindings = scriptEngine.createBindings();
+		bindings.put(BEAN_SCRIPT_TYPE, hookType);
+		// input
+		bindings.put(BEAN_RP_CONFIG, relyingPartySetupService);  // undocumented, unused (even dangerous when modified)
+		bindHttpCommonBeans(bindings);
+		bindings.put(BEAN_WS_TRUST_REQUEST, request);
+		// input/output
+		bindings.put(BEAN_ASSERTIONS, assertions);  // assertion patching
+		return bindings;
+	}
+
 	private Bindings bindResponseBeans(String hookType, CpResponse cpResponse, Response response,
 			WSTrustObject wsTrustResponse, List<IdmQuery> idmQueries) {
 		var bindings = scriptEngine.createBindings();
@@ -408,8 +499,11 @@ public class ScriptService {
 		bindings.put(BEAN_HTTP_REQUEST, HttpExchangeSupport.getRunningHttpRequest()); // allow some HTTP wire based decisions
 		// input/output (documented)
 		bindings.put(BEAN_CP_RESPONSE, cpResponse); // documented, used, our main vehicle for SAML  manipulations
-		bindings.put(BEAN_RP_REQUEST, deriveRpRequestFromCpResponse(cpResponse));
 		bindHttpCommonBeans(bindings);
+		// RPRequest not persisted, dervice it from inbound data of CPresponse
+		if (cpResponse != null) {
+			bindings.put(BEAN_RP_REQUEST, deriveRpRequestFromCpResponse(cpResponse));
+		}
 		return bindings;
 	}
 
@@ -442,12 +536,21 @@ public class ScriptService {
 				.build();
 	}
 
-	public void prepareRefresh() {
+	private String getGlobalScriptPath() {
 		var configurationPath = trustBrokerProperties.getConfigurationPath();
 		var latestPath = configurationPath + DIRECTORY_LATEST;
-		var scriptsFullPath = latestPath + trustBrokerProperties.getScriptPath();
-		var globalScriptsFullPath = scriptsFullPath + trustBrokerProperties.getGlobalScriptPath();
-		var tempCompiledScriptsMap = compileScripts(scriptsFullPath, globalScriptsFullPath);
+		return latestPath + trustBrokerProperties.getScriptPath();
+	}
+
+	private String getGlobalScriptFullPath() {
+		var globalScriptPath = getGlobalScriptPath();
+		return globalScriptPath + trustBrokerProperties.getGlobalScriptPath();
+	}
+
+	public void prepareRefresh() {
+		var globalScriptPath = getGlobalScriptPath();
+		var globalScriptsFullPath = getGlobalScriptFullPath();
+		var tempCompiledScriptsMap = compileScripts(globalScriptPath, globalScriptsFullPath);
 		prepareScriptsMap(tempCompiledScriptsMap);
 	}
 
@@ -537,14 +640,14 @@ public class ScriptService {
 		// 1. relative path
 		if (StringUtils.isNotEmpty(subPath)) {
 			var name = Path.of(subPath, script).toString();
-			var compiledScript = resolveScript(name, map, true);
+			var compiledScript = resolveCachedScript(name, map, true);
 			if (compiledScript != null) {
 				log.trace("Script={} in subPath={} resolved to name={}", script, subPath, name);
 				return compiledScript;
 			}
 		}
 		// 2. global scripts (stored with name) or full path
-		var compiledScript = resolveScript(script, map, true);
+		var compiledScript = resolveCachedScript(script, map, true);
 		if (compiledScript != null) {
 			log.trace("Global or full path script={} found", script);
 			return compiledScript;
@@ -557,11 +660,20 @@ public class ScriptService {
 	}
 
 	private Pair<String, CompiledScript> resolveScript(String scriptName) {
-		return resolveScript(scriptName, getScriptsMap(true), false);
+		if (GitService.hasFastConfigVeto()) {
+			return recompileScript(scriptName);
+		}
+		return resolveCachedScript(scriptName, getScriptsMap(true), false);
 	}
 
-	private Pair<String, CompiledScript> resolveScript(String scriptName, Map<String, CompiledScript> scriptsMap,
-			boolean tryOnly) {
+	private Pair<String, CompiledScript> recompileScript(String scriptName) {
+		var scriptSrc = new ScriptSource(getGlobalScriptFullPath() + scriptName);
+		var compiledScript = scriptSrc.loadScript(compilingEngine);
+		return Pair.of(scriptName, compiledScript);
+	}
+
+	private Pair<String, CompiledScript> resolveCachedScript(
+			String scriptName, Map<String, CompiledScript> scriptsMap, boolean tryOnly) {
 		var compiledScript = scriptsMap.get(scriptName);
 		if (compiledScript != null) {
 			return Pair.of(scriptName, compiledScript);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -27,6 +27,7 @@ import javax.xml.crypto.dsig.dom.DOMValidateContext;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import net.shibboleth.shared.xml.SerializeSupport;
+import org.opensaml.core.xml.ElementExtensibleXMLObject;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.MarshallingException;
@@ -43,6 +44,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import swiss.trustbroker.common.exception.ExceptionUtil;
 import swiss.trustbroker.common.exception.TechnicalException;
 
 @Slf4j
@@ -108,7 +110,7 @@ public class SoapUtil {
 		var xmlObjects = envelope.getBody().getUnknownXMLObjects();
 		if (xmlObjects.size() != 1) {
 			throw new TechnicalException(
-					String.format("Unexpected request containing xmlObjects=%i != 1", xmlObjects.size()));
+					String.format("Unexpected request containing xmlObjects=%d != 1", xmlObjects.size()));
 
 		}
 		var xmlObject = xmlObjects.get(0);
@@ -117,6 +119,17 @@ public class SoapUtil {
 					xmlObject.getClass().getName(), samlObjectClass.getName()));
 		}
 		return samlObjectClass.cast(xmlObject);
+	}
+
+	public static <T extends XMLObject> T findChildXmlObject(ElementExtensibleXMLObject baseObject, Class<T> xmlObjectClass) {
+		var xmlObjects =
+				baseObject.getUnknownXMLObjects().stream().filter(xmlObjectClass::isInstance).map(xmlObjectClass::cast).toList();
+		if (xmlObjects.size() != 1) {
+			throw new TechnicalException(String.format("Unexpected %s containing xmlObjects=%d != 1 of class=%s",
+					baseObject.getClass().getSimpleName(), xmlObjects.size(), xmlObjectClass.getName()));
+
+		}
+		return xmlObjects.get(0);
 	}
 
 	public static void sendSoap11Response(HttpServletResponse response, SAMLObject samlResponse) {
@@ -162,6 +175,11 @@ public class SoapUtil {
 				log.debug("No signature for element={}", element.getNodeName());
 				return false;
 			}
+			if (trustCredentials == null) {
+				log.info("Signature={} not validated for element={} without trust credentials",
+						signatureNode.getNodeName(), element.getNodeName());
+				return false;
+			}
 			var sigFactory = createSignatureFactory();
 			List<String> failedCredentials = new ArrayList<>();
 			for (var trustCredential : trustCredentials) {
@@ -183,7 +201,8 @@ public class SoapUtil {
 			return false;
 		}
 		catch (Exception ex) {
-			log.info("Could not validate signature of element={} : {}", element.getNodeName(), ex.getMessage(), ex);
+			log.info("Could not validate signature of element={} : {} caused by {}", element.getNodeName(), ex.getMessage(),
+					ExceptionUtil.getRootMessage(ex));
 			return false;
 		}
 	}

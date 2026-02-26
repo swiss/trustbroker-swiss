@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -55,8 +55,11 @@ public class HttpExchangeSupport {
 	// prevent multiple logs
 	private boolean authContextHandled;
 
+	// support PEN testing
+	private String penTestScenario;
+
 	public static HttpExchangeSupport begin(HttpServletRequest request, HttpServletResponse response) {
-		var exchange = new HttpExchangeSupport(request, response, false, null, null, null, false);
+		var exchange = new HttpExchangeSupport(request, response, false, null, null, null, false, null);
 		runningHttpExchange.set(exchange);
 		return runningHttpExchange.get();
 	}
@@ -70,6 +73,22 @@ public class HttpExchangeSupport {
 		var entry = runningHttpExchange.get();
 		if (entry != null) {
 			return entry.request;
+		}
+		return null;
+	}
+
+	public static HttpSession getOrCreateRunningHttpSession() {
+		var request = getRunningHttpRequest();
+		if (request != null) {
+			return request.getSession(true);
+		}
+		return null;
+	}
+
+	public static String getOrCreateSessionId() {
+		var session = HttpExchangeSupport.getOrCreateRunningHttpSession();
+		if (session != null) {
+			return session.getId();
 		}
 		return null;
 	}
@@ -152,6 +171,22 @@ public class HttpExchangeSupport {
 	public static boolean isRunningLogoutRequest(HttpServletRequest request) {
 		request = request != null ? request : getRunningHttpRequest();
 		return request != null && ApiSupport.isLogoutRequest(request.getRequestURI());
+	}
+
+	public static void setRunningPenTestScenario(String scenario) {
+		var exchange = getRunningHttpExchange();
+		exchange.setPenTestScenario(scenario);
+	}
+
+	// see PenTestScenarios.groovy
+	public static String getRunningPenTestScenario() {
+		var exchange = getRunningHttpExchange();
+		return exchange != null ? exchange.getPenTestScenario() : null;
+	}
+
+	// see PenTestScenarios.groovy
+	public static boolean isRunningPenTestScenario() {
+		return getRunningPenTestScenario() != null;
 	}
 
 }

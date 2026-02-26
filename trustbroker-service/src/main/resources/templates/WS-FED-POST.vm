@@ -1,0 +1,62 @@
+## Derivative work of original template from org.opensaml:opensaml-saml-impl:5.1.2:
+## saml2-post-binding.vm
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
+##
+## Velocity Template for SAML 2 HTTP-POST binding
+## Customized for SSO logout notification
+##
+## Velocity context may contain the following properties
+##
+## OpenSAML:
+## action - String - the action URL for the form
+## binding - String - the SAML binding type in use
+## XTBAction - String - the WS-FED action
+## XTBContext - String - the WS-FED context for the message
+## XTBResult - String - the RST Response as XML (not base64!)
+##
+## Binding:
+## XTBHttpMethod - String - HTTP method to use (default: post)
+##
+#set ($onLoad="document.forms[0].submit()")
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+    <head>
+    #parse ( "/templates/add-html-head-content.vm" )
+    </head>
+    <body onload="${onLoad}">
+        <noscript>
+            <p>
+                <strong>Note:</strong> Since your browser does not support JavaScript,
+                you must press the Continue button once to proceed.
+            </p>
+        </noscript>
+        <form name="wsfed.result" action="${action}" method="#if($XTBHttpMethod)${XTBHttpMethod}#{else}POST#end">
+            <div>
+				#if($XTBAction)<input type="hidden" name="wa" value="${XTBAction}"/>#end
+
+                #if($XTBContext)<input type="hidden" name="wctx" value="${XTBContext}"/>#end
+
+                #if($XTBResult)<input type="hidden" name="wresult" value="${XTBResult}"/>#end
+
+            </div>
+            <noscript>
+                <div>
+                    <input type="submit" value="Continue"/>
+                </div>
+            </noscript>
+        </form>
+        <div id="wsfed"></div>
+        #parse ( "/templates/add-html-body-content.vm" )
+    </body>
+</html>

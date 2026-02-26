@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -21,7 +21,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -102,7 +101,7 @@ public class AppConfigService {
 			// load up-to-date scripts for validation
 			scriptService.prepareRefresh();
 			checkAndUpdateMapping();
-			checkAndUpdateOidcRegistry(relyingPartyDefinitions.getRelyingPartySetup());
+			checkAndUpdateOidcRegistry(relyingPartyDefinitions.getRelyingPartySetup(), relyingPartyDefinitions.getClaimsProviderSetup());
 			// load scripts, this MUST be last as the refresh will swap the script registry, and we are not transactional here
 			scriptService.activateRefresh();
 			updateMetrics();
@@ -180,37 +179,30 @@ public class AppConfigService {
 
 		var ssoGroupSetup = ClaimsProviderUtil.loadSsoGroups(newConfigPath + ssoGroupSetupPath);
 
-		if (claimsProviderDefinitions != null) {
-			relyingPartyDefinitions.setClaimsProviderDefinitions(claimsProviderDefinitions);
-		}
-
-		if (claimsProviderSetup != null) {
-			checkAndLoadCpCertificates(claimsProviderSetup);
-			validateScripts(claimsProviderSetup);
-			filterInvalidClaimsParties(claimsProviderSetup);
-			relyingPartyDefinitions.setClaimsProviderSetup(claimsProviderSetup);
-		}
+		relyingPartyDefinitions.setClaimsProviderDefinitions(claimsProviderDefinitions);
+		checkAndLoadCpCertificates(claimsProviderSetup);
+		validateScripts(claimsProviderSetup);
+		filterInvalidClaimsParties(claimsProviderSetup);
+		relyingPartyDefinitions.setClaimsProviderSetup(claimsProviderSetup);
 
 		if (ssoGroupSetup != null) {
 			relyingPartyDefinitions.setSsoGroupSetup(ssoGroupSetup);
 		}
 
-		if (relyingPartySetup != null) {
-			Collection<RelyingParty> claimRules = relyingPartySetup.getRelyingParties();
-			RelyingPartySetupUtil.loadRelyingParty(claimRules, trustBrokerProperties.getConfigurationPath()
-							+ CONFIG_CACHE_DEFINITION_SUBPATH, newConfigPath, trustBrokerProperties, idmQueryServices,
-					scriptService, claimsProviderSetup, claimsProviderDefinitions);
-			checkAndLoadRelyingPartyCertificates(relyingPartySetup);
-			checkRpSsoIntegrity(relyingPartySetup, ssoGroupSetup);
-			filterInvalidRelyingParties(relyingPartySetup);
-			relyingPartyDefinitions.setRelyingPartySetup(relyingPartySetup);
-			relyingPartyDefinitions.loadOidcConfiguration(trustBrokerProperties.getOidc());
-			relyingPartyDefinitions.loadAccessRequestConfigurations();
-		}
+		var claimRules = relyingPartySetup.getRelyingParties();
+		RelyingPartySetupUtil.loadRelyingParty(claimRules, trustBrokerProperties.getConfigurationPath()
+						+ CONFIG_CACHE_DEFINITION_SUBPATH, newConfigPath, trustBrokerProperties, idmQueryServices,
+				scriptService, claimsProviderSetup, claimsProviderDefinitions);
+		checkAndLoadRelyingPartyCertificates(relyingPartySetup);
+		checkRpSsoIntegrity(relyingPartySetup, ssoGroupSetup);
+		filterInvalidRelyingParties(relyingPartySetup);
+		relyingPartyDefinitions.setRelyingPartySetup(relyingPartySetup);
+		relyingPartyDefinitions.loadOidcConfiguration(trustBrokerProperties.getOidc());
+		relyingPartyDefinitions.loadAccessRequestConfigurations();
 	}
 
-	public void checkAndUpdateOidcRegistry(RelyingPartySetup relyingPartySetup) {
-		log.info("OIDC provider registry update for relyingPartyCount={} items", relyingPartySetup.getRelyingParties().size());
+	public void checkAndUpdateOidcRegistry(RelyingPartySetup relyingPartySetup, ClaimsProviderSetup claimsProviderSetup) {
+		log.info("OIDC provider registry update for relyingPartyCount={} claimPartyCount={} items", relyingPartySetup.getRelyingParties().size(), claimsProviderSetup.getClaimsParties().size());
 		var oidcClientCount = 0;
 		for (var relyingParty : relyingPartySetup.getRelyingParties()) {
 			for (var oidcClient : relyingParty.getOidcClients()) {
@@ -218,9 +210,23 @@ public class AppConfigService {
 				try {
 					clientConfigInMemoryRepository.findByClientId(oidcClient.getId());
 					oidcClientCount += 1;
-				} catch (RuntimeException ex) {
+				}
+				catch (RuntimeException ex) {
 					log.error("Invalid RP={} oidcClientId={}: {}", relyingParty.getId(), oidcClient.getId(), ex);
 					relyingParty.invalidate(ex);
+				}
+			}
+		}
+		for (var claimParty : claimsProviderSetup.getClaimsParties()) {
+			for (var oidcClient : claimParty.getOidcClients()) {
+				// INFO logs and caches spring registered OIDC clients
+				try {
+					clientConfigInMemoryRepository.findByClientId(oidcClient.getId());
+					oidcClientCount += 1;
+				}
+				catch (RuntimeException ex) {
+					log.error("Invalid CP={} oidcClientId={}: {}", claimParty.getId(), oidcClient.getId(), ex);
+					claimParty.invalidate(ex);
 				}
 			}
 		}

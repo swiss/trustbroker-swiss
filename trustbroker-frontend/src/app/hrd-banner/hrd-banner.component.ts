@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -31,7 +31,7 @@ import { Theme } from '../model/Theme';
 	standalone: false
 })
 export class HrdBannerComponent {
-	baseUrl: string = environment.apiUrl;
+	apiBaseUrl: string = environment.apiUrl;
 	readonly i18nPrefix = `trustbroker.hrd.cards.banner`;
 
 	config = input.required<BannerConfig>();
@@ -41,9 +41,9 @@ export class HrdBannerComponent {
 	translatedSubtitle$ = this.streamTranslation(name => `${this.i18nPrefix}.${name}.subtitle`);
 	paragraphs$ = combineLatest([toObservable(this.config), this.languageService.langChange$]).pipe(
 		map(([{ name }]) => {
-			const paragraphs = [];
+			const paragraphs: string[] = [];
 			let index = 1;
-			let newParagraph: string;
+			let newParagraph: string | undefined;
 			do {
 				const key = `${this.i18nPrefix}.${name}.paragraph${index}.text`;
 				newParagraph = this.translateService.instant(key);
@@ -75,11 +75,11 @@ export class HrdBannerComponent {
 		this.expandedParagraphs.set(expand);
 	}
 
-	streamTranslation(keyFn: (bannerName: string) => string): Observable<string> {
+	streamTranslation(keyFn: (bannerName: string) => string): Observable<string | undefined> {
 		return toObservable(this.config).pipe(
 			switchMap(({ name }) => {
 				const key = keyFn(name);
-				return this.translateService.stream(key).pipe(map<string, string>(translation => (translation === key ? undefined : translation)));
+				return this.translateService.stream(key).pipe(map<string, string | undefined>(translation => (translation === key ? undefined : translation)));
 			})
 		);
 	}

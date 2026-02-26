@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,12 +15,23 @@
 
 package swiss.trustbroker.oidcmock;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.JWKMatcher;
+import com.nimbusds.jose.jwk.JWKSelector;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,13 +82,43 @@ public class OIdcMockJwtCustomizer implements OAuth2TokenCustomizer<JwtEncodingC
 		if (OidcParameterNames.ID_TOKEN.equals(context.getTokenType().getValue())) {
 			OidcUserInfo userInfo = userInfoService.loadUser(
 					context.getPrincipal().getName());
-			for (Map.Entry<String, Object> entry : customClaims.entrySet()) {
-				context.getClaims().claim(entry.getKey(), entry.getValue());
-			}
-
 			context.getClaims().claims(claims -> claims.putAll(userInfo.getClaims()));
 		}
 
+		for (Map.Entry<String, Object> entry : customClaims.entrySet()) {
+			context.getClaims().claim(entry.getKey(), entry.getValue());
+		}
+
+		generateDPoP(jwkSource);
+	}
+
+	private static void generateDPoP(JWKSource<SecurityContext> jwkSource) {
+		try {
+			var claims = new JWTClaimsSet.Builder()
+					.claim("htm", "POST")
+					.claim("htu", "http://localhost:8080/realms/XTB-dev/protocol/openid-connect/token")
+					.issueTime(new Date())
+					.jwtID(UUID.randomUUID().toString())
+					// Optional: .claim("ath", base64urlSHA256(accessToken))
+					.build();
+			var jwkSelector = new JWKSelector(new JWKMatcher.Builder().build());
+			List<JWK> jwks = jwkSource.get(jwkSelector, null);
+			var signer = new RSASSASigner(jwks.get(0).toRSAKey());
+			var publicJWK = jwks.get(0).toPublicJWK();
+			var signedJWT = new SignedJWT(
+					new JWSHeader.Builder(JWSAlgorithm.RS256)
+							.type(new JOSEObjectType("dpop+jwt"))
+							.jwk(publicJWK)
+							.build(),
+					claims
+			);
+			signedJWT.sign(signer);
+			var dpopJwt = signedJWT.serialize();
+			log.info("Generated DPOP JWT: {}", dpopJwt);
+		}
+		catch (Exception ex) {
+			log.error(ex.getMessage(), ex);
+		}
 	}
 
 	private void addConfigClaims(String clientId, Map<String, Object> customClaims) {

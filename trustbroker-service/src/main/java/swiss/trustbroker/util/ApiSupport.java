@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -23,12 +23,13 @@ import swiss.trustbroker.common.saml.util.Base64Util;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
-import swiss.trustbroker.homerealmdiscovery.controller.HrdController;
 
 /**
  * Build application and API URLs in a consistent way with properly encoded parameters.
- * <p>
+ * <br/>
  * Note: Only the URLs needed from business or test code have been added.
+ * <br/>
+ * When changing values, also check usage in frontend routing and API service and skinny HTML pages!
  */
 @Component
 @SuppressWarnings("java:S1075")
@@ -60,15 +61,26 @@ public class ApiSupport {
 	 * Base URL of APIs, prefix for the following API paths.
 	 * See controllers for URL mappings and their parameters.
 	 *
-	 * @see HrdController
+	 * @see swiss.trustbroker.gui.WebResourceController
+	 * @see swiss.trustbroker.homerealmdiscovery.controller.HrdController
 	 * @see swiss.trustbroker.saml.controller.AppController
 	 * @see swiss.trustbroker.sso.controller.SsoController
 	 */
 	public static final String API_CONTEXT = "/api/v1";
 
+	public static final String WEB_RESOURCE_PATH = API_CONTEXT + "/ui";
+
+	public static final String ASSETS_URL = WEB_RESOURCE_PATH + "/assets";
+
+	public static final String IMAGES_URL = WEB_RESOURCE_PATH + "/images";
+
+	public static final String TRANSLATIONS_URL = WEB_RESOURCE_PATH + "/translations";
+
 	static final String HRD_API = "/hrd";
 
 	static final String HRD_RP_API = HRD_API + "/relyingparties";
+
+	public static final String HRD_RP_URL = API_CONTEXT + HRD_RP_API;
 
 	static final String HRD_TILES_POSTFIX = "/tiles";
 
@@ -86,23 +98,41 @@ public class ApiSupport {
 
 	static final String HRD_CP_API = HRD_API + "/claimsproviders";
 
-	static final String HRD_ID_PARAM = "session";
+	public static final String HRD_CP_URL = API_CONTEXT + HRD_CP_API;
+
+	public static final String HRD_SID_PARAM = "sid";
 
 	static final String SSO_GROUP_API = "/sso/group";
 
+	public static final String SSO_GROUP_URL = API_CONTEXT + SSO_GROUP_API;
+
 	static final String SSO_RP_API = "/sso/rp";
+
+	public static final String SSO_RP_URL = API_CONTEXT + SSO_RP_API;
 
 	static final String SSO_PARTICIPANTS_API = "/sso/participants";
 
+	public static final String SSO_PARTICIPANTS_URL = API_CONTEXT + SSO_PARTICIPANTS_API;
+
 	static final String DEVICE_INFO_API = "/device/info";
 
-	static final String ACCESS_REQUEST_COMPLETE = "/accessrequest/complete";
+	public static final String DEVICE_INFO_URL = API_CONTEXT + DEVICE_INFO_API;
 
-	static final String ACCESS_REQUEST_INITIATE = "/accessrequest/initiate";
+	static final String ACCESS_REQUEST_COMPLETE_API = "/accessrequest/complete";
 
-	static final String ACCESS_REQUEST_ABORT = "/accessrequest/abort";
+	public static final String ACCESS_REQUEST_COMPLETE_URL = API_CONTEXT + ACCESS_REQUEST_COMPLETE_API;
 
-	static final String ACCESS_REQUEST_TRIGGER = "/accessrequest/trigger";
+	static final String ACCESS_REQUEST_INITIATE_API = "/accessrequest/initiate";
+
+	public static final String ACCESS_REQUEST_INITIATE_URL = API_CONTEXT + ACCESS_REQUEST_INITIATE_API;
+
+	static final String ACCESS_REQUEST_ABORT_API = "/accessrequest/abort";
+
+	public static final String ACCESS_REQUEST_ABORT_URL = API_CONTEXT + ACCESS_REQUEST_ABORT_API;
+
+	static final String ACCESS_REQUEST_TRIGGER_API = "/accessrequest/trigger";
+
+	public static final String ACCESS_REQUEST_TRIGGER_URL = API_CONTEXT + ACCESS_REQUEST_TRIGGER_API;
 
 	private static final String MONITORING_ACS_API = "/monitoring/relyingparties";
 
@@ -126,6 +156,8 @@ public class ApiSupport {
 
 	public static final String WSTRUST_API = API_CONTEXT + "/wstrust";
 
+	public static final String WSFED_API = API_CONTEXT + "/wsfed";
+
 	public static final String ARP_API = "/saml/arp";
 
 	static final String METADATA_API = "/metadata";
@@ -139,10 +171,6 @@ public class ApiSupport {
 	public static final String RECONFIG_URL = API_CONTEXT + "/config";
 
 	static final String SUPPORT_API = "/support";
-
-	static final String ASSETS_API = HRD_API + "/assets";
-
-	public static final String ASSETS_URL = API_CONTEXT + ASSETS_API;
 
 	/**
 	 * OIDC support
@@ -222,14 +250,24 @@ public class ApiSupport {
 		this.trustBrokerProperties = trustBrokerProperties;
 	}
 
+	// API is in theory stateless but serves resources but addresses profiles and announcements of a running federation
 	public static boolean isApiPath(String path) {
 		return path != null && path.startsWith(API_CONTEXT);
 	}
 
-	public static boolean isSamlPath(String path) {
-		return path !=null && (isApiPath(path) || path.startsWith(ADFS_PATH) || path.startsWith(XTB_LEGACY_ADFS_PATH));
+	// web resource API is stateless, served from Git
+	public static boolean isWebResourcePath(String path) {
+		return path != null && path.startsWith(WEB_RESOURCE_PATH);
 	}
 
+	// SAML protocol endpoints (RelayState backing, HTTP security polices)
+	public static boolean isSamlPath(String path) {
+		return path != null && (path.startsWith(SAML_API)
+				|| path.startsWith(ADFS_PATH) || path.startsWith(XTB_LEGACY_ADFS_PATH)
+				|| path.startsWith(WSTRUST_API));
+	}
+
+	// UI
 	public static boolean isFrontendPath(String path) {
 		return path != null && (path.startsWith(FRONTEND_CONTEXT) || path.startsWith(SKINNY_PATH));
 	}
@@ -259,6 +297,7 @@ public class ApiSupport {
 				|| path.startsWith(ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH));
 	}
 
+	// OIDC protocol endpoints (including SAML protocol switch) that need federation state backing (BSESSION, sid, auth_state)
 	public static boolean isOidcSessionPath(String path) {
 		// We could use OidcSessionSupport.getOidcClientId here for consistency with
 		// the session detection in the session management, but it's too heavy...
@@ -278,6 +317,14 @@ public class ApiSupport {
 
 	public static boolean isUserInfoRequest(String path) {
 		return path != null && path.endsWith(ApiSupport.OIDC_USERINFO);
+	}
+
+	public static boolean isIntrospectRequest(String path) {
+		return path != null && path.endsWith(ApiSupport.OIDC_INTROSPECT);
+	}
+
+	public static boolean isReadyOnlyAccess(String path) {
+		return isUserInfoRequest(path) || isIntrospectRequest(path);
 	}
 
 	public static boolean isLogoutRequest(String path) {
@@ -303,7 +350,7 @@ public class ApiSupport {
 		}
 		url.append(skinnyHtml);
 		url.append("?");
-		url.append(requestId);
+		url.append(encodeUrlParameter(requestId));
 		url.append("&");
 		url.append(pageContent);
 		url.append("&");
@@ -371,15 +418,15 @@ public class ApiSupport {
 
 	public String getAccessRequestCompleteApi(String requestId) {
 		var baseUrl = getBaseUrl();
-		return getFrontendUrlWithBase(baseUrl, API_CONTEXT, ACCESS_REQUEST_COMPLETE, requestId);
+		return getFrontendUrlWithBase(baseUrl, API_CONTEXT, ACCESS_REQUEST_COMPLETE_API, requestId);
 	}
 
 	public String getAccessRequestInitiateApi(String requestId) {
-		return getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_INITIATE, requestId);
+		return getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_INITIATE_API, requestId);
 	}
 
 	public String getAccessRequestTriggerApi(String application, String returnUrl) {
-		var url = getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_TRIGGER);
+		var url = getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_TRIGGER_API);
 		url += "?appl=" + application;
 		if (returnUrl != null) {
 			url += "&returnURL=" + WebUtil.urlEncodeValue(returnUrl);
@@ -388,7 +435,7 @@ public class ApiSupport {
 	}
 
 	public String getAccessRequestAbortApi(String requestId) {
-		return getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_ABORT, requestId);
+		return getFrontendUrl(API_CONTEXT, ACCESS_REQUEST_ABORT_API, requestId);
 	}
 
 	public String getSsoParticipantsApi() {
@@ -414,7 +461,7 @@ public class ApiSupport {
 
 	public String getHrdRpApi(String issuer, String authnRequestId) {
 		return getFrontendUrl(API_CONTEXT, HRD_RP_API, encodeUrlParameter(issuer)) + HRD_TILES_POSTFIX
-				+ '?' + HRD_ID_PARAM + '=' + authnRequestId;
+				+ '?' + HRD_SID_PARAM + '=' + encodeUrlParameter(authnRequestId);
 	}
 
 	public String getHrdRpContinueApi(String sessionId) {
@@ -423,7 +470,8 @@ public class ApiSupport {
 
 	public String getHrdCpApi(String issuer, String authnRequestId) {
 		// API inconsistency with query parameter instead of path parameter
-		return getFrontendUrl(API_CONTEXT, HRD_CP_API, encodeUrlParameter(issuer)) + '?' + HRD_ID_PARAM + '=' + authnRequestId;
+		return getFrontendUrl(API_CONTEXT, HRD_CP_API, encodeUrlParameter(issuer)) +
+				'?' + HRD_SID_PARAM + '=' + encodeUrlParameter(authnRequestId);
 	}
 
 	public String getMonitoringAcsUrl() {

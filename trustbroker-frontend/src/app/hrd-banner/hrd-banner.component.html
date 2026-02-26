@@ -1,5 +1,5 @@
 <!--
- Copyright (C) 2024 trustbroker.swiss team BIT
+ Copyright (C) 2026 trustbroker.swiss team BIT
 
  This program is free software.
  You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -19,13 +19,13 @@
 	}
 
 	@if (translatedSubtitle$ | async; as subtitle) {
-		<p class="subtitle">{{ subtitle }}</p>
+		<p [innerHTML]="subtitle | safeMarkup" class="subtitle"></p>
 	}
 
 	@if (config().secondaryImages?.length) {
 		<div class="images">
 			@for (image of config().secondaryImages; track image) {
-				<img src="{{ baseUrl }}hrd/assets/images/{{ theme().name }}/{{ image }}" class="secondary-image" alt="" />
+				<img src="{{ apiBaseUrl }}ui/assets/images/{{ theme().name }}/{{ image }}" class="secondary-image" alt="" />
 			}
 		</div>
 	}
@@ -45,6 +45,6 @@
 </div>
 @if (config().mainImage) {
 	<div class="main-image-container">
-		<img src="{{ baseUrl }}hrd/assets/images/{{ theme().name }}/{{ config().mainImage }}" class="main-image" alt="" />
+		<img src="{{ apiBaseUrl }}ui/assets/images/{{ theme().name }}/{{ config().mainImage }}" class="main-image" alt="" />
 	</div>
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -92,6 +92,7 @@ public class OidcConfigurationUtil {
 		// spring security OIDC registry entry
 		var clientSettings = getClientSettings(polices);
 		var tokenSettings = getTokenSettings(polices, defaultTokenTimeSec, defaultCodeTimeSec);
+		var redirectUrls = client.getRedirectUris() != null ? client.getRedirectUris().getRedirectUrls() : List.of("Missing redirectUrl for client");
 
 		// construct it
 		var registeredClient = RegisteredClient.withId(clientId)
@@ -109,7 +110,7 @@ public class OidcConfigurationUtil {
 				// RedirectUris is a mandatory field for a Registered client (we don't distinguish between login and logout URIs)
 				// postLogoutRedirectUris is not set, required for Spring's OidcLogoutAuthenticationValidator,
 				// but not without CustomEndpointInterceptor
-				.redirectUris(uris -> uris.addAll(client.getRedirectUris().getRedirectUrls()))
+				.redirectUris(uris -> uris.addAll(redirectUrls))
 				.tokenSettings(tokenSettings)
 				.build();
 

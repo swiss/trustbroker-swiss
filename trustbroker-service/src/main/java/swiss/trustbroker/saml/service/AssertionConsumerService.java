@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -39,6 +39,7 @@ import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.security.credential.Credential;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import swiss.trustbroker.api.announcements.dto.Announcement;
 import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.homerealmdiscovery.service.HrdService;
@@ -50,16 +51,15 @@ import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
-import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.tracing.TraceSupport;
 import swiss.trustbroker.common.util.CollectionUtil;
+import swiss.trustbroker.common.util.ConfigUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.Banner;
 import swiss.trustbroker.config.dto.GuiFeatures;
-import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 import swiss.trustbroker.federation.xmlconfig.Definition;
@@ -113,6 +113,8 @@ public class AssertionConsumerService {
 
 	private final QoaMappingService qoaMappingService;
 
+	@Transactional
+	@SuppressWarnings("java:S6809") // this method is transactional, so calling a transactional method on this is OK
 	public CpResponse handleSuccessCpResponse(ResponseData<Response> responseData) {
 		// message assertions
 		var response = responseData.getResponse();
@@ -136,11 +138,12 @@ public class AssertionConsumerService {
 		List<Definition> cpAttributeDefinitions = claimsParty.getAttributesDefinitions();
 		var cpResponse = extractCpResponseDto(response, responseAssertions, cpAttributeDefinitions);
 		// Known attributes from config as a default before we offer the opportunity to modify it in the CP/RP BeforeIdm scripts
-		cpResponse.setHomeName(relyingPartySetupService.getHomeName(claimsParty, responseAssertions, cpResponse));
+		cpResponse.setHomeName(relyingPartySetupService.getHomeNameChecked(claimsParty, responseAssertions, cpResponse));
 		return handleSuccessCpResponse(claimsParty, idpStateData, cpResponse, referrer, response);
 	}
 
 	// response is optional
+	@Transactional
 	public CpResponse handleSuccessCpResponse(ClaimsParty claimsParty, StateData idpStateData,
 			CpResponse cpResponse, String referrer, Response response) {
 		// Make RP issuer available to scripts in case AfterIdm hooks need to have it as input
@@ -162,12 +165,7 @@ public class AssertionConsumerService {
 		// make some RpRequest related data available in response phase (why not the whole RPRequest object?)
 		var rpStateData = idpStateData.getSpStateData();
 		if (rpStateData != null) {
-			cpResponse.setRpContext(rpStateData.getRpContext());
-			cpResponse.setRpReferer(rpStateData.getReferer());
-			cpResponse.setRpContextClasses(rpStateData.getContextClasses());
-			// propagate applicationName and OIDC client_id for scripting
-			cpResponse.setOidcClientId(rpStateData.getOidcClientId());
-			cpResponse.setApplicationName(rpStateData.getApplicationName());
+			rpStateData.copyRpParametersIntoCpResponse(cpResponse);
 		}
 
 		// Scripts BeforeIdm CP side
@@ -199,6 +197,7 @@ public class AssertionConsumerService {
 		return cpResponse;
 	}
 
+	@Transactional
 	public CpResponse handleFailedCpResponse(ResponseData<Response> responseData) {
 		// message assertions
 		OpenSamlUtil.checkResponsePresent(responseData.getResponse(), "CP failed response processing");
@@ -439,8 +438,7 @@ public class AssertionConsumerService {
 	// - HTTP Origin was dropped because we actually never used it anywhere an ambiguity hurts here
 	String getAssertionConsumerServiceUrl(final String consumerUrl,
 			final String referer, final String origin, RelyingParty relyingParty) {
-		var acWhitelist = relyingParty != null && relyingParty.getAcWhitelist() != null ?
-				relyingParty.getAcWhitelist() : new AcWhitelist(new ArrayList<>());
+		var acWhitelist = RelyingParty.initializedAcWhitelist(relyingParty);
 
 		var rpIssuer = relyingParty != null ? relyingParty.getId() : null;
 		if (log.isDebugEnabled()) {
@@ -449,15 +447,7 @@ public class AssertionConsumerService {
 		}
 
 		//  may be signed AuthnRequest
-		Optional<String> consumer;
-		// use default?
-		if (consumerUrl == null) {
-			consumer = acWhitelist.getDefault();
-			log.debug("rpIssuerId={} did not send an ACS URL - using default={}", rpIssuer, consumer.orElse(null));
-		}
-		else {
-			consumer = acWhitelist.findFirst(String::equals, consumerUrl);
-		}
+		Optional<String> consumer = acWhitelist.findEqualWithDefault(consumerUrl);
 
 		// internal AuthnRequest for monitoring
 		if (consumer.isEmpty() && consumerUrl != null && consumerUrl.startsWith(ApiSupport.MONITORING_ACS_URL)) {
@@ -491,7 +481,8 @@ public class AssertionConsumerService {
 	}
 
 	// In the discontinued stealth mode we also needed to save this state as well to be able to analyse the SAMLResponse
-	public StateData saveState(AuthnRequest authnRequest, boolean signatureValidated, HttpServletRequest request,
+	public StateData saveState(AuthnRequest authnRequest, String spRelayState, boolean signatureValidated,
+			HttpServletRequest request,
 			RelyingParty relyingParty, Optional<StateData> ssoState, SamlBinding requestBinding) {
 		// without a consumer URL we at least need something from the config
 		var referer = WebUtil.getReferer(request);
@@ -500,7 +491,6 @@ public class AssertionConsumerService {
 				authnRequest.getAssertionConsumerServiceURL(), referer, rpIssuer, relyingParty);
 
 		// RP using relay state?
-		var spRelayState = request.getParameter(SamlIoUtil.SAML_RELAY_STATE);
 		if (log.isDebugEnabled()) {
 			log.debug("Inbound SP RelayState: {}", StringUtil.clean(spRelayState));
 		}
@@ -600,6 +590,9 @@ public class AssertionConsumerService {
 		List<ClaimsProvider> cpMappings = new ArrayList<>();
 
 		// request mapping towards processing
+		if (applicationName == null && stateData != null) {
+			applicationName = stateData.getRpApplicationName();
+		}
 		var rpRequest = RpRequest.builder()
 				.claimsProviders(cpMappings) // pass on per request handling copy, uiObjects stay empty (render later)
 				.rpIssuer(rpIssuer)
@@ -655,14 +648,17 @@ public class AssertionConsumerService {
 
 	private void updateSpStateDataOnHrdChanges(StateData stateData, RpRequest rpRequest) {
 		if (stateData != null && stateData.getSpStateData() != null) {
-			var spStateDate = stateData.getSpStateData();
+			var spStateData = stateData.getSpStateData();
 			// improve and store RpRequest instead of partial fields only
 			var changed = !CollectionUtils.isEqualCollection(stateData.getRpContextClasses(), rpRequest.getContextClasses());
-			changed = changed || !spStateDate.getRpContext().equals(rpRequest.getContext()); // works for String values
+			changed = changed || (spStateData.getApplicationName() != null &&
+					!spStateData.getApplicationName().equals(rpRequest.getApplicationName()));
+			changed = changed || !spStateData.getRpContext().equals(rpRequest.getContext()); // works for String values
 			if (changed) {
-				spStateDate.setContextClasses(rpRequest.getContextClasses());
-				spStateDate.setComparisonType(rpRequest.getComparisonType());
-				spStateDate.getRpContext().putAll(rpRequest.getContext());
+				spStateData.setContextClasses(rpRequest.getContextClasses());
+				spStateData.setComparisonType(rpRequest.getComparisonType());
+				spStateData.getRpContext().putAll(rpRequest.getContext());
+				spStateData.setApplicationName(rpRequest.getApplicationName());
 				stateCacheService.save(stateData, this.getClass().getSimpleName());
 			}
 		}
@@ -782,20 +778,11 @@ public class AssertionConsumerService {
 		if (announcementService.showAnnouncements(relyingParty.getAnnouncement(), rpRequest.getApplicationName(), rpRequest.featureConditionSet()) && !skipUserFeatures) {
 			for (Announcement announcement : announcementService.getGlobalAnnouncements()) {
 				if (announcement.getApplicationAccessible() != null && !announcement.getApplicationAccessible()) {
-					globalAnnouncements.add(getGlobalAppName(announcement.getApplicationName()));
+					globalAnnouncements.add(ConfigUtil.getGlobalAnnouncementAppName(announcement.getApplicationName()));
 				}
 			}
 		}
 		return globalAnnouncements;
-	}
-
-	private static String getGlobalAppName(String applicationName) {
-		if (applicationName == null) {
-			return "None";
-		}
-		String[] appNameElements = applicationName.split("-");
-		int length = appNameElements.length;
-		return appNameElements[length - 1];
 	}
 
 	private static String getTileDescription(ClaimsProvider claimsProvider) {
@@ -848,13 +835,13 @@ public class AssertionConsumerService {
 
 	// Banner for the frontend
 	private UiBanner createBanner(ClaimsProvider claimsProvider, boolean hrdBanners) {
-		if (!hrdBanners) {
+		if (!hrdBanners || claimsProvider.getBanner() == null) {
 			return null;
 		}
 		var bannerOpt = trustBrokerProperties.getGui().getBanner(claimsProvider.getBanner());
 		return bannerOpt
 				.map(banner -> createBannerFromConfig(banner, claimsProvider.getOrder()))
-				.orElse(null);
+				.orElseGet(() -> createBannerWithDefaults(claimsProvider));
 	}
 
 	static UiBanner createBannerFromConfig(Banner banner, Integer order) {
@@ -867,6 +854,14 @@ public class AssertionConsumerService {
 					   .build();
 	}
 
+	static UiBanner createBannerWithDefaults(ClaimsProvider claimsProvider) {
+		return UiBanner.builder()
+					   .name(claimsProvider.getBanner())
+					   .collapseParagraphs(true)
+					   .order(claimsProvider.getOrder())
+					   .build();
+	}
+
 	private static UiDisableReason cpDisabled(String id, ArrayList<String> globalDisabledAppNames, boolean cpCanFulfillQoa) {
 		if (!cpCanFulfillQoa) {
 			return UiDisableReason.INSUFFICIENT;
@@ -875,15 +870,11 @@ public class AssertionConsumerService {
 			return null;
 		}
 		for (String announcementId : globalDisabledAppNames) {
-			if (removeIdSpecChar(id).contains(announcementId.toUpperCase())) {
+			if (ConfigUtil.removeIdSpecChar(id).contains(announcementId.toUpperCase())) {
 				return UiDisableReason.UNAVAILABLE;
 			}
 		}
 		return null;
-	}
-
-	private static String removeIdSpecChar(String id) {
-		return id.replace("-", "").toUpperCase();
 	}
 
 	public AssertionValidator.MessageValidationResult validateAuthnRequest(AuthnRequest authnRequest, HttpServletRequest request,

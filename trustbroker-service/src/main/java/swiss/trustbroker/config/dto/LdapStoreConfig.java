@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -39,8 +39,8 @@ public class LdapStoreConfig {
 	private boolean enabled;
 
 	/**
-	 * Base context for the LDAP search configured in the IDMQuery.AppFilter.
+	 * Default value for undefined IDMQuery.AppFilter value
 	 */
-	private String searchBase;
+	private String undefined;
 
 }

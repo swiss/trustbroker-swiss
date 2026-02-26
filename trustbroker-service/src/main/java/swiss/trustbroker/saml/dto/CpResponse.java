@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -355,7 +355,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 */
 	public void setAttribute(String name, String namespaceUri, String value) {
 		if ((name == null && namespaceUri == null) || value == null) {
-			log.warn("CpResponse.setAttribute(name={}, value={}) rejected", name, value);
+			log.warn("CpResponse.setAttribute(name={}, namespaceUri={}, value={}) rejected", name, namespaceUri, value);
 			return;
 		}
 
@@ -369,8 +369,8 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * @since 1.11.0
 	 */
 	public void setAttributes(String name, String namespaceUri, List<String> values) {
-		if (name == null || values == null || values.isEmpty()) {
-			log.warn("CpResponse.setAttributes(name={}, values={}) rejected", name, values);
+		if ((name == null && namespaceUri == null) || values == null || values.isEmpty()) {
+			log.warn("CpResponse.setAttributes(name={}, namespaceUri={}, values={}) rejected", name, namespaceUri, values);
 			return;
 		}
 		var definition = DefinitionUtil.getOrCreateDefinition(name, namespaceUri, ClaimSource.CP.name(), attributes);
@@ -393,7 +393,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 			log.warn("CpResponse.setAttributes(def={} values={}) rejected", def, values);
 			return;
 		}
-		def.setSource(ClaimSource.CP.name());
+		def = def.withSource(ClaimSource.CP.name());
 		var oldValue = attributes.put(def, values);
 		log.debug("CpResponse.attribute change def={} value={} oldValue={}",def, values, oldValue);
 	}
@@ -932,4 +932,9 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 		return originalNameId != null && originalNameId.equals(nameId);
 	}
 
+	public String getSsoSubjectFromCpResponse(String ssoSubjectClaim) {
+		var ret = DefinitionUtil.findByNameOrNamespace(ssoSubjectClaim, ClaimSource.CP.name(), originalAttributes);
+		var attributeValues = ret.map(Map.Entry::getValue).orElse(null);
+		return attributeValues != null ? attributeValues.get(0) : null;
+	}
 }

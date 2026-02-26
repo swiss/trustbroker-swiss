@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -127,6 +127,7 @@ import org.springframework.util.CollectionUtils;
 import org.w3c.dom.Element;
 import swiss.trustbroker.common.exception.ExceptionUtil;
 import swiss.trustbroker.common.exception.RequestDeniedException;
+import swiss.trustbroker.common.exception.StandardErrorCode;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.exception.TrustBrokerException;
 import swiss.trustbroker.common.saml.dto.ArtifactPeer;
@@ -377,7 +378,7 @@ public class OpenSamlUtil {
 				}
 				var signature = artifactResponse.getSignature();
 				if (!SamlUtil.isSignatureValid(signature, credentials)) {
-					throw new RequestDeniedException(String.format(
+					throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 							"SAML Signature validation failed using signer='%s' using configured verifiers='%s'. Message "
 									+ "details: %s",
 							SamlUtil.getKeyInfoHintFromSignature(signature),
@@ -387,7 +388,7 @@ public class OpenSamlUtil {
 				log.debug("Signature validated on artifactResponseId={}", artifactResponse.getID());
 			}
 			else if (signatureValidationParameters.isRequireSignature()) {
-				throw new RequestDeniedException(String.format("ArtifactResponseId=%s is not signed. Message details: %s",
+				throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format("ArtifactResponseId=%s is not signed. Message details: %s",
 						artifactResponse.getID(), OpenSamlUtil.samlObjectToString(artifactResponse)));
 			}
 		}
@@ -1121,6 +1122,9 @@ public class OpenSamlUtil {
 				break;
 			case SOAP:
 				sendSamlSoapMessage(context, samlRequest, httpServletResponse, destinationAlias);
+				break;
+			case WS_FED:
+				throw new TechnicalException("WS-Fed not supported");
 		}
 	}
 

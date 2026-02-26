@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -40,11 +40,13 @@ public class WsTrustConfig {
 
 	/**
 	 * Feature toggle allowing to disable the WSTrust endpoint
+	 * <br/>
+	 * Default: false (since 1.13.0)
 	 *
 	 * @since 1.9.0
 	 */
 	@Builder.Default
-	private boolean enabled = true;
+	private boolean enabled = false;
 
 	/**
 	 * Keystore path.
@@ -59,7 +61,7 @@ public class WsTrustConfig {
 	/**
 	 * Keystore alias.
 	 *
-	 * @since 1.12.0
+	 * @since 1.13.0
 	 */
 	private String alias;
 
@@ -77,11 +79,11 @@ public class WsTrustConfig {
 	/**
 	 * Enable ISSUE request.
 	 * <br/>
-	 * Default: true
+	 * Default: false (since 1.13.0)
 	 * @since 1.12.0
 	 */
 	@Builder.Default
-	private boolean issueEnabled = true;
+	private boolean issueEnabled = false;
 
 	/**
 	 * Enable RENEW request.
@@ -111,10 +113,30 @@ public class WsTrustConfig {
 	private boolean renewRequiresSecurityToken = true;
 
 	/**
-	 * Require signed SOAP requests.
+	 * Require signed SOAP requests for WS-Trust ISSUE.
 	 * <br/>
 	 * Default: true
-	 * @since 1.12.0
+	 * @since 1.13.0
+	 */
+	@Builder.Default
+	private boolean issueRequireSignedRequests = true;
+
+	/**
+	 * Require signed SOAP requests for WS-Trust RENEW.
+	 * <br/>
+	 * Default: true
+	 * @since 1.13.0
+	 * @deprecated
+	 */
+	@Builder.Default
+	@Deprecated(since = "1.13.0", forRemoval = true)
+	private boolean issueRequireSignedAssertions = true;
+
+	/**
+	 * Require signed SOAP requests for WS-Trust RENEW.
+	 * <br/>
+	 * Default: true
+	 * @since 1.13.0
 	 */
 	@Builder.Default
 	private boolean renewRequireSignedRequests = true;
@@ -123,7 +145,7 @@ public class WsTrustConfig {
 	 * Sign SOAP responses.
 	 * <br/>
 	 * Default: true
-	 * @since 1.12.0
+	 * @since 1.13.0
 	 */
 	@Builder.Default
 	private boolean doSignResponse = true;
@@ -145,6 +167,42 @@ public class WsTrustConfig {
 	@Builder.Default
 	private SoapVersionConfig soapVersion = SoapVersionConfig.SOAP_1_X;
 
+	/**
+	 * SOAP headers considered by the WS-Trust implementation.
+	 * <br/>
+	 * Default: not set
+	 */
 	private List<String> soapHeadersToConsider;
+
+	/**
+	 * List of client networks allowed (using <code>trustbroker.config.network.networkHeader</code> HTTP header).
+	 *
+	 * Default: not restricted
+	 * @since 1.13.0
+	 */
+	private List<String> allowedNetworks;
+
+	/**
+	 * Client networks enforced if configured (<code>allowedNetworks</code>).
+	 * <br/>
+	 * Default: true - set to false in order to warn for violations only
+	 * @since 1.13.0
+	 */
+	private boolean enforceNetwork = true;
+
+	/**
+	 * Regex of client IPs allowed (using <code>X-Forwarded-For</code> HTTP header).
+	 * <br/>
+	 * @since 1.13.0
+	 */
+	private String allowedClientIpRegex;
+
+	/**
+	 * Client IPs enforced if configured (<code>allowedClientIpRegex</code>).
+	 * <br/>
+	 * Default: true - set to false in order to warn for violations only
+	 * @since 1.13.0
+	 */
+	private boolean enforceClientIp = true;
 
 }

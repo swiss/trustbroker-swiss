@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -21,8 +21,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import javax.xml.namespace.QName;
 
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,8 @@ import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.messaging.encoder.MessageEncodingException;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Attribute;
+import org.opensaml.saml.saml2.core.Audience;
+import org.opensaml.saml.saml2.core.AudienceRestriction;
 import org.opensaml.saml.saml2.core.EncryptedAssertion;
 import org.opensaml.saml.saml2.core.NameIDType;
 import org.opensaml.saml.saml2.core.Response;
@@ -189,6 +193,10 @@ public class SamlUtil {
 				// ourselves handling X509Certificates, X509SKIs and 509IssuerSerials ourselves using complex matcher code...
 				if (isSignatureFromCredential(signature, credential) || checkUnknown) {
 					SignatureValidator.validate(signature, credential);
+					if (log.isDebugEnabled()) {
+						log.debug("Signature validation succeeded using credential='{}' for signature='{}'",
+								getKeyInfoHintFromCredential(credential), getKeyInfoHintFromSignature(signature));
+					}
 					return true;
 				}
 				return false;
@@ -508,6 +516,20 @@ public class SamlUtil {
 		return values;
 	}
 
+	// checks only first AttributeStatement
+	public static List<String> getValuesForAttribute(Assertion assertion, String attributeName) {
+		if (assertion.getAttributeStatements().isEmpty()) {
+			return Collections.emptyList();
+		}
+		var assertionAttributes = assertion.getAttributeStatements().get(0).getAttributes();
+		for (Attribute attribute : assertionAttributes) {
+			if (attributeName.equals(attribute.getName())) {
+				return getValuesFromAttribute(attribute);
+			}
+		}
+		return Collections.emptyList();
+	}
+
 	// should not happen, log only an error for now as we do not necessarily use the ID as NcName
 	public static boolean validateSessionId(String id, String usage) {
 		if (!isValidNcName(id)) {
@@ -623,4 +645,17 @@ public class SamlUtil {
 		}
 		return assertions;
 	}
+
+	public static List<String> getAudiences(Assertion assertion) {
+		if (assertion.getConditions() == null) {
+			return Collections.emptyList();
+		}
+		return assertion.getConditions().getAudienceRestrictions()
+				.stream()
+				.map(AudienceRestriction::getAudiences)
+				.flatMap(List::stream)
+				.map(Audience::getURI)
+				.filter(Objects::nonNull)
+				.toList();
+		}
 }

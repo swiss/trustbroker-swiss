@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -45,7 +45,6 @@ import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimNames;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
-import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -132,6 +131,10 @@ public class OidcUtil {
 
 	public static final String OIDC_TOKEN_TYPE = "typ"; // token claim (Keycloak specific, spec uses JWT as default)
 
+	public static final String OIDC_TOKEN_CNF = "cnf"; // token claim (DPop confirmation claim)
+
+	public static final String OIDC_TOKEN_JKT = "jkt"; // token claim (the public key (jkt) for DPoP)
+
 	public static final String OIDC_SCOPE = "scope"; // scope claim
 
 	public static final String OIDC_CODE = "code"; // PKCE code parameter
@@ -139,6 +142,8 @@ public class OidcUtil {
 	public static final String OIDC_REFRESH_TOKEN = "refresh_token"; // non-PKCE
 
 	public static final String OIDC_HEADER_KEYID = "kid";
+
+	public static final String OIDC_HEADER_JWK = "jwk";
 
 	public static final String OIDC_HEADER_TYPE_JWT = "JWT";
 
@@ -208,7 +213,13 @@ public class OidcUtil {
 
 	private static String getUserFromBasicAuth(String basicAuthB64) {
 		var basicAuth = new String(Base64Util.decode(basicAuthB64));
-		return basicAuth.split(":")[0];
+		var split = basicAuth.split(":");
+		if (split.length == 0) {
+			// could contain a secret, but invalid syntax should not happen for proper clients:
+			throw new RequestDeniedException(
+					String.format("Invalid Basic authorization header=%s - no elements when split by :", basicAuth));
+		}
+		return split[0];
 	}
 
 	// https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication
@@ -242,23 +253,6 @@ public class OidcUtil {
 			return getUserFromBasicAuth(toks[1]);
 		}
 		log.debug("Ignoring unknown {}={} type", HttpHeaders.AUTHORIZATION, header);
-		return null;
-	}
-
-	public static String getAuthorizationToken(String header, String token) {
-		if (header != null && !header.isEmpty()) {
-			var toks = header.split(" ");
-			if (toks.length < 2) {
-				log.debug("Ignoring {}={} to check", HttpHeaders.AUTHORIZATION, header);
-				return null;
-			}
-			if (toks[0].equalsIgnoreCase(OIDC_BEARER) || toks[0].equalsIgnoreCase(HTTP_BASIC)) {
-				return toks[1];
-			}
-		}
-		if (token != null && !token.isEmpty()) {
-			return token;
-		}
 		return null;
 	}
 
@@ -406,7 +400,7 @@ public class OidcUtil {
 				throw new RequestDeniedException(String.format("Missing keyId in token from=%s", clientId));
 			}
 			var key = keySupplier.apply(kid);
-			if (!key.isPresent()) {
+			if (key.isEmpty()) {
 				throw new RequestDeniedException(String.format("Missing key with keyId=%s from clientId=%s", kid, clientId));
 			}
 			var verifier = getVerifier(key.get().getKeyType(), key.get(), clientId);
@@ -440,6 +434,19 @@ public class OidcUtil {
 			return JWTClaimsSet.parse(jsonObject);
 		} catch (ParseException ex) {
 			throw new TechnicalException(String.format("Could not parse JSON: %s", ex.getMessage()), ex);
+		}
+	}
+
+	// parse JWTClaimsSet from Map<String, Object>
+	public static JWTClaimsSet parseJwtClaims(Map<String, Object> map) {
+		if (map == null || map.isEmpty()) {
+			return new JWTClaimsSet.Builder().build();
+		}
+		try {
+			return JWTClaimsSet.parse(map);
+		}
+		catch (ParseException ex) {
+			throw new TechnicalException(String.format("Could not parse Map: %s", ex.getMessage()), ex);
 		}
 	}
 

@@ -1,5 +1,5 @@
 <!--
- Copyright (C) 2024 trustbroker.swiss team BIT
+ Copyright (C) 2026 trustbroker.swiss team BIT
 
  This program is free software.
  You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -29,7 +29,7 @@
 					@for (idpObject of idpObjects; track idpObject.urn) {
 						<div class="idp-card-container">
 							<button class="idp-card {{ theme.name }} small" (click)="onCardClick(idpObject)" [disabled]="idpObject.disabled">
-								<img src="{{ baseUrl }}hrd/assets/images/{{ theme.name }}/{{ idpObject.image }}" alt="" />
+								<img src="{{ apiBaseUrl }}ui/assets/images/{{ theme.name }}/{{ idpObject.image }}" alt="" />
 								<div
 									[id]="idpObject.title"
 									[innerHTML]="'trustbroker.hrd.cards.' + idpObject.name + '.title' | translate: { Default: idpObject.title } | safeMarkup"
@@ -45,7 +45,7 @@
 									(click)="onOpenDialog(idpObject, overlayDiv, $event)"
 									(keyup)="onOpenDialog(idpObject, overlayDiv, $event)"
 								>
-									<img class="{{ theme.name }} help-icon" src="{{ baseUrl }}hrd/assets/images/{{ theme.name }}/help.svg" alt="" />
+									<img class="{{ theme.name }} help-icon" src="{{ apiBaseUrl }}ui/assets/images/{{ theme.name }}/help.svg" alt="" />
 									<p
 										class="title"
 										[innerHTML]="'trustbroker.hrd.cards.' + idpObject.name + '.title' | translate: { Default: idpObject.title } | safeMarkup"

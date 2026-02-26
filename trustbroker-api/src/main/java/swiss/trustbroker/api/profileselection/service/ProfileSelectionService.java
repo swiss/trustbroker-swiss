@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -17,6 +17,7 @@ package swiss.trustbroker.api.profileselection.service;
 
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
+import swiss.trustbroker.api.profileselection.dto.ProfileSelectionProperties;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionResult;
 import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
 import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
@@ -49,4 +50,8 @@ public interface ProfileSelectionService {
 	ProfileResponse buildProfileResponse(ProfileSelectionData profileSelectionData, CpResponseData cpResponseData);
 
 	boolean isValidSelectedProfile(ProfileSelectionData profileSelectionData, CpResponseData cpResponseData);
+
+	static boolean isProfileSelectionDisabled(ProfileSelectionProperties profileSelection) {
+		return profileSelection == null || !profileSelection.isProfileSelectionEnabled();
+	}
 }

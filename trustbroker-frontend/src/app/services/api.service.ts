@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -28,23 +28,24 @@ import { EncodeUtil } from '../shared/encode-util';
 	providedIn: 'root'
 })
 export class ApiService {
-	private readonly baseUrl = environment.apiUrl;
+	private readonly apiBaseUrl = environment.apiUrl;
 	private configuration: Configuration | undefined;
 
 	constructor(private readonly http: HttpClient) {}
 
 	getIdpObjects(issuer: string, authnRequestId: string): Observable<HttpResponse<string>> {
-		return this.http.get(`${this.baseUrl}hrd/relyingparties/${issuer}/tiles?session=${authnRequestId}`, {
+		authnRequestId = this.base64UrlEncode(authnRequestId);
+		return this.http.get(`${this.apiBaseUrl}hrd/relyingparties/${issuer}/tiles?sid=${authnRequestId}`, {
 			headers: new HttpHeaders().set('Accept', 'text/html,application/json'),
 			observe: 'response',
 			responseType: 'text'
 		});
 	}
 
-	// btoa support just from IE10
 	selectIdp(authnRequestId: string, urn: string): Observable<HttpResponse<string>> {
-		urn = btoa(urn).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-		return this.http.get<string>(`${this.baseUrl}hrd/claimsproviders/${urn}?session=${authnRequestId}`, {
+		urn = this.base64UrlEncode(urn);
+		authnRequestId = this.base64UrlEncode(authnRequestId);
+		return this.http.get<string>(`${this.apiBaseUrl}hrd/claimsproviders/${urn}?sid=${authnRequestId}`, {
 			headers: new HttpHeaders().set('Accept', 'text/html'),
 			observe: 'response',
 			responseType: 'text' as 'json'
@@ -53,33 +54,33 @@ export class ApiService {
 
 	continueResponseToRp(sessionId: string) {
 		// top level navigation, the response is the SAML response form
-		window.location.href = `${this.baseUrl}hrd/relyingparties/${sessionId}/continue`;
+		window.location.href = `${this.apiBaseUrl}hrd/relyingparties/${sessionId}/continue`;
 	}
 
 	relogin(sessionId: string) {
 		// top level navigation, the response is the SAML request form to CP or HRD screen
-		window.location.href = `${this.baseUrl}hrd/${sessionId}/continue`;
+		window.location.href = `${this.apiBaseUrl}hrd/${sessionId}/continue`;
 	}
 
 	fetchSupportInfo(errorCode: string, sessionId: string) {
-		return this.http.get<SupportInfo>(`${this.baseUrl}support/${errorCode}/${sessionId}`);
+		return this.http.get<SupportInfo>(`${this.apiBaseUrl}support/${errorCode}/${sessionId}`);
 	}
 
 	getSsoParticipants(ssoGroupName: string): Observable<SsoParticipants[]> {
 		return ssoGroupName
-			? this.http.get<SsoParticipants[]>(`${this.baseUrl}sso/participants/${ssoGroupName}`)
-			: this.http.get<SsoParticipants[]>(`${this.baseUrl}sso/participants`);
+			? this.http.get<SsoParticipants[]>(`${this.apiBaseUrl}sso/participants/${ssoGroupName}`)
+			: this.http.get<SsoParticipants[]>(`${this.apiBaseUrl}sso/participants`);
 	}
 
 	logoutSingleActiveGroup(logoutIssuer: string): Observable<SsoParticipants[]> {
-		return this.http.delete<SsoParticipants[]>(`${this.baseUrl}sso/rp/${logoutIssuer}`);
+		return this.http.delete<SsoParticipants[]>(`${this.apiBaseUrl}sso/rp/${logoutIssuer}`);
 	}
 
 	logoutSsoParticipant(ssoGroupName: string, relyingPartyId: string, claimsPartyId: string, subjectNameId: string): Observable<HttpResponse<string>> {
 		const rpId = EncodeUtil.base64UrlEncodeNoPadding(relyingPartyId);
 		const cpId = EncodeUtil.base64UrlEncodeNoPadding(claimsPartyId);
 		const subjId = EncodeUtil.base64UrlEncodeNoPadding(subjectNameId);
-		return this.http.delete<string>(`${this.baseUrl}sso/group/${ssoGroupName}/${rpId}/${cpId}/${subjId}`, {
+		return this.http.delete<string>(`${this.apiBaseUrl}sso/group/${ssoGroupName}/${rpId}/${cpId}/${subjId}`, {
 			headers: new HttpHeaders().set('Accept', 'text/html'),
 			observe: 'response',
 			responseType: 'text' as 'json'
@@ -87,7 +88,7 @@ export class ApiService {
 	}
 
 	public initializeConfiguration(): Observable<never> {
-		return this.http.get<Configuration>(`${this.baseUrl}config/frontend`).pipe(
+		return this.http.get<Configuration>(`${this.apiBaseUrl}config/frontend`).pipe(
 			catchError(error => {
 				console.error('Failed to load configuration', error);
 				return throwError(() => error);
@@ -98,13 +99,18 @@ export class ApiService {
 	}
 
 	getImageUrl(theme: Theme, image: string) {
-		return `${this.baseUrl}hrd/assets/images/${theme.name}/${image}`;
+		return `${this.apiBaseUrl}ui/assets/images/${theme.name}/${image}`;
 	}
 
 	getConfiguration(): Configuration {
-		if (this.configuration === undefined) {
-			console.error('Configuration is not loaded!');
+		if (!this.configuration) {
+			throw new Error('Configuration is not loaded!');
 		}
 		return this.configuration;
+	}
+
+	base64UrlEncode(value: string): string {
+		// btoa support just from IE10
+		return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 	}
 }

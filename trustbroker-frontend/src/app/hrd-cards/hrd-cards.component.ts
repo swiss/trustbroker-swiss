@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -39,7 +39,7 @@ export class HrdCardsComponent {
 	idpObjects = input.required<IdpObjects>();
 
 	showHrd = true;
-	baseUrl: string = environment.apiUrl;
+	apiBaseUrl: string = environment.apiUrl;
 	showNormalSize$: Observable<boolean>;
 	clicked: boolean;
 
@@ -57,12 +57,13 @@ export class HrdCardsComponent {
 		private readonly destroyRef: DestroyRef
 	) {
 		effect(() => {
-			if (this.idpObjects().tiles?.length === 1 && !this.idpObjects().tiles[0].disabled) {
+			const tiles = this.idpObjects().tiles || [];
+			if (tiles.length === 1 && !tiles[0].disabled) {
 				this.showHrd = false;
-				this.onClickCard(this.idpObjects().tiles[0]);
+				this.onClickCard(tiles[0]);
 			} else {
 				// disabled tiles are also displayed in help
-				this.idpObjectService.addIdpObjects(this.idpObjects().tiles);
+				this.idpObjectService.addIdpObjects(tiles);
 			}
 		});
 
@@ -73,7 +74,7 @@ export class HrdCardsComponent {
 		const currentLang = this.languageService.currentLang;
 		const newImgName = imageName.replace('{language}', currentLang);
 
-		return `${this.baseUrl}hrd/images/${newImgName}`;
+		return `${this.apiBaseUrl}ui/images/${newImgName}`;
 	}
 
 	onClickCard(idpObject): void {
@@ -104,14 +105,14 @@ export class HrdCardsComponent {
 			return;
 		}
 		// document.write for error page does not work here
-		const url = resp.url.replace(/^.*(\/failure\/.*$)/, '$1');
+		const url = resp.url!.replace(/^.*(\/failure\/.*$)/, '$1');
 		if (url !== resp.url) {
 			void this.router.navigate([url]);
 			return;
 		}
-		window.document.write(resp.body);
+		window.document.write(resp.body!);
 		if (document.forms.length > 0) {
-			document.forms.item(0).submit();
+			document.forms.item(0)?.submit();
 		} else {
 			// not a SAML form, e.g. AccessRequest
 			// NOSONAR

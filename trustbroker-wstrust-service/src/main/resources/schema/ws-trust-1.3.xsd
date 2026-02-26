@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 
+<!--
 OASIS takes no position regarding the validity or scope of any intellectual property or other rights that might be claimed to pertain to the implementation or use of the technology described in this document or the extent to which any license under such rights might or might not be available; neither does it represent that it has made any effort to identify any such rights. Information on OASIS's procedures with respect to rights in OASIS specifications can be found at the OASIS website. Copies of claims of rights made available for publication and any assurances of licenses to be made available, or the result of an attempt made to obtain a general license or permission for the use of such proprietary rights by implementors or users of this specification, can be obtained from the OASIS Executive Director.
 OASIS invites any interested party to bring to its attention any copyrights, patents or patent applications, or other proprietary rights which may cover technology that may be required to implement this specification. Please address the information to the OASIS Executive Director.
 Copyright Â© OASIS Open 2002-2006. All Rights Reserved.
@@ -8,13 +8,13 @@ The limited permissions granted above are perpetual and will not be revoked by O
 This document and the information contained herein is provided on an AS IS basis and OASIS DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 -->
 <xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'
-xmlns:wsse='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
-xmlns:wsu='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd'
-xmlns:wsp='http://schemas.xmlsoap.org/ws/2004/09/policy' 
-xmlns:wsa='http://www.w3.org/2005/08/addressing'
-xmlns:wst='http://docs.oasis-open.org/ws-sx/ws-trust/200512/'
-targetNamespace='http://docs.oasis-open.org/ws-sx/ws-trust/200512/'
-elementFormDefault='qualified' >
+           xmlns:wsse='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
+           xmlns:wsu='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd'
+           xmlns:wsp='http://schemas.xmlsoap.org/ws/2004/09/policy' 
+           xmlns:wsa='http://www.w3.org/2005/08/addressing'
+           xmlns:wst='http://docs.oasis-open.org/ws-sx/ws-trust/200512/'
+           targetNamespace='http://docs.oasis-open.org/ws-sx/ws-trust/200512/'
+           elementFormDefault='qualified'>
 
   <xs:import namespace='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd'
              schemaLocation='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd' />
@@ -198,7 +198,7 @@ elementFormDefault='qualified' >
   <xs:complexType name='RequestSecurityTokenCollectionType' >
     <xs:annotation>
       <xs:documentation>
-        The RequestSecurityTokenCollection (RSTC) element is used to provide multiple RST requests. 
+        The RequestSecurityTokenCollection (RSTC) element is used to provide multiple RST requests.
         One or more RSTR elements in an RSTRC element are returned in the response to the RequestSecurityTokenCollection.
       </xs:documentation>
     </xs:annotation>
@@ -211,7 +211,7 @@ elementFormDefault='qualified' >
   <xs:complexType name='RequestSecurityTokenResponseCollectionType' >
     <xs:annotation>
       <xs:documentation>
-        The &lt;wst:RequestSecurityTokenResponseCollection> element (RSTRC) MUST be used to return a security token or 
+        The &lt;wst:RequestSecurityTokenResponseCollection> element (RSTRC) MUST be used to return a security token or
         response to a security token request on the final response.
       </xs:documentation>
     </xs:annotation>

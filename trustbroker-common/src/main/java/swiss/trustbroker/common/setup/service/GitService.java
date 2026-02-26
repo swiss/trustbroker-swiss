@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -20,6 +20,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.micrometer.core.annotation.Timed;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,8 @@ public class GitService {
 
 	private static final String GIT_CONNECT_HINT
 			= " (HINT: In case of authorization failures check SSH_KEY (HOME/.ssh/id_rsa) or GIT_TOKEN (HOME/keys/git_token))";
+
+	private static final AtomicBoolean VETO = new AtomicBoolean(false);
 
 	private final DirectoryUtil directoryUtil;
 
@@ -461,13 +464,20 @@ public class GitService {
 		}
 	}
 
-	public boolean hasRemoteConfigVeto() {
+	// startup or scheduled (IO)
+	public static boolean hasRemoteConfigVeto() {
 		var vetoFile = new File(BootstrapProperties.getGitConfigCache(), "veto");
-		if (vetoFile.exists()) {
+		var hasVeto = vetoFile.exists();
+		if (hasVeto) {
 			log.info("Remote config check/pull vetoed by {}", vetoFile.getAbsolutePath());
-			return true;
 		}
-		return false;
+		VETO.set(hasVeto);
+		return hasVeto;
+	}
+
+	// script re-loading during development (fast)
+	public static boolean hasFastConfigVeto() {
+		return VETO.get();
 	}
 
 	// optional key caching from env

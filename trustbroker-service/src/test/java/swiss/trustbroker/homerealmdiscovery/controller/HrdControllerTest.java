@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -23,9 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -58,6 +60,7 @@ import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
 import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
+import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
@@ -78,7 +81,6 @@ import swiss.trustbroker.saml.dto.UiObjects;
 import swiss.trustbroker.saml.service.AssertionConsumerService;
 import swiss.trustbroker.saml.service.ClaimsProviderService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
-import swiss.trustbroker.saml.service.SamlOutputService;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sessioncache.service.StateCacheService;
 import swiss.trustbroker.sso.service.SsoService;
@@ -136,13 +138,10 @@ class HrdControllerTest {
 	private AnnouncementService announcementService;
 
 	@MockitoBean
-	private ProfileSelectionService profileSelectionService;
-
-	@MockitoBean
 	private StateCacheService stateCacheService;
 
 	@MockitoBean
-	private SamlOutputService samlOutputService;
+	private List<OutputService> outputServices;
 
 	@MockitoBean
 	private WebResourceProvider resourceProvider;
@@ -331,6 +330,7 @@ class HrdControllerTest {
 
 	@Test
 	void handleProfiles() throws Exception {
+		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		var result = ProfileResponse.builder().redirectUrl(URL).id(PROFILE_ID).build();
 		var resultJson = new ObjectMapper().writeValueAsString(result);
 		var stateData = StateData.builder().id(PROFILE_ID).build();
@@ -338,7 +338,8 @@ class HrdControllerTest {
 		stateData.setCpResponse(cpResponse);
 		doReturn(stateData).when(stateCacheService).find(PROFILE_ID, HrdController.class.getSimpleName());
 		var profileSelectionData = ProfileSelectionData.builder().selectedProfileId(PROFILE_ID).build();
-		doReturn(result).when(profileSelectionService).buildProfileResponse(profileSelectionData, stateData.getCpResponse());
+		when(relyingPartyService.getProfileSelectionService(any())).thenReturn(mockProfileSelectionService);
+		doReturn(result).when(mockProfileSelectionService).buildProfileResponse(profileSelectionData, stateData.getCpResponse());
 		this.mockMvc.perform(get(apiSupport.getProfilesApi()).header(WebSupport.HTTP_HEADER_XTB_PROFILE_ID, PROFILE_ID))
 				.andExpect(status().isOk())
 				.andExpect(content().json(resultJson));
@@ -361,7 +362,7 @@ class HrdControllerTest {
 		var request = new ProfileRequest(PROFILE_ID, SESSION_ID);
 		var requestJson = new ObjectMapper().writeValueAsString(request);
 		doReturn(redirectUrl).when(relyingPartyService)
-							 .sendResponseWithSelectedProfile(eq(samlOutputService), eq(request), any(), any());
+							 .sendResponseWithSelectedProfile(eq(outputServices), eq(request), any(), any());
 		return post(apiSupport.getProfileApi())
 				.content(requestJson)
 				.contentType(MediaType.APPLICATION_JSON_VALUE);

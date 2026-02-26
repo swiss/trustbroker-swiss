@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -130,6 +131,10 @@ public class OidcMetadataCacheService {
 			}
 		}
 		return Optional.ofNullable(key);
+	}
+
+	public Function<String, Optional<JWK>> jwtKeySupplier(ClaimsParty claimsParty) {
+		return id -> getKey(claimsParty, id);
 	}
 
 	public OpenIdProviderConfiguration getOidcConfiguration(ClaimsParty claimsParty) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -127,6 +127,7 @@ class FederationMetadataServiceTest {
 		trustBrokerProperties.setPerimeterUrl(PERIMETER_URL);
 		var wsTrust = new WsTrustConfig();
 		wsTrust.setWsBasePath(ApiSupport.WSTRUST_API);
+		wsTrust.setEnabled(true);
 		trustBrokerProperties.setWstrust(wsTrust);
 		return trustBrokerProperties;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,12 +16,19 @@
 package swiss.trustbroker.wstrust.util;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import javax.xml.namespace.QName;
 import javax.xml.transform.dom.DOMSource;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.opensaml.core.xml.util.XMLObjectSupport;
+import org.opensaml.saml.saml2.core.Assertion;
+import org.opensaml.saml.saml2.core.NameID;
+import org.opensaml.saml.saml2.core.Subject;
+import org.opensaml.soap.wsaddressing.EndpointReference;
 import org.opensaml.soap.wsfed.Address;
 import org.opensaml.soap.wsfed.EndPointReference;
 import org.opensaml.soap.wspolicy.AppliesTo;
@@ -34,20 +41,31 @@ import org.opensaml.soap.wssecurity.WSSecurityConstants;
 import org.opensaml.soap.wstrust.KeyType;
 import org.opensaml.soap.wstrust.Lifetime;
 import org.opensaml.soap.wstrust.RequestSecurityToken;
+import org.opensaml.soap.wstrust.RequestSecurityTokenResponse;
 import org.opensaml.soap.wstrust.RequestType;
 import org.opensaml.soap.wstrust.RequestedAttachedReference;
+import org.opensaml.soap.wstrust.RequestedSecurityToken;
 import org.opensaml.soap.wstrust.RequestedUnattachedReference;
 import org.opensaml.soap.wstrust.TokenType;
 import org.opensaml.soap.wstrust.WSTrustConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.ws.soap.SoapElement;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import swiss.trustbroker.common.exception.RequestDeniedException;
+import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.util.WSSConstants;
+import swiss.trustbroker.config.dto.NetworkConfig;
+import swiss.trustbroker.util.WebSupport;
 
 @Slf4j
 public class WsTrustUtil {
+
+	public static final Logger OP_LOG = LoggerFactory.getLogger("swiss.trustbroker.op.wstrust");
 
 	private WsTrustUtil() {
 	}
@@ -155,6 +173,24 @@ public class WsTrustUtil {
 		return new QName(WSSecurityConstants.WSSE11_NS, WSSConstants.WSS_SAML2_TOKEN_TYPE);
 	}
 
+	public static RequestedSecurityToken createRequestedSecurityToken(Assertion assertion) {
+		var requestedSecurityToken =
+				(RequestedSecurityToken) XMLObjectSupport.buildXMLObject(RequestedSecurityToken.ELEMENT_NAME);
+
+		requestedSecurityToken.setUnknownXMLObject(assertion);
+
+		return requestedSecurityToken;
+	}
+
+	public static RequestSecurityTokenResponse createSecurityTokenResponse(RequestedSecurityToken requestedSecurityToken) {
+		var requestSecurityTokenResponse =
+				(RequestSecurityTokenResponse) XMLObjectSupport.buildXMLObject(RequestSecurityTokenResponse.ELEMENT_NAME);
+
+		requestSecurityTokenResponse.getUnknownXMLObjects().add(requestedSecurityToken);
+
+		return requestSecurityTokenResponse;
+	}
+
 	public static String getKeyTypeFromRequest(RequestSecurityToken requestSecurityToken) {
 		var childObjects = requestSecurityToken.getUnknownXMLObjects();
 		var keyTypeQname = new QName(WSTrustConstants.WST_NS, KeyType.ELEMENT_LOCAL_NAME);
@@ -173,7 +209,7 @@ public class WsTrustUtil {
 				"Address", "wsa:Address", requestSecurityToken.getDOM());
 
 		if (addressFromRequest == null) {
-			throw new RequestDeniedException("Missing Address in RSTR");
+			throw new RequestDeniedException("Missing Address in RST");
 		}
 
 		return addressFromRequest;
@@ -217,5 +253,107 @@ public class WsTrustUtil {
 		var source = soapMessage.getSource();
 		var domSource = (DOMSource) source;
 		return domSource.getNode();
+	}
+
+	public static boolean isNetworkAllowed(List<String> allowedNetworks, boolean enforceClientNetwork,
+			HttpServletRequest request, NetworkConfig network) {
+		if (CollectionUtils.isEmpty(allowedNetworks)) {
+			return true;
+		}
+		if (request == null) {
+			log.error("Missing HttpServletRequest, cannot restrict WS-Trust to allowedNetworks={}", allowedNetworks);
+			return true;
+		}
+		var clientNetwork = WebSupport.getClientNetwork(request, network);
+		if (clientNetwork == null) {
+			log.error("Client network not known, cannot restrict WS-Trust to allowedNetworks={}", allowedNetworks);
+			return true;
+		}
+		var allowedNetwork = allowedNetworks.contains(clientNetwork);
+		if (allowedNetwork) {
+			log.debug("Access to WS-Trust allowed from clientNetwork={} for allowedNetworks={}", clientNetwork, allowedNetworks);
+			return true;
+		}
+		if (enforceClientNetwork) {
+			log.error("Access to WS-Trust blocked from clientNetwork={} for allowedNetworks={}", clientNetwork, allowedNetworks);
+			return false;
+		}
+		log.warn("Access to WS-Trust allowed from clientNetwork={} despite allowedNetworks={}", clientNetwork, allowedNetworks);
+		return true;
+	}
+
+	public static boolean isClientIpAllowed(String clientIpRegex, boolean enforceClientIp, String clientIp) {
+		if (!StringUtils.hasLength(clientIpRegex)) {
+			return true;
+		}
+		if (clientIp == null) {
+			log.error("Missing clientIp, cannot restrict WS-Trust to allowedClientIpRegex={}", clientIpRegex);
+			return true;
+		}
+		var allowedIp = clientIp.matches(clientIpRegex);
+		if (allowedIp) {
+			log.debug("Access to WS-Trust allowed from clientIp={} for allowedClientIpRegex={}", clientIp, clientIpRegex);
+			return true;
+		}
+		if (enforceClientIp) {
+			log.error("Access to WS-Trust blocked from clientIp={} for allowedClientIpRegex={}", clientIp, clientIpRegex);
+			return false;
+		}
+		log.warn("Access to WS-Trust allowed from clientIp={} despite allowedClientIpRegex={}", clientIp, clientIpRegex);
+		return true;
+	}
+
+	public static NameID getNameID(Assertion assertion) {
+		Subject subject = assertion.getSubject();
+		if (subject == null) {
+			throw new TechnicalException(String.format("Missing Assertion.Subject from RST with id=%s", assertion.getID()));
+		}
+		return subject.getNameID();
+	}
+
+	public static List<String> getAuthnContextClasses(Assertion requestHeaderAssertion) {
+		List<String> contextClasses = Collections.emptyList();
+		if (requestHeaderAssertion == null || requestHeaderAssertion.getAuthnStatements().isEmpty()) {
+			return contextClasses;
+		}
+		var authnContext = requestHeaderAssertion.getAuthnStatements().get(0).getAuthnContext();
+		if (authnContext != null && authnContext.getAuthnContextClassRef() != null &&
+				authnContext.getAuthnContextClassRef().getURI() != null) {
+			var authnContextClassRef = authnContext.getAuthnContextClassRef().getURI();
+			contextClasses = List.of(authnContextClassRef);
+		}
+		return contextClasses;
+	}
+
+	// rpIssuerId for ISSUE - see also CompatEndPointReferenceUnmarshaller
+	public static String getEndpointReferenceAddress(RequestSecurityToken requestSecurityToken) {
+		for (var child : requestSecurityToken.getUnknownXMLObjects()) {
+			if (child instanceof AppliesTo appliesTo) {
+				for (var appliesChild : appliesTo.getUnknownXMLObjects()) {
+					if (appliesChild instanceof EndPointReference endpointReference && endpointReference.getAddress() != null) {
+						var address = endpointReference.getAddress().getValue();
+						log.debug("wsfed EndPointReference address=={}", address);
+						return address;
+					}
+					else if (appliesChild instanceof EndpointReference endpointReference && endpointReference.getAddress() != null) {
+						var address = endpointReference.getAddress().getURI();
+						log.debug("wsadressing EndpointReference address={}", address);
+						return address;
+					}
+				}
+			}
+		}
+		log.warn("Missing AppliesTo with EndPointReference.Address in RST");
+		return null;
+	}
+
+	// cpIssuerId for ISSUE
+	public static String getIssuerId(Assertion assertion) {
+		if (assertion == null || assertion.getIssuer() == null || assertion.getIssuer().getValue() == null) {
+			throw new RequestDeniedException(String.format(
+					"Assertion in RSTR with assertionID='%s' missing Issuer",
+					assertion != null ? assertion.getID() : null));
+		}
+		return assertion.getIssuer().getValue();
 	}
 }

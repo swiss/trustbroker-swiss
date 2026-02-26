@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -66,6 +66,7 @@ public abstract class BaseAuditLogger implements AuditLogger {
 			case OIDC_LOGOUT -> log::info;
 			// in: logout initiated by TB, RP responded / out: logout initiated by RP, response to RP
 			case LOGOUT_RESPONSE -> inbound ? log::debug : log::info;
+			// in: WS-Trust RST, out: RSTR
 			case RST_REQUEST -> log::debug;
 			case RST_RESPONSE -> log::info;
 			case OIDC_TOKEN -> log::info; // access_token is not opaque so we log that primarily

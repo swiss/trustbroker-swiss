@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -52,6 +52,7 @@ import swiss.trustbroker.sessioncache.repo.StateCacheRepository;
 
 @Service
 @Slf4j
+@Transactional
 public class StateCacheService {
 
 	private final StateCacheRepository stateCacheRepository;
@@ -77,18 +78,20 @@ public class StateCacheService {
 		this.objectMapper = new ObjectMapper(); // trusted anything
 	}
 
+	// @Transactional on repository boundary below + on Service/Controller boundary above
 	public void save(StateData stateData, String actor) {
 		var now = clock.instant();
 		var expiration = now.plusSeconds(trustBrokerProperties.getSessionLifetimeSec());
 		save(stateData, now, expiration, actor);
 	}
 
+	// @Transactional on repository boundary below + on Filter boundary above
 	public void save(StateData stateData, Instant expiration, String actor) {
 		var now = clock.instant();
 		save(stateData, now, expiration, actor);
 	}
 
-	public void save(StateData stateData, Instant now, Instant expiration, String actor) {
+	private void save(StateData stateData, Instant now, Instant expiration, String actor) {
 		try {
 			if (stateData.getLifecycle().getInitTime() == null) {
 				stateData.getLifecycle().setInitTime(Timestamp.from(now));
@@ -455,7 +458,7 @@ public class StateCacheService {
 			invalidate(stateData, false, actor);
 		}
 		catch (Exception ex) {
-			log.warn("Try invalidating sessionId={} failed: {}", stateData.getId(), ex.getMessage(), ex);
+			log.warn("Try invalidating sessionId={} failed for actor={}: {}", stateData.getId(), actor, ex.getMessage(), ex);
 		}
 	}
 

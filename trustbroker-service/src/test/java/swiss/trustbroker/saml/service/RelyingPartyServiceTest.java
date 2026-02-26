@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -91,6 +92,7 @@ import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionResult;
 import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
 import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
+import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.audit.service.AuditService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
@@ -137,6 +139,8 @@ import swiss.trustbroker.mapping.dto.CustomQoa;
 import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.mapping.service.ClaimsMapperService;
 import swiss.trustbroker.mapping.service.QoaMappingService;
+import swiss.trustbroker.oidc.client.service.JwtClaimsService;
+import swiss.trustbroker.profileselection.service.ProfileSelectionServiceFactory;
 import swiss.trustbroker.saml.dto.CpResponse;
 import swiss.trustbroker.saml.dto.ResponseData;
 import swiss.trustbroker.saml.test.util.ServiceSamlTestUtil;
@@ -210,7 +214,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 	ScriptService scriptService;
 
 	@MockitoBean
-	private ProfileSelectionService profileSelectionService;
+	private ProfileSelectionServiceFactory profileSelectionServiceFactory;
 
 	@MockitoBean
 	private SsoService ssoService;
@@ -239,8 +243,11 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 	@MockitoBean
 	private ClaimsMapperService claimsMapperService;
 
+	@MockitoBean
+	private JwtClaimsService jwtClaimsService;
+
 	@Autowired
-	private SamlOutputService outputService;
+	private List<OutputService> outputServices;
 
 	@Autowired
 	private RelyingPartyService relyingPartyService;
@@ -277,7 +284,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var logoutRequest = setupLogoutRequestMockData(request, succeedLogout, null);
 
 		var signatureContext = SignatureContext.forPostBinding();
-		relyingPartyService.handleLogoutRequest(outputService, logoutRequest, RELAY_STATE, request, response, signatureContext);
+		relyingPartyService.handleLogoutRequest(outputServices, logoutRequest, RELAY_STATE, request, response, signatureContext);
 
 		// we always send a success response
 		var expectedContent = new ArrayList<String>();
@@ -292,7 +299,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var response = new MockHttpServletResponse();
 		var logoutRequest = setupLogoutRequestMockData(request, true, mode);
 
-		var ex = assertThrows(RequestDeniedException.class, () -> relyingPartyService.handleLogoutRequest(outputService,
+		var ex = assertThrows(RequestDeniedException.class, () -> relyingPartyService.handleLogoutRequest(outputServices,
 				logoutRequest, RELAY_STATE,	request, response, signatureContext));
 		assertThat(ex.getInternalMessage(), containsString("does not support inbound binding"));
 	}
@@ -575,7 +582,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		stateData.setCpResponse(cpResponse);
 		doReturn(stateData).when(stateCacheService).find(RELAY_STATE, RelyingPartyService.class.getSimpleName());
 		var mockHttpResponse = new MockHttpServletResponse();
-		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputService, responseData, stateData, null,
+		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputServices, responseData, stateData, null,
 				mockHttpRequest, mockHttpResponse);
 		assertThat(result, is("/app/failure/denied/" + traceId + "/" + ApiSupport.encodeUrlParameter("sessionId") + "/continue"));
 	}
@@ -598,7 +605,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var mockHttpResponse = new MockHttpServletResponse();
 		doReturn(stateData).when(stateCacheService).find(RELAY_STATE, RelyingPartyService.class.getSimpleName());
 		mockSecurityChecks();
-		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputService, responseData, stateData, null,
+		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputServices, responseData, stateData, null,
 				mockHttpRequest, mockHttpResponse);
 		assertThat(result, is(nullValue()));
 		var response = samlTestUtil.extractSamlPostResponse(mockHttpResponse.getContentAsString());
@@ -620,6 +627,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		stateData.setCpResponse(cpResponse);
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
+		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		mockSecurityChecks();
 		mockClaimsParty();
 		var arResult = AccessRequestResult.of(false, null);
@@ -627,10 +635,11 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		doReturn(arResult)
 				.when(accessRequestService).performAccessRequestIfRequired(eq(httpData), eq(relyingParty), eq(stateData), any());
 
-		doReturn(ProfileSelectionResult.empty()).when(profileSelectionService).doInitialProfileSelection(
+		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
+		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doInitialProfileSelection(
 				ProfileSelectionData.builder().exchangeId(RELAY_STATE).oidcClientId(CLIENT_ID).build(),
 				relyingParty, cpResponse, stateData);
-		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputService, responseData, stateData, null,
+		var result = relyingPartyService.sendSuccessSamlResponseToRp(outputServices, responseData, stateData, null,
 				mockHttpRequest, mockHttpResponse);
 		assertThat(result, is(nullValue()));
 		validateResponse(useArtifactBinding, StatusCode.SUCCESS, mockHttpResponse);
@@ -647,7 +656,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
 		mockSecurityChecks();
-		var result = relyingPartyService.sendFailedSamlResponseToRp(outputService, responseData, mockHttpRequest,
+		var result = relyingPartyService.sendFailedSamlResponseToRp(outputServices, responseData, mockHttpRequest,
 				mockHttpResponse, stateData);
 		assertThat(result, is(nullValue()));
 		validateResponse(useArtifactBinding, StatusCode.AUTHN_FAILED, mockHttpResponse);
@@ -666,7 +675,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
 		mockSecurityChecks();
-		var result = relyingPartyService.sendFailedSamlResponseToRp(outputService, responseData, mockHttpRequest,
+		var result = relyingPartyService.sendFailedSamlResponseToRp(outputServices, responseData, mockHttpRequest,
 				mockHttpResponse, stateData);
 		if (expectedRedirectUrl == null) {
 			assertThat(result, is(nullValue()));
@@ -710,6 +719,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		relyingParty.setSso(Sso.builder().enabled(ssoEnabled).forceIdmRefresh(forceIdmFetch).build());
 		givenMockedOidcProperties(PERIMETER_URL);
 		mockSecurityChecks();
+		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		var stateData = givenState(RP_ISSUER_ID);
 		stateData.getSpStateData().setRelayState(RELAY_STATE);
 		stateData.getSpStateData().setOidcClientId(CLIENT_ID);
@@ -726,12 +736,13 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 				.oidcClientId(CLIENT_ID)
 				.exchangeId(RELAY_STATE)
 				.build();
-		doReturn(ProfileSelectionResult.empty()).when(profileSelectionService).doSsoProfileSelection(
+		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
+		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doSsoProfileSelection(
 				profileSelectionData, relyingParty, cpResponse, stateData);
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
 		mockClaimsParty();
-		var result = relyingPartyService.sendAuthnResponseToRpFromState(outputService, mockHttpRequest, mockHttpResponse,
+		var result = relyingPartyService.sendAuthnResponseToRpFromState(outputServices, mockHttpRequest, mockHttpResponse,
 				ssoStateData, stateData);
 		assertThat(result, is(nullValue()));
 		validateResponse(useArtifactBinding, StatusCode.SUCCESS, mockHttpResponse);
@@ -762,6 +773,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var relyingParty = givenMockedRelyingParty(useArtifactBinding);
 		givenMockedOidcProperties(PERIMETER_URL);
 		mockSecurityChecks();
+		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		var stateData = givenState(RP_ISSUER_ID);
 		stateData.getSpStateData().setOidcClientId(CLIENT_ID);
 		doReturn(stateData).when(stateCacheService).find(RELAY_STATE, RelyingPartyService.class.getSimpleName());
@@ -772,13 +784,14 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var mockHttpResponse = new MockHttpServletResponse();
 		var arResult = AccessRequestResult.of(false, null);
 		var httpData = AccessRequestHttpData.of(mockHttpRequest);
+		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
 		doReturn(arResult)
 				.when(accessRequestService).performAccessRequestIfRequired(eq(httpData), eq(relyingParty), eq(stateData), any());
-		doReturn(ProfileSelectionResult.empty()).when(profileSelectionService).doInitialProfileSelection(
+		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doInitialProfileSelection(
 				ProfileSelectionData.builder().exchangeId(RELAY_STATE).oidcClientId(CLIENT_ID).build(),
 				relyingParty, cpResponse, stateData);
 
-		var result = relyingPartyService.sendResponseWithSamlResponseFromCp(outputService, responseData, cpResponse,
+		var result = relyingPartyService.sendResponseWithSamlResponseFromCp(outputServices, responseData, cpResponse,
 				mockHttpRequest, mockHttpResponse);
 
 		assertThat(result, is(nullValue()));

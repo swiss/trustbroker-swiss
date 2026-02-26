@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -17,6 +17,12 @@ package swiss.trustbroker.homerealmdiscovery.util;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import swiss.trustbroker.common.util.ConfigUtil;
+import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
+import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 
 public class RelyingPartyUtil {
 
@@ -52,4 +58,15 @@ public class RelyingPartyUtil {
 		return profiledRole;
 	}
 
+	public static Set<String> getCpIdsWithoutSpecChars(RelyingParty relyingParty) {
+		List<ClaimsProvider> claimsProviderList = relyingParty.getClaimsProviderMappings().getClaimsProviderList();
+		return claimsProviderList.stream()
+								 .filter(claimsProvider -> claimsProvider.getId() != null)
+								 .map(claimsProvider ->
+								 {
+									 var id = claimsProvider.getId();
+									 return ConfigUtil.removeIdSpecChar(id);
+								 })
+								 .collect(Collectors.toSet());
+	}
 }

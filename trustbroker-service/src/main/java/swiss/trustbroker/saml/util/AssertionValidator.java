@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -59,6 +59,7 @@ import org.opensaml.xmlsec.signature.Signature;
 import org.opensaml.xmlsec.signature.support.SignatureException;
 import swiss.trustbroker.common.exception.ExceptionUtil;
 import swiss.trustbroker.common.exception.RequestDeniedException;
+import swiss.trustbroker.common.exception.StandardErrorCode;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.exception.TrustBrokerException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
@@ -294,13 +295,10 @@ public class AssertionValidator {
 		if (now == null) {
 			now = Instant.now();
 		}
-		log.debug("Start Assertion validation ID={} now={} excluding signature check (wss4j case)", assertion.getID(), now);
+		log.debug("Start RST Assertion validation ID={} now={} signatureCheck={}", assertion.getID(), now,
+				signatureValidationCredentials.isPresent());
 
 		// message checks (stateless)
-		var validationResult = MessageValidationResult.unvalidated();
-		if (signatureValidationCredentials.isPresent()) {
-			validationResult = validateAssertionSignature(assertion, signatureValidationCredentials.get(), properties);
-		}
 		validateAssertionId(assertion);
 		validateAssertionIssueInstant(assertion, now, expectedValues.renew, properties, securityPolicies);
 		validateAssertionIssuer(assertion, expectedValues.expectedIssuer, properties);
@@ -311,6 +309,12 @@ public class AssertionValidator {
 		validateAssertionAuthnStatements(assertion, now, claimsParty, new QoaConfig(null, null), properties,
 				expectedValues.expectedCpContextClasses, null, expectedValues.renew);
 		validateAssertionAttributeStatements(assertion);
+
+		var validationResult = MessageValidationResult.unvalidated();
+		// signature check last for retry scripts
+		if (signatureValidationCredentials.isPresent()) {
+			validationResult = validateAssertionSignature(assertion, signatureValidationCredentials.get(), properties);
+		}
 
 		log.debug("RST assertion validation was successful for ID={} validationResult={}",
 				assertion.getID(), validationResult);
@@ -381,7 +385,7 @@ public class AssertionValidator {
 		}
 	}
 
-	static void validateAssertionId(Assertion assertion) {
+	public static void validateAssertionId(Assertion assertion) {
 		if (StringUtils.isBlank(assertion.getID())) {
 			throw new RequestDeniedException(String.format(
 					"Assertion.ID missing: %s", OpenSamlUtil.samlObjectToString(assertion)));
@@ -414,7 +418,7 @@ public class AssertionValidator {
 		}
 	}
 
-	static void validateAssertionIssuer(Assertion assertion, String expectedIssuer, TrustBrokerProperties properties) {
+	public static void validateAssertionIssuer(Assertion assertion, String expectedIssuer, TrustBrokerProperties properties) {
 		var issuer = assertion.getIssuer();
 		if (issuer == null || StringUtils.isBlank(issuer.getValue())) {
 			throw new RequestDeniedException(String.format(
@@ -454,7 +458,7 @@ public class AssertionValidator {
 				return MessageValidationResult.unvalidated();
 			}
 			else {
-				throw new RequestDeniedException(String.format(
+				throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 						"%s not signed and requireSignedAuthnRequest=true: %s",
 						request.getClass().getName(), OpenSamlUtil.samlObjectToString(request)));
 			}
@@ -467,7 +471,7 @@ public class AssertionValidator {
 	static MessageValidationResult validateResponseSignature(Response response, List<Credential> credentials, boolean requireSignedResponse) {
 		if (!response.isSigned()) {
 			if (requireSignedResponse) {
-				throw new RequestDeniedException(String.format(
+				throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 						"Response not signed: %s", OpenSamlUtil.samlObjectToString(response)));
 			}
 			log.debug("trustbroker.config.security.requireSignedResponse=false: Accepted unsigned response, rely on Assertion.");
@@ -482,7 +486,7 @@ public class AssertionValidator {
 			List<Credential> credentials, TrustBrokerProperties properties) {
 		if (!assertion.isSigned()) {
 			if (properties.getSecurity().isRequireSignedAssertion()) {
-				throw new RequestDeniedException(String.format(
+				throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 						"Assertion not signed: %s", OpenSamlUtil.samlObjectToString(assertion)));
 			}
 			if (log.isErrorEnabled()) {
@@ -511,7 +515,7 @@ public class AssertionValidator {
 		}
 		// we should not get here without a message
 		if (samlMessage == null) {
-			throw new RequestDeniedException(String.format("Missing message in URL: %s", signatureContext.getRequestUrl()));
+			throw new RequestDeniedException(String.format("Missing message in URL: %s", signatureContext.getContext()));
 		}
 
 		var signature = WebSupport.getUniqueQueryParameter(urlBuilder, SamlIoUtil.SAML_REDIRECT_SIGNATURE);
@@ -519,7 +523,7 @@ public class AssertionValidator {
 		if (signature == null || signatureAlgorithm == null) {
 			throw new RequestDeniedException(String.format("%s or %s missing in URL: %s",
 					SamlIoUtil.SAML_REDIRECT_SIGNATURE, SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM,
-					StringUtil.clean(signatureContext.getRequestUrl())));
+					StringUtil.clean(signatureContext.getContext())));
 		}
 
 		// relayState required according to spec when provided
@@ -540,22 +544,22 @@ public class AssertionValidator {
 		if (!signatureValid) {
 			throw new RequestDeniedException(String.format("%s or %s invalid in URL: %s",
 					SamlIoUtil.SAML_REDIRECT_SIGNATURE, SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM,
-					StringUtil.clean(signatureContext.getRequestUrl())));
+					StringUtil.clean(signatureContext.getContext())));
 		}
 
-		log.debug("Accepted valid SAML redirect message on: {}", signatureContext.getRequestUrl());
+		log.debug("Accepted valid SAML redirect message on: {}", signatureContext.getContext());
 	}
 
 	private static URLBuilder urlBuilderForRedirectBinding(SignatureContext signatureContext) {
 		try {
 			// URLBuilder expects a full URL, we only care about the query params here
-			var url = "https://localhost" + signatureContext.getRequestUrl();
+			var url = "https://localhost" + signatureContext.getContext();
 			return new URLBuilder(url);
 		}
 		catch (final MalformedURLException e) {
 			// an invalid URL could be an attack (or a bug)
 			throw new RequestDeniedException(String.format("URL %s is not a valid URL",
-					StringUtil.clean(signatureContext.getRequestUrl())), e);
+					StringUtil.clean(signatureContext.getContext())), e);
 		}
 	}
 
@@ -614,7 +618,7 @@ public class AssertionValidator {
 		}
 
 		if (!SamlUtil.isSignatureValid(signature, credentials)) {
-			throw new RequestDeniedException(String.format(
+			throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 					"SAML Signature validation failed using signer='%s' using configured verifiers='%s'. Message details: %s",
 					SamlUtil.getKeyInfoHintFromSignature(signature),
 					SamlUtil.credentialsToKeyInfo(credentials),
@@ -1157,6 +1161,18 @@ public class AssertionValidator {
 			log.debug("Accepting unsigned artifactResolve={}", artifactResolve.getID());
 			return MessageValidationResult.unvalidated();
 		}
+	}
+
+	public static void validateTokenAssertion(ClaimsParty claimsParty, Assertion assertion, TrustBrokerProperties trustBrokerProperties) {
+		List<Credential> credentials = new ArrayList<>();
+		Instant now = Instant.now();
+		var securityPolicies = claimsParty.getSecurityPolicies();
+		AssertionValidator.validateAssertionSignature(assertion, credentials, trustBrokerProperties);
+		AssertionValidator.validateAssertionId(assertion);
+		validateAssertionIssueInstant(assertion, now, false, trustBrokerProperties, securityPolicies);
+		AssertionValidator.validateAssertionIssuer(assertion, claimsParty.getId(), trustBrokerProperties);
+		AssertionValidator.validateAssertionSubject(assertion, Instant.now(), claimsParty.getId(), false, false, null, trustBrokerProperties);
+		validateAssertionAttributeStatements(assertion);
 	}
 
 	// ALl message related data is DateTime internalized as UTC, so use that as a reference for checking timestamps.

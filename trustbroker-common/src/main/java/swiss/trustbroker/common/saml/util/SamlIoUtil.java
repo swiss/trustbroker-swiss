@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -37,6 +37,7 @@ import net.shibboleth.shared.collection.Pair;
 import net.shibboleth.shared.net.URLBuilder;
 import net.shibboleth.shared.xml.SerializeSupport;
 import org.apache.velocity.app.VelocityEngine;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.opensaml.core.config.ConfigurationService;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistry;
@@ -134,7 +135,7 @@ public class SamlIoUtil {
 		}
 
 		public String encodeSamlMessage(SAMLObject message, String relayState, String issuer, String destination,
-				ArtifactResolutionParameters artifactResolutionParameters) throws MessageEncodingException {
+										ArtifactResolutionParameters artifactResolutionParameters) throws MessageEncodingException {
 			var context = OpenSamlUtil.createMessageContext(message, null, destination, relayState);
 			OpenSamlUtil.initiateArtifactBindingContext(context, issuer, artifactResolutionParameters);
 			var artifact = super.buildArtifact(context);
@@ -285,7 +286,7 @@ public class SamlIoUtil {
 
 			return unmarshaller.unmarshall(element);
 		}
-		catch(TechnicalException ex) {
+		catch (TechnicalException ex) {
 			throw ex;
 		}
 		catch (Exception ex) {
@@ -334,22 +335,22 @@ public class SamlIoUtil {
 	// does not, hence the duplicate encodeSamlArtifactData (and generic methods do not support 'T extends X | Y')
 
 	public static String encodeSamlArtifactData(VelocityEngine velocityEngine, SAMLArtifactMap artifactMap,
-			RequestAbstractType message, ArtifactResolutionParameters artifactResolutionParameters,
-			String relayState) {
+												RequestAbstractType message, ArtifactResolutionParameters artifactResolutionParameters,
+												String relayState) {
 		return encodeSamlArtifactData(velocityEngine, artifactMap, message, message.getIssuer().getValue(),
 				message.getDestination(), artifactResolutionParameters, relayState);
 	}
 
 	public static String encodeSamlArtifactData(VelocityEngine velocityEngine, SAMLArtifactMap artifactMap,
-			StatusResponseType message, ArtifactResolutionParameters artifactResolutionParameters,
-			String relayState) {
+												StatusResponseType message, ArtifactResolutionParameters artifactResolutionParameters,
+												String relayState) {
 		return encodeSamlArtifactData(velocityEngine, artifactMap, message, message.getIssuer().getValue(),
 				message.getDestination(), artifactResolutionParameters, relayState);
 	}
 
 	private static String encodeSamlArtifactData(VelocityEngine velocityEngine, SAMLArtifactMap artifactMap,
-			SAMLObject message, String issuer, String destination,
-			ArtifactResolutionParameters artifactResolutionParameters, String relayState) {
+												 SAMLObject message, String issuer, String destination,
+												 ArtifactResolutionParameters artifactResolutionParameters, String relayState) {
 		try {
 			return new SamlArtifactEncoder(velocityEngine, artifactMap)
 					.encodeSamlMessage(message, relayState, issuer, destination, artifactResolutionParameters);
@@ -365,14 +366,25 @@ public class SamlIoUtil {
 			return SerializeSupport.prettyPrintXML(xmlObject.getDOM());
 		}
 		else {
-			var out = new ByteArrayOutputStream();
-			writeXmlObjectToSteam(xmlObject, out);
-			return new String(out.toByteArray(), StandardCharsets.UTF_8);
+			return xmlObjectToString(xmlObject);
 		}
+	}
+
+	public static String xmlObjectToString(XMLObject xmlObject) {
+		var out = new ByteArrayOutputStream();
+		writeXmlObjectToSteam(xmlObject, out);
+		return new String(out.toByteArray(), StandardCharsets.UTF_8);
 	}
 
 	public static void writeXmlObjectToSteam(XMLObject xmlObject, OutputStream out) {
 		SerializeSupport.writeNode(xmlObject.getDOM(), out);
+	}
+
+	public static XMLObject getXmlObjectFromString(String data) {
+		if (data == null) {
+			return null;
+		}
+		return getXmlObjectFromString(data, "XMLString");
 	}
 
 	private static XMLObject getXmlObjectFromString(String data, String sourceName) {
@@ -381,7 +393,7 @@ public class SamlIoUtil {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends XMLObject> T getXmlObjectFromString(Class<? extends T> expected, String data,
-			String sourceName) {
+																 String sourceName) {
 		if (data == null) {
 			return null;
 		}
@@ -392,15 +404,29 @@ public class SamlIoUtil {
 		throw new TechnicalException(String.format("Message of class=%s", xmlObj.getClass().getName()));
 	}
 
+	public static <T extends XMLObject> String marshalXmlObjectToString(T xmlObject) {
+		if (xmlObject == null) {
+			return null;
+		}
+		return new String(marshalXmlObjectToBytes(xmlObject), StandardCharsets.UTF_8);
+	}
+
 	public static <T extends XMLObject> String marshalXmlObject(T xmlObject) {
 		if (xmlObject == null) {
 			return null;
+		}
+		return Base64.getEncoder().encodeToString(marshalXmlObjectToBytes(xmlObject));
+	}
+
+	public static <T extends XMLObject> byte[] marshalXmlObjectToBytes(T xmlObject) {
+		if (xmlObject == null) {
+			return new byte[0];
 		}
 		try {
 			var out = new ByteArrayOutputStream();
 			XMLObjectSupport.getMarshaller(xmlObject).marshall(xmlObject);
 			writeXmlObjectToSteam(xmlObject, out);
-			return Base64.getEncoder().encodeToString(out.toByteArray());
+			return out.toByteArray();
 		}
 		catch (MarshallingException ex) {
 			throw new TechnicalException(String.format("Could not marshal xmlObject class=%s message=%s",
@@ -446,7 +472,7 @@ public class SamlIoUtil {
 	}
 
 	public static String buildSamlRedirectQueryString(String sigAlg, boolean request, String encodedSamlMessage,
-			String relayState, String signature) {
+													  String relayState, String signature) {
 		URLBuilder urlBuilder;
 		try {
 			// URL has to be valid, but is not relevant for this method
@@ -472,7 +498,7 @@ public class SamlIoUtil {
 	}
 
 	public static String buildSignedSamlRedirectQueryString(SAMLObject message, Credential credential, String sigAlg,
-			String relayState) {
+															String relayState) {
 		var encodedMessage = encodeSamlRedirectData(message);
 		var signatureEncoded = buildEncodedSamlRedirectSignature(message, credential, sigAlg, relayState, encodedMessage);
 		return buildSamlRedirectQueryString(sigAlg, true, encodedMessage, relayState, signatureEncoded);
@@ -486,7 +512,7 @@ public class SamlIoUtil {
 	}
 
 	public static String buildEncodedSamlRedirectSignature(SAMLObject message, Credential credential, String sigAlg,
-			String relayState, String encodedSamlMessage) {
+														   String relayState, String encodedSamlMessage) {
 		var request = message instanceof RequestAbstractType;
 		sigAlg = getSamlRedirectSignatureAlgorithmWithDefault(sigAlg);
 		var query = buildSamlRedirectQueryString(sigAlg, request, encodedSamlMessage, relayState, null);
@@ -512,4 +538,17 @@ public class SamlIoUtil {
 				previous, unmarshaller, qname);
 	}
 
+	public static Assertion getAssertionFromSubjectToken(String subjectToken) {
+		var normalized = subjectToken.replace(' ', '+');
+		normalized = normalized.replaceAll("\\s+", "");
+
+		byte[] decoded = Base64.getDecoder().decode(normalized);
+
+		XMLObject xmlObject = SamlIoUtil.getXmlObjectFromStream(new ByteArrayInputStream(decoded), null);
+		if (!(xmlObject instanceof Assertion)) {
+			throw new TechnicalException(String.format("Decoded object=%s is not a SAML Assertion", xmlObject.getClass()));
+		}
+
+		return (Assertion) xmlObject;
+	}
 }

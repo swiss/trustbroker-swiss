@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -37,7 +37,7 @@ export class SsoComponent implements OnInit {
 	ssoParticipants: SsoParticipants[];
 	ssoGroupName: string;
 	ssoSubject: string;
-	baseUrl: string = environment.apiUrl;
+	apiBaseUrl: string = environment.apiUrl;
 	isButtonSize: boolean;
 	silentLogout: boolean;
 	logoutIssuer: string;
@@ -81,7 +81,7 @@ export class SsoComponent implements OnInit {
 
 	getImageUrl(imageName: string): string {
 		// re-use of HRD images in SSO, not too nice, but avoids duplication
-		return `${this.baseUrl}hrd/images/${imageName}`;
+		return `${this.apiBaseUrl}ui/images/${imageName}`;
 	}
 
 	onClickCard(ssoGroupName: string, rpId: string, cpId: string, subjectNameId: string): void {

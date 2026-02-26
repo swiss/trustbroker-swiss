@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -20,6 +20,7 @@ import static org.hamcrest.Matchers.equalToObject;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,6 +38,7 @@ import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 import swiss.trustbroker.common.saml.util.CoreAttributeInitializer;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
+import swiss.trustbroker.saml.dto.ClaimSource;
 
 class DefinitionTest {
 
@@ -211,6 +213,24 @@ class DefinitionTest {
 		assertEquals(attributes.size(), initialSize);
 	}
 
+	@Test
+	void withSource() {
+		var definitionScript = Definition.builder().name("test").source(ClaimSource.SCRIPT.name()).build();
+		var definitionCp = Definition.builder().name("test").source(ClaimSource.CP.name()).build();
+		var definitionNoSource = Definition.builder().name("test").build();
+
+		var resultCp = definitionCp.withSource(ClaimSource.SCRIPT.name());
+		assertThat(resultCp, is(definitionScript));
+		assertThat(resultCp, is(not(sameInstance(definitionCp))));
+
+		var resultNoSource = definitionNoSource.withSource(ClaimSource.SCRIPT.name());
+		assertThat(resultNoSource, is(definitionScript));
+		assertThat(resultNoSource, is(not(sameInstance(definitionNoSource))));
+
+		assertThat(definitionScript.withSource(ClaimSource.SCRIPT.name()), is(sameInstance(definitionScript)));
+		assertThat(definitionScript.getSource(), is(ClaimSource.SCRIPT.name()));
+
+	}
 
 	private static Map<AttributeName, List<String>> givenAttributeMap() {
 		Map<AttributeName, List<String>> map = new HashMap<>();

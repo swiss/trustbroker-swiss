@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -57,19 +57,19 @@ export class DeviceInfoComponent implements OnInit {
 
 	private handleDeviceInfoResponse(resp: HttpResponse<string>): void {
 		// document.write for error page does not work here
-		const url = resp?.url.replace(/^.*(\/failure\/.*$)/, '$1');
-		if (url !== resp?.url) {
+		const url = resp.url!.replace(/^.*(\/failure\/.*$)/, '$1');
+		if (url !== resp.url) {
 			void this.router.navigate([url]);
 			return;
 		}
-		if (resp?.body?.includes('redirectUrl')) {
+		if (resp.body?.includes('redirectUrl')) {
 			const profile = JSON.parse(resp.body);
 			void this.router.navigate([profile.redirectUrl]);
 			return;
 		}
-		window.document.write(resp?.body);
+		window.document.write(resp.body || '');
 		if (document.forms.length > 0) {
-			document.forms.item(0).submit();
+			document.forms.item(0)!.submit();
 		} else {
 			void this.router.navigate(['/failure']);
 		}

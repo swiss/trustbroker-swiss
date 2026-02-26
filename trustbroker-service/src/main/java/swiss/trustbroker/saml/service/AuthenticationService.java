@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -15,6 +15,7 @@
 
 package swiss.trustbroker.saml.service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -26,6 +27,7 @@ import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
@@ -71,8 +73,8 @@ public class AuthenticationService {
 
 	private final RelyingPartyDefinitions relyingPartyDefinitions;
 
-	@SuppressWarnings("java:S1172")
-	public String handleSamlResponse(OutputService outputService, ResponseData<Response> responseData,
+	@Transactional
+	public String handleSamlResponse(List<OutputService> outputServices, ResponseData<Response> responseData,
 			HttpServletRequest request, HttpServletResponse response) {
 		var statusCode = OpenSamlUtil.getStatusCode(responseData.getResponse());
 
@@ -80,7 +82,7 @@ public class AuthenticationService {
 			var cpResponse = assertionConsumerService.handleSuccessCpResponse(responseData);
 			log.debug("Process success SAML response from {} inResponseTo {}", cpResponse.getIssuer(),
 					cpResponse.getInResponseTo());
-			return relyingPartyService.sendResponseWithSamlResponseFromCp(outputService,
+			return relyingPartyService.sendResponseWithSamlResponseFromCp(outputServices,
 					responseData, cpResponse, request, response);
 		}
 		else if (isSwitchToEnterprise(responseData, trustBrokerProperties)) {
@@ -96,7 +98,7 @@ public class AuthenticationService {
 			var cpResponse = assertionConsumerService.handleFailedCpResponse(responseData);
 			log.debug("Process failed SAML response from {} inResponseTo {}", cpResponse.getIssuer(),
 					cpResponse.getInResponseTo());
-			return relyingPartyService.sendFailedSamlResponseToRp(outputService, responseData, request, response, cpResponse);
+			return relyingPartyService.sendFailedSamlResponseToRp(outputServices, responseData, request, response, cpResponse);
 		}
 		return null;
 	}
@@ -113,7 +115,8 @@ public class AuthenticationService {
 		return result;
 	}
 
-	public String handleAuthnRequest(OutputService outputService, AuthnRequest authnRequest,
+	@Transactional
+	public String handleAuthnRequest(List<OutputService> outputServices, AuthnRequest authnRequest, String spRelayState,
 			HttpServletRequest httpRequest, HttpServletResponse httpResponse, SignatureContext signatureContext) {
 		log.debug("Process RP SAML request");
 		if (authnRequest.getIssuer() == null) {
@@ -149,14 +152,15 @@ public class AuthenticationService {
 					relyingParty.getSecurityPolicies());
 
 			// state for SSO save pending AuthnRequest as new state until we know the SSO group from the CP chosen CP in HRD
-			stateDataByAuthnReq = assertionConsumerService.saveState(authnRequest, validationResult.isSignatureValidated(),
-					httpRequest, relyingParty, Optional.empty(), signatureContext.getBinding());
+			stateDataByAuthnReq = assertionConsumerService.saveState(authnRequest, spRelayState,
+					validationResult.isSignatureValidated(), httpRequest, relyingParty, Optional.empty(),
+					signatureContext.getBinding());
 		}
 		catch (RequestDeniedException ex) {
 			// discontinued stealth mode only (we log the error but analyze requests anyway)
 			if (trustBrokerProperties.getSecurity().isSaveStateOnValidationFailure()) {
-				assertionConsumerService.saveState(authnRequest, false, httpRequest, relyingParty, Optional.empty(),
-						signatureContext.getBinding());
+				assertionConsumerService.saveState(authnRequest, spRelayState,
+						false, httpRequest, relyingParty, Optional.empty(), signatureContext.getBinding());
 			}
 			throw ex;
 		}
@@ -164,7 +168,7 @@ public class AuthenticationService {
 		// process incoming RP request
 		var rpRequest = assertionConsumerService.handleRpAuthnRequest(authnRequest, httpRequest, stateDataByAuthnReq);
 		if (rpRequest.isAborted()) {
-			return relyingPartyService.sendAbortedSamlResponseToRp(outputService, stateDataByAuthnReq,
+			return relyingPartyService.sendAbortedSamlResponseToRp(outputServices, stateDataByAuthnReq,
 					httpRequest, httpResponse, rpRequest, signatureContext.getBinding());
 		}
 

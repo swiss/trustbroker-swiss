@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -31,6 +31,7 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.annotation.Id;
 import swiss.trustbroker.api.sessioncache.dto.SessionState;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
@@ -43,6 +44,7 @@ import swiss.trustbroker.saml.dto.CpResponse;
 @NoArgsConstructor
 @RequiredArgsConstructor
 @ToString
+@Slf4j
 public class StateData implements Serializable, SessionState {
 
 	@Id
@@ -256,6 +258,21 @@ public class StateData implements Serializable, SessionState {
 			maxSessionTimeSec = defaultSsoSessionLifetimeSec;
 		}
 		return getLifecycle().getSsoEstablishedTime().toInstant().plusSeconds(maxSessionTimeSec);
+	}
+
+	// update CpResponse RP parameters from this RP state
+	public void copyRpParametersIntoCpResponse(CpResponse targetCpResponse) {
+		var sourceState = spStateData != null ? spStateData : this;
+		// incoming current RP data (init of participant1, stepup of participant1 or join of participant 2)
+		targetCpResponse.setRpContext(sourceState.getRpContext());
+		targetCpResponse.setRpReferer(sourceState.getReferer());
+		targetCpResponse.setRpContextClasses(sourceState.getContextClasses());
+		// propagate applicationName and OIDC client_id for scripting
+		log.debug("Switch rpIssuer={} CPResponse data from oldApplicationName={} to applicationName={}",
+				targetCpResponse.getRpIssuer(), targetCpResponse.getApplicationName(),
+				sourceState.getApplicationName());
+		targetCpResponse.setOidcClientId(sourceState.getOidcClientId());
+		targetCpResponse.setApplicationName(sourceState.getApplicationName());
 	}
 
 }

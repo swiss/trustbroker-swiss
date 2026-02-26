@@ -35,6 +35,7 @@ import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenRevocationAuthenticationToken;
+import org.springframework.transaction.annotation.Transactional;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
@@ -71,6 +72,7 @@ public class CustomTokenRevocationAuthenticationProvider implements Authenticati
 	}
 
 	@Override
+	@Transactional
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		OAuth2TokenRevocationAuthenticationToken tokenRevocationAuthentication =
 				(OAuth2TokenRevocationAuthenticationToken) authentication;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -54,6 +54,16 @@ public class EncodingParameters {
 	private boolean useSoapBinding = false;
 
 	/**
+	 * Use WS-FED binding for encoding.
+	 * <br/>
+	 * Default: false
+	 *
+	 * @since 1.13.0
+	 */
+	@Builder.Default
+	private boolean useWsFedBinding = false;
+
+	/**
 	 * Optional signature algorithm for redirect encoding.
 	 *
 	 * @since 1.10.0
@@ -63,4 +73,7 @@ public class EncodingParameters {
 	@Builder.Default
 	private Map<String, Object> templateParameters = Collections.emptyMap();
 
+	public boolean useSamlBinding() {
+		return !useWsFedBinding;
+	}
 }

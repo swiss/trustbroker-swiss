@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,9 +16,8 @@
 package swiss.trustbroker.config.controller;
 
 import lombok.AllArgsConstructor;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.VersionInfo;
 import swiss.trustbroker.gui.GuiSupport;
@@ -28,20 +27,18 @@ import swiss.trustbroker.util.ApiSupport;
 /**
  * Controller for the version API.
  */
-@Controller
+@RestController
 @AllArgsConstructor
 public class ConfigController {
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
 	@GetMapping(path = ApiSupport.VERSION_API)
-	@ResponseBody
 	public VersionInfo getVersion() {
 		return new VersionInfo(trustBrokerProperties.getVersionInfo());
 	}
 
 	@GetMapping(value = ApiSupport.CONFIG_FRONTEND_API)
-	@ResponseBody
 	public GuiConfig getGuiConfig() {
 		return GuiSupport.buildConfig(trustBrokerProperties.getGui());
 	}

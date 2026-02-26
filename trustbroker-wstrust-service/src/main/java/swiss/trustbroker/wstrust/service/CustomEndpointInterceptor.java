@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -58,7 +58,9 @@ import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlTracer;
 import swiss.trustbroker.common.saml.util.SoapUtil;
+import swiss.trustbroker.common.tracing.TraceSupport;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.util.WebSupport;
 import swiss.trustbroker.wstrust.dto.SoapMessageHeader;
 import swiss.trustbroker.wstrust.util.WsTrustUtil;
 
@@ -102,15 +104,24 @@ public class CustomEndpointInterceptor implements SoapEndpointInterceptor {
 		var webServiceMessageRequest = messageContext.getRequest();
 		var soapMessage = (SoapMessage) webServiceMessageRequest;
 		SamlTracer.logSoapObject(String.format(">>>>> Incoming RST SOAP message soap11action='%s'", soapMessage.getSoapAction()),
-				soapMessage.getDocument());
+				soapMessage.getDocument(), WsTrustUtil.OP_LOG);
 
 		var headerNode = WsTrustUtil.getNode(soapMessage.getSoapHeader());
 
-		SamlTracer.logSoapObject(">>>>> Incoming RST SOAP header", headerNode);
+		SamlTracer.logSoapObject(">>>>> Incoming RST SOAP header", headerNode, WsTrustUtil.OP_LOG);
 
 		var bodyNode = WsTrustUtil.getNode(soapMessage.getSoapBody());
 
-		SamlTracer.logSoapObject(">>>>> Incoming RST SOAP body", bodyNode);
+		SamlTracer.logSoapObject(">>>>> Incoming RST SOAP body", bodyNode, WsTrustUtil.OP_LOG);
+
+		// check after logging
+		if (!WsTrustUtil.isNetworkAllowed(trustBrokerProperties.getWstrust().getAllowedNetworks(),
+				trustBrokerProperties.getWstrust().isEnforceNetwork(), WebSupport.getWebRequest(),
+				trustBrokerProperties.getNetwork()) ||
+				!WsTrustUtil.isClientIpAllowed(trustBrokerProperties.getWstrust().getAllowedClientIpRegex(),
+						trustBrokerProperties.getWstrust().isEnforceClientIp(), TraceSupport.getClientIp())) {
+			return false;
+		}
 
 		var requestHeader = getRequestHeaderElements(headerNode);
 		requestHeader.setSoapAction(soapMessage.getSoapAction());
@@ -119,6 +130,7 @@ public class CustomEndpointInterceptor implements SoapEndpointInterceptor {
 
 		return true;
 	}
+
 
 	private SoapMessageHeader getRequestHeaderElements(Node headerNode) {
 		var requestHeader = new SoapMessageHeader();

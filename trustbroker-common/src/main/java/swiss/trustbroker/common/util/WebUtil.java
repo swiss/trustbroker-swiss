@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -99,6 +99,17 @@ public class WebUtil {
 			return ret.map(Cookie::getValue).orElse(null);
 		}
 		return null;
+	}
+
+	public static String getAny(String name, HttpServletRequest request) {
+		var value = getHeader(name, request);
+		if (value == null) {
+			value = getParameter(name, request);
+		}
+		if (value == null) {
+			value = getCookie(name, request);
+		}
+		return value;
 	}
 
 	public static String getUserAgent(HttpServletRequest request) {

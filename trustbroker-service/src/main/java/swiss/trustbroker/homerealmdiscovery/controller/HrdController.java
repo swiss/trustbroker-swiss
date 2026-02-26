@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -18,6 +18,7 @@ package swiss.trustbroker.homerealmdiscovery.controller;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,10 +42,9 @@ import swiss.trustbroker.api.announcements.dto.AnnouncementUiElement;
 import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
-import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
+import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
-import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
@@ -53,14 +53,13 @@ import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.dto.ProfileRequest;
 import swiss.trustbroker.homerealmdiscovery.dto.SupportInfo;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
-import swiss.trustbroker.homerealmdiscovery.service.WebResourceProvider;
 import swiss.trustbroker.homerealmdiscovery.util.OperationalUtil;
+import swiss.trustbroker.homerealmdiscovery.util.RelyingPartyUtil;
 import swiss.trustbroker.saml.dto.DeviceInfoReq;
 import swiss.trustbroker.saml.dto.UiObjects;
 import swiss.trustbroker.saml.service.AssertionConsumerService;
 import swiss.trustbroker.saml.service.ClaimsProviderService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
-import swiss.trustbroker.saml.service.SamlOutputService;
 import swiss.trustbroker.saml.util.SamlStatusCode;
 import swiss.trustbroker.saml.util.SamlValidationUtil;
 import swiss.trustbroker.sessioncache.dto.StateData;
@@ -95,31 +94,27 @@ public class HrdController {
 
 	private final ApiSupport apiSupport;
 
-	private final SamlOutputService samlOutputService;
-
-	private final ProfileSelectionService profileSelectionService;
-
-	private final WebResourceProvider resourceCache;
+	private final List<OutputService> outputServices;
 
 	// Return the list of CP issuers we need to render
 	// once the FE has been adapted, id and stateDataByAuthnReq can be changed to required
-	@GetMapping(path = "/api/v1/hrd/relyingparties/{issuer}/tiles")
+	@GetMapping(path = ApiSupport.HRD_RP_URL + "/{issuer}/tiles")
 	@ResponseBody
 	public UiObjects getHrdTilesForRpIssuer(HttpServletRequest httpRequest, HttpServletResponse httpResponse,
-			@PathVariable("issuer") String issuer, @RequestParam(value = "session", required = false) String rpAuthnRequestId) {
-		rpAuthnRequestId = StringUtil.clean(rpAuthnRequestId);
+			@PathVariable("issuer") String issuer, @RequestParam(value = ApiSupport.HRD_SID_PARAM, required = false) String rpAuthnRequestId) {
+		rpAuthnRequestId = ApiSupport.decodeUrlParameter(rpAuthnRequestId);
+
 		var rpIssuer = ApiSupport.decodeUrlParameter(issuer);
 		var referer = WebUtil.getReferer(httpRequest);
 
 		// state for current AuthnRequest must exist
 		var stateDataByAuthnReq = stateCacheService.findBySpIdResilient(rpAuthnRequestId, this.getClass().getSimpleName());
-
 		var rpRequest = assertionConsumerService.renderUi(rpIssuer, referer, null, httpRequest, null,
 				stateDataByAuthnReq.orElse(null));
 		return rpRequest.getUiObjects();
 	}
 
-	@GetMapping(path = "/api/v1/hrd/relyingparties/{sessionId}/continue")
+	@GetMapping(path = ApiSupport.HRD_RP_URL + "/{sessionId}/continue")
 	public String handleContinueToRp(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable(name = "sessionId") String sessionIdEncoded) {
 		log.debug("User confirmed continuation to RP");
@@ -130,12 +125,12 @@ public class HrdController {
 		stateData.getCpResponse().resetErrorPageStatus();
 		var rpId = stateData.getRpIssuer();
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(rpId, null);
-		var returnUrl = relyingPartyService.sendResponseToRpFromSessionState(samlOutputService, relyingParty, stateData, request,
+		var returnUrl = relyingPartyService.sendResponseToRpFromSessionState(outputServices, relyingParty, stateData, request,
 				response);
 		return WebSupport.getViewRedirectResponse(returnUrl);
 	}
 
-	@GetMapping(path = "/api/v1/hrd/profiles")
+	@GetMapping(path = ApiSupport.API_CONTEXT + "/hrd/profiles")
 	@ResponseBody
 	public ProfileResponse getUserProfiles(HttpServletRequest request, HttpServletResponse response,
 			@RequestHeader(WebSupport.HTTP_HEADER_XTB_PROFILE_ID) String id) {
@@ -149,53 +144,32 @@ public class HrdController {
 													   .selectedProfileId(id)
 													   .applicationName(stateData.getRpApplicationName())
 													   .build();
+		final var profileSelectionService = relyingPartyService.getProfileSelectionService(relyingParty != null ? relyingParty.getIdmLookup() : null);
 		return profileSelectionService.buildProfileResponse(profileSelectionData, stateData.getCpResponse());
 	}
 
-	@PostMapping(path = "/api/v1/hrd/profile")
-	@Transactional
+	@PostMapping(path = ApiSupport.API_CONTEXT + "/hrd/profile")
 	public String selectProfile(HttpServletRequest request, HttpServletResponse response,
 			@RequestBody ProfileRequest profileRequest) {
-		var redirectUrl = relyingPartyService.sendResponseWithSelectedProfile(samlOutputService,
+		var redirectUrl = relyingPartyService.sendResponseWithSelectedProfile(outputServices,
 				profileRequest, request, response);
 		return WebSupport.getViewRedirectResponse(redirectUrl);
-	}
-
-	@GetMapping(value = "/api/v1/hrd/images/{name}")
-	public void getImageByNameWithMediaType(
-			HttpServletRequest request, HttpServletResponse response, @PathVariable("name") String imageName) {
-		resourceCache.getImageByNameWithMediaType(request, response, imageName);
-	}
-
-	@GetMapping(value = ApiSupport.ASSETS_URL + "/**")
-	public void getThemeAsset(HttpServletRequest request, HttpServletResponse response) {
-		var path = request.getRequestURI();
-		var resource = path.substring(ApiSupport.ASSETS_URL.length());
-		resourceCache.getThemeAsset(request, response, resource);
-	}
-
-	// translations are generic, but we use the HRD namespace for now
-	// NOTE: When ops messages or something else pops up, move this code to a TranslationService
-	@GetMapping(value = "/api/v1/hrd/translations/{language}")
-	public void getTranslationForLanguage(
-			HttpServletRequest request, HttpServletResponse response, @PathVariable("language") String language) {
-		resourceCache.getTranslationForLanguage(request, response, language);
 	}
 
 	/**
 	 * CP selection handling called by UI (we have provided with the links earlier) Updates the relay state cache with the CP's
 	 * AuthnRequest ID.
 	 */
-	@GetMapping(path = "/api/v1/hrd/claimsproviders/{cpid}", produces = MediaType.TEXT_HTML_VALUE)
+	@GetMapping(path = ApiSupport.HRD_CP_URL + "/{cpid}", produces = MediaType.TEXT_HTML_VALUE)
 	@Transactional
 	public void redirectUserToClaimsProvider(
 			HttpServletRequest request,
 			HttpServletResponse response,
 			@PathVariable("cpid") String cpIssuerId,
-			@RequestParam("session") String rpAuthnRequestId) {
+			@RequestParam(ApiSupport.HRD_SID_PARAM) String rpAuthnRequestId) {
 		// security
 		cpIssuerId = ApiSupport.decodeUrlParameter(cpIssuerId);
-		rpAuthnRequestId = StringUtil.clean(rpAuthnRequestId);
+		rpAuthnRequestId = ApiSupport.decodeUrlParameter(rpAuthnRequestId);
 
 		// state for current AuthnRequest must exist
 		var stateDataByAuthnReq = stateCacheService.findRequiredBySpId(rpAuthnRequestId, this.getClass().getSimpleName());
@@ -204,7 +178,7 @@ public class HrdController {
 		var rpIssuerId = stateDataByAuthnReq.getRpIssuer();
 		var ssoOperation = ssoService.prepareRedirectForDeviceInfoAfterHrd(request.getCookies(), stateDataByAuthnReq, cpIssuerId);
 		if (ssoOperation.skipCpAuthentication()) {
-			// SSO session joined
+			// SSO session join next if device is accepted using IDP ID from HRD configuration
 			sendDeviceInfoRedirect(response, cpIssuerId, rpIssuerId, rpAuthnRequestId);
 			return;
 		}
@@ -231,7 +205,7 @@ public class HrdController {
 	}
 
 	// SSO and device fingerprinting is not an HRD functionality and this one might want to go to a new SSOController instead
-	@PostMapping(value = "/api/v1/device/info")
+	@PostMapping(value = ApiSupport.DEVICE_INFO_URL)
 	@ResponseBody
 	@Transactional
 	public ResponseEntity<ProfileResponse> checkDeviceInfo(
@@ -256,8 +230,8 @@ public class HrdController {
 			var ssoStateData = stateByCookieId.get();
 			// SSO established
 			// AuthnRequest attributes like QOA etc. have been checked earlier in AssertionConsumerService
-			if (ssoService.ssoStateValidForDeviceInfo(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, deviceID,
-					cpIssuerId)) {
+			if (ssoService.ssoStateValidForDeviceInfo(claimsParty, relyingParty, ssoStateData,
+					stateDataByAuthnReq, deviceID, cpIssuerId)) {
 				return sendResponseForSso(request, response, relyingParty, claimsParty, ssoStateData, stateDataByAuthnReq);
 			}
 		}
@@ -283,18 +257,29 @@ public class HrdController {
 
 	private ResponseEntity<ProfileResponse> sendResponseForSso(HttpServletRequest request, HttpServletResponse response,
 			RelyingParty relyingParty, ClaimsParty claimsParty, StateData ssoStateData, StateData stateDataByAuthnReq) {
-		log.debug("Established CP identity and accepted fingerprint, sending AuthnResponse");
+		if (stateDataByAuthnReq == null) {
+			throw new TechnicalException(String.format(
+					"SSO handling for ssoState=%s not possible with missing stateDataByAuthnReq", ssoStateData.getId()));
+		}
+		if (log.isDebugEnabled()) {
+			log.debug("Established CP identity from cpIssuer={} accepted fingerprint={} on ssoState={} rpState={}",
+					ssoStateData.getCpIssuer(), WebSupport.getDeviceId(request),
+					ssoStateData.getId(), stateDataByAuthnReq.getId());
+		}
 
+		// SSO processing before participant join, redirect will abort federation
 		var redirectUrl = relyingPartyService.performAccessRequestWithDataRefreshIfRequired(request, relyingParty, claimsParty,
 				ssoStateData, stateDataByAuthnReq);
 		if (redirectUrl == null) {
-			redirectUrl = relyingPartyService.sendAuthnResponseToRpFromState(samlOutputService, request, response,
+			// SSO participant join and further feature processing
+			redirectUrl = relyingPartyService.sendAuthnResponseToRpFromState(outputServices, request, response,
 					ssoStateData, stateDataByAuthnReq);
 		}
 		if (redirectUrl == null) {
 			return null;
 		}
-		// return relative URL for Angular router:
+
+		// ProfileSelection (return relative URL for Angular router)
 		redirectUrl = apiSupport.relativeUrl(redirectUrl);
 		var profileResponse = ProfileResponse.builder().redirectUrl(redirectUrl).build();
 		return new ResponseEntity<>(profileResponse, HttpStatus.OK);
@@ -322,7 +307,7 @@ public class HrdController {
 		throw new RequestDeniedException(String.format("Unexpected invalid sessionId=%s", stateDataByAuthnReq.getId()));
 	}
 
-	@GetMapping(value = { "/api/v1/announcements/{issuer}/{appName}", "/api/v1/announcements/{issuer}" })
+	@GetMapping(value = { ApiSupport.API_CONTEXT + "/announcements/{issuer}/{appName}", ApiSupport.API_CONTEXT + "/announcements/{issuer}" })
 	@ResponseBody
 	public List<AnnouncementUiElement> getAnnouncements(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable("issuer") String issuer, @PathVariable(required = false, name = "appName") String appName) {
@@ -341,8 +326,10 @@ public class HrdController {
 			return Collections.emptyList();
 		}
 
+		Set<String> idpIds = RelyingPartyUtil.getCpIdsWithoutSpecChars(relyingParty);
+
 		List<Announcement> announcementsForApplication =
-				announcementService.getAnnouncementsForApplication(relyingParty, relyingParty.getAnnouncement(), applicationName);
+				announcementService.getAnnouncementsForApplication(relyingParty, relyingParty.getAnnouncement(), applicationName, idpIds);
 
 		// adminlogin cookie shall let users pass
 		var skipDisabling = OperationalUtil.skipUiFeaturesForAdminAndMonitoringClients(request, trustBrokerProperties);
@@ -363,7 +350,7 @@ public class HrdController {
 	}
 
 	// redirect to HRD for the given session
-	@GetMapping(path = "/api/v1/hrd/{session}/continue")
+	@GetMapping(path = ApiSupport.API_CONTEXT + "/hrd/{session}/continue")
 	public String backToHrd(HttpServletRequest request, HttpServletResponse response, @PathVariable("session") String session) {
 		var sessionId = ApiSupport.decodeUrlParameter(session);
 		var stateData = stateCacheService.find(sessionId, HrdController.class.getSimpleName());
@@ -375,7 +362,7 @@ public class HrdController {
 		return WebSupport.getViewRedirectResponse(redirectUrl);
 	}
 
-	@GetMapping(path = "/api/v1/support/{errorCode}/{session}")
+	@GetMapping(path = ApiSupport.API_CONTEXT + "/support/{errorCode}/{session}")
 	@ResponseBody
 	public SupportInfo fetchSupportInfo(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable("errorCode") String errorCode, @PathVariable("session") String session) {
@@ -420,5 +407,4 @@ public class HrdController {
 				relyingParty.getId(), sessionId, errorCode, flowOpt.orElse(null));
 		return flowOpt;
 	}
-
 }

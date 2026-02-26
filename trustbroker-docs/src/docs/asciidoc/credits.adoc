@@ -29,7 +29,7 @@ Migration use case only. We prefer you package this with your client ao we can r
 
 |zulu-openjdk-alpine
 |GPL-2
-|https://docs.azul.com/core/tpls/january-2024/zulu17_tpl.html
+|https://docs.azul.com/core/tpls/october-2025/zulu21_jdk_tpl.html
 
 
 |org.apache.wss4j.wss4j-ws-security-common

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -16,6 +16,7 @@
 package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -23,6 +24,7 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.XmlValue;
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -128,6 +130,25 @@ public class ProfileSelection implements Serializable, ProfileSelectionPropertie
 	private Boolean filterUnits = Boolean.FALSE;
 
 	/**
+	 * Attribute used as selector (kind of unique Primary Key) for profile selection.
+	 */
+	@XmlAttribute(name = "profileSelector")
+	private String profileSelector;
+
+	/**
+	 * Attribute used as displayName for profile selection UI.
+	 */
+	@XmlAttribute(name = "displayName")
+	private String displayName;
+
+	/**
+	 * Additional information to be displayed for profile selection.
+	 */
+	@XmlAttribute(name = "displayClaims")
+	@XmlJavaTypeAdapter(StringListAdapter.class)
+	private List<String> displayClaims;
+
+	/**
 	 * Mode for profile selection.
 	 */
 	@XmlValue
@@ -200,4 +221,6 @@ public class ProfileSelection implements Serializable, ProfileSelectionPropertie
 		return filter;
 	}
 
+	@JsonIgnore
+	public List<String> getDisplayClaims() {return displayClaims;}
 }

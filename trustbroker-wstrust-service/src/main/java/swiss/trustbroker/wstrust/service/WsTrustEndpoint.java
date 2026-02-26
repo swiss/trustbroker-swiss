@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -25,6 +25,7 @@ import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponse;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponseCollection;
 import org.opensaml.soap.wstrust.WSTrustObject;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
 import org.springframework.ws.server.endpoint.annotation.RequestPayload;
@@ -38,10 +39,12 @@ import swiss.trustbroker.common.saml.util.SamlTracer;
 import swiss.trustbroker.common.saml.util.SoapUtil;
 import swiss.trustbroker.common.util.WSSConstants;
 import swiss.trustbroker.wstrust.dto.SoapMessageHeader;
+import swiss.trustbroker.wstrust.util.WsTrustUtil;
 
 @Endpoint
 @Slf4j
 @AllArgsConstructor
+@ConditionalOnProperty(value = "trustbroker.config.wstrust.enabled", havingValue = "true")
 public class WsTrustEndpoint {
 
 	private static final String NAMESPACE_URI = WSSConstants.WST_NS_05_12;
@@ -67,7 +70,7 @@ public class WsTrustEndpoint {
 			var response = wsTrustService.processSecurityTokenRequest(requestSecurityToken, soapContext);
 
 			var soapResponse = marshalResponse(response);
-			SamlTracer.logSoapObject("<<<<< Outgoing RSTR SOAP message", soapResponse);
+			SamlTracer.logSoapObject("<<<<< Outgoing RSTR SOAP message", soapResponse, WsTrustUtil.OP_LOG);
 			return soapResponse;
 		}
 		catch (TrustBrokerException e) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -18,7 +18,6 @@ package swiss.trustbroker.wstrust.service;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,17 +30,16 @@ import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Attribute;
 import org.opensaml.saml.saml2.core.AttributeStatement;
-import org.opensaml.saml.saml2.core.NameID;
 import org.opensaml.saml.saml2.core.Subject;
 import org.opensaml.soap.wstrust.KeyType;
 import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponse;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponseCollection;
 import org.opensaml.soap.wstrust.RequestType;
-import org.opensaml.soap.wstrust.RequestedSecurityToken;
 import org.opensaml.soap.wstrust.TokenType;
 import org.opensaml.soap.wstrust.WSTrustConstants;
 import org.opensaml.soap.wstrust.WSTrustObject;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.audit.service.AuditService;
@@ -62,6 +60,7 @@ import swiss.trustbroker.homerealmdiscovery.util.DefaultIdmStatusPolicyCallback;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
 import swiss.trustbroker.mapping.service.ClaimsMapperService;
 import swiss.trustbroker.mapping.util.AttributeFilterUtil;
+import swiss.trustbroker.oidc.session.HttpExchangeSupport;
 import swiss.trustbroker.saml.dto.CpResponse;
 import swiss.trustbroker.saml.dto.ResponseParameters;
 import swiss.trustbroker.saml.service.RelyingPartyService;
@@ -75,6 +74,7 @@ import swiss.trustbroker.wstrust.validator.WsTrustValidator;
 @Service
 @AllArgsConstructor
 @Slf4j
+@ConditionalOnProperty(value = "trustbroker.config.wstrust.enabled", havingValue = "true")
 public class WsTrustService {
 
 	private final TrustBrokerProperties trustBrokerProperties;
@@ -112,11 +112,11 @@ public class WsTrustService {
 
 	private RequestSecurityTokenResponse createSecurityTokenResponse(List<Attribute> cpAttributes,
 			CpResponse cpResponse, WsTrustValidationResult validationResult) {
-		var requestSecurityTokenResponse =
-				(RequestSecurityTokenResponse) XMLObjectSupport.buildXMLObject(RequestSecurityTokenResponse.ELEMENT_NAME);
-
 		var assertionId = OpenSamlUtil.generateSecureRandomId();
 		var assertion = createAssertion(cpAttributes, cpResponse, assertionId, validationResult);
+
+		var requestedSecurityToken = WsTrustUtil.createRequestedSecurityToken(assertion);
+		var requestSecurityTokenResponse = WsTrustUtil.createSecurityTokenResponse(requestedSecurityToken);
 
 		// Current implementation SAML Token Lifetime 8h (configurable)
 		// or what the validator determined
@@ -130,9 +130,6 @@ public class WsTrustService {
 
 		var appliesTo = WsTrustUtil.createResponseAppliesTo(validationResult.getIssuerId());
 		requestSecurityTokenResponse.getUnknownXMLObjects().add(appliesTo);
-
-		var requestedSecurityToken = createRequestedSecurityToken(assertion, validationResult);
-		requestSecurityTokenResponse.getUnknownXMLObjects().add(requestedSecurityToken);
 
 		var requestedAttachedReference = WsTrustUtil.createRequestedAttachedRef(assertionId);
 		requestSecurityTokenResponse.getUnknownXMLObjects().add(requestedAttachedReference);
@@ -152,21 +149,6 @@ public class WsTrustService {
 		return requestSecurityTokenResponse;
 	}
 
-	private RequestedSecurityToken createRequestedSecurityToken(Assertion assertion, WsTrustValidationResult validationResult) {
-		var requestedSecurityToken =
-				(RequestedSecurityToken) XMLObjectSupport.buildXMLObject(RequestedSecurityToken.ELEMENT_NAME);
-
-		requestedSecurityToken.setUnknownXMLObject(assertion);
-
-		// trace
-		SamlTracer.logSamlObject("<<<<< Outgoing RSTR assertion", assertion);
-
-		// audit
-		auditRstResponseToClient(assertion, validationResult.getIssuerId());
-
-		return requestedSecurityToken;
-	}
-
 	Assertion createAssertion(List<Attribute> cpAttributes, CpResponse cpResponse, String assertionId,
 			WsTrustValidationResult validationResult) {
 
@@ -175,7 +157,7 @@ public class WsTrustService {
 		var rp = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(params.getIssuerId(), null);
 		var constAttr = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(validationResult.getIssuerId(), null)
 												.getConstAttributes();
-		List<String> contextClasses = getAuthnContextClasses(validationResult.getValidatedAssertion());
+		List<String> contextClasses = WsTrustUtil.getAuthnContextClasses(validationResult.getValidatedAssertion());
 
 		var userDetails = AttributeFilterUtil.filteredUserDetails(cpResponse.getUserDetails(), cpResponse.getIdmLookup(),
 				rp.getClaimsSelection());
@@ -191,11 +173,17 @@ public class WsTrustService {
 									.build();
 		SamlFactory.signSignableObject(assertion, signatureParameters);
 
+		// trace
+		SamlTracer.logSamlObject("<<<<< Outgoing RSTR assertion", assertion, WsTrustUtil.OP_LOG);
+
+		// audit
+		auditRstResponseToClient(assertion, validationResult.getIssuerId());
+
 		return assertion;
 	}
 
 	private ResponseParameters buildResponseParams(String assertionId, WsTrustValidationResult validationResult) {
-		var requestNameId = getNameID(validationResult.getValidatedAssertion());
+		var requestNameId = WsTrustUtil.getNameID(validationResult.getValidatedAssertion());
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(validationResult.getIssuerId(), null);
 		var tokenLifetime = relyingPartySetupService.getTokenLifetime(relyingParty);
 		var audienceLifetime = relyingPartySetupService.getAudienceRestrictionLifetime(relyingParty);
@@ -222,28 +210,6 @@ public class WsTrustService {
 								 .build();
 	}
 
-	private static NameID getNameID(Assertion assertion) {
-		Subject subject = assertion.getSubject();
-		if (subject == null) {
-			throw new TechnicalException(String.format("Missing Assertion.Subject from RST with id=%s", assertion.getID()));
-		}
-		return subject.getNameID();
-	}
-
-	private static List<String> getAuthnContextClasses(Assertion requestHeaderAssertion) {
-		List<String> contextClasses = Collections.emptyList();
-		if (requestHeaderAssertion == null || requestHeaderAssertion.getAuthnStatements().isEmpty()) {
-			return contextClasses;
-		}
-		var authnContext = requestHeaderAssertion.getAuthnStatements().get(0).getAuthnContext();
-		if (authnContext != null && authnContext.getAuthnContextClassRef() != null &&
-				authnContext.getAuthnContextClassRef().getURI() != null) {
-			var authnContextClassRef = authnContext.getAuthnContextClassRef().getURI();
-			contextClasses = List.of(authnContextClassRef);
-		}
-		return contextClasses;
-	}
-
 	public WSTrustObject processSecurityTokenRequest(
 			RequestSecurityToken requestSecurityToken, SoapMessageHeader requestHeader) {
 		// trace
@@ -252,7 +218,7 @@ public class WsTrustService {
 		}
 		var headerAssertion = requestHeader.getAssertion();
 		if (headerAssertion != null) {
-			SamlTracer.logSamlObject(">>>>> Incoming RST header assertion", headerAssertion);
+			SamlTracer.logSamlObject(">>>>> Incoming RST header assertion", headerAssertion, WsTrustUtil.OP_LOG);
 		}
 
 		// accept request
@@ -261,7 +227,7 @@ public class WsTrustService {
 
 		// trace assertion extracted from body
 		if (headerAssertion != requestAssertion) {
-			SamlTracer.logSamlObject(">>>>> Incoming RST assertion", requestAssertion);
+			SamlTracer.logSamlObject(">>>>> Incoming RST assertion", requestAssertion, WsTrustUtil.OP_LOG);
 		}
 
 		log.debug("Incoming RST accepted -> send RSTR");
@@ -307,6 +273,7 @@ public class WsTrustService {
 
 		var response = createResponse(cpAttributes, cpResponse, validationResult);
 
+		// RP side only, CP issuer can be XTB
 		scriptService.processWsTrustOnResponse(cpResponse, response, validationResult.getIssuerId(), "");
 
 		return response;
@@ -483,7 +450,7 @@ public class WsTrustService {
 
 		if (validationResult.isRecomputeAttributes()) {
 			var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(cpIssuer, "");
-			var homeName = relyingPartySetupService.getHomeName(claimsParty, List.of(requestAssertion), cpResponse);
+			var homeName = relyingPartySetupService.getHomeNameChecked(claimsParty, List.of(requestAssertion), cpResponse);
 			cpResponse.setHomeName(homeName);
 		}
 
@@ -509,13 +476,13 @@ public class WsTrustService {
 		return cpResponse;
 	}
 
-
 	private void auditRstRequestFromClient(Assertion assertion, String recipientIssuerId) {
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(recipientIssuerId, null);
 		var auditDto = new OutboundAuditMapper(trustBrokerProperties)
 				.mapFromRstRequestAssertion(assertion)
 				.mapFromThreadContext() // conversation switch done by assertion
 				.mapFrom(relyingParty)
+				.mapFrom(HttpExchangeSupport.getRunningHttpRequest())
 				.build();
 		auditService.logOutboundFlow(auditDto);
 	}
@@ -526,6 +493,7 @@ public class WsTrustService {
 				.mapFromThreadContext()
 				.mapFromRstResponseAssertion(assertion)
 				.mapFrom(relyingParty)
+				.mapFrom(HttpExchangeSupport.getRunningHttpRequest())
 				.build();
 		auditService.logOutboundFlow(auditDto);
 	}

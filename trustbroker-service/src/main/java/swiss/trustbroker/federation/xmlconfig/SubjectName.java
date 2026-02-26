@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -75,4 +75,13 @@ public class SubjectName implements Serializable {
 	 */
 	@XmlAttribute(name = "format")
 	private String format;
+
+	/**
+	 * Scope of the SubjectName
+	 *
+	 * @since 1.13.0
+	 */
+	@XmlAttribute(name = "scope")
+	@Builder.Default
+	private SubjectNameScope scope = SubjectNameScope.RESPONSE;
 }

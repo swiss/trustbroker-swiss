@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 trustbroker.swiss team BIT
+ * Copyright (C) 2026 trustbroker.swiss team BIT
  *
  * This program is free software.
  * You can redistribute it and/or modify it under the terms of the GNU Affero General Public License
@@ -58,6 +58,7 @@ import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.monitoring.dto.Status;
+import swiss.trustbroker.monitoring.service.MonitoringService;
 import swiss.trustbroker.saml.dto.RpRequest;
 import swiss.trustbroker.saml.dto.UiObject;
 import swiss.trustbroker.saml.dto.UiObjects;
@@ -71,7 +72,8 @@ import swiss.trustbroker.util.SamlValidator;
 @ExtendWith(SpringExtension.class)
 @WebMvcTest
 @ContextConfiguration(classes = {
-		MonitoringController.class
+		MonitoringController.class,
+		MonitoringService.class
 })
 @AutoConfigureMockMvc
 class MonitoringControllerTest {
@@ -94,6 +96,9 @@ class MonitoringControllerTest {
 
 	@MockitoBean
 	private ClaimsProviderService claimsProviderService;
+
+	@Autowired
+	private MonitoringService monitoringService;
 
 	@Autowired
 	private WebApplicationContext webApplicationContext;
@@ -134,7 +139,7 @@ class MonitoringControllerTest {
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_URN, null, true);
 		var state = createState();
 		doReturn(state).when(assertionConsumerService)
-					   .saveState(any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
+					   .saveState(any(), any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
 		var rpRequest = createRpRequest("dummyCp");
 		doReturn(rpRequest).when(assertionConsumerService).handleRpAuthnRequest(any(), any(), eq(state));
 
@@ -150,7 +155,7 @@ class MonitoringControllerTest {
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_URN, null, true);
 		var state = createState();
 		doReturn(state).when(assertionConsumerService)
-					   .saveState(any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
+					   .saveState(any(), any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
 		var rpRequest = createRpRequest(CP_URN, "otherCp");
 		doReturn(rpRequest).when(assertionConsumerService).handleRpAuthnRequest(any(), any(), eq(state));
 
@@ -166,7 +171,7 @@ class MonitoringControllerTest {
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_URN, null, true);
 		var state = createState();
 		doReturn(state).when(assertionConsumerService)
-					   .saveState(any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
+					   .saveState(any(), any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
 		var rpRequest = createRpRequest(CP_URN);
 		doReturn(rpRequest).when(assertionConsumerService).handleRpAuthnRequest(any(), any(), eq(state));
 
@@ -186,7 +191,7 @@ class MonitoringControllerTest {
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_URN, null, true);
 		var state = createState();
 		doReturn(state).when(assertionConsumerService)
-					   .saveState(any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
+					   .saveState(any(), any(), anyBoolean(), any(), eq(rp), eq(Optional.empty()), any());
 		var rpRequest = createRpRequest("otherCp1", CP_URN);
 		doReturn(rpRequest).when(assertionConsumerService).handleRpAuthnRequest(any(), any(), eq(state));
 
