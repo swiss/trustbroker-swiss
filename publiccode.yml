@@ -1,8 +1,8 @@
 publiccodeYmlVersion: 0.5.0
 name: trustbroker.swiss
 url: https://github.com/swiss/trustbroker-swiss
-softwareVersion: 1.12.0
-releaseDate: 2025-11-25
+softwareVersion: 1.13.0
+releaseDate: 2026-03-06
 platforms:
   - web
 categories:
