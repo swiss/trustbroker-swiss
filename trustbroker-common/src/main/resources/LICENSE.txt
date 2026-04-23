@@ -17,7 +17,7 @@ This binary contains derivative work of the following OSS projects.
  
 Derivative work is marked in the source as such, along with the original licenses:
 
-https://github.com/swiss/trustbroker-swiss/tree/main/trustbroker-common
+https://github.com/swiss/trustbroker.swiss/tree/main/trustbroker-common
 
 === 
 

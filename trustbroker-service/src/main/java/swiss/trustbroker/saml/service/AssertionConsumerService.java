@@ -269,12 +269,14 @@ public class AssertionConsumerService {
 		var expectedAudienceId = claimsParty.getAuthnRequestIssuerId();
 		var spStateData = idpStateData.getSpStateData();
 		var rpQoa = getRpQoa(idpStateData, spStateData);
+		var expectedRequestId = idpStateData.getId();
 
 		var expectedValues = AssertionValidator.ExpectedAssertionValues
 				.builder()
 				.expectedIssuer(expectedIssuer)
 				.expectedAudience(expectedAudienceId)
 				.expectSuccess(expectSuccess)
+				.expectedRequestId(expectedRequestId)
 				.expectedRelayState(existingRelayState)
 				.expectedCpComparison(idpStateData.getComparisonType())
 				.expectedCpContextClasses(idpStateData.getContextClasses())

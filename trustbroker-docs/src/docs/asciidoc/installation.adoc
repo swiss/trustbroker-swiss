@@ -41,7 +41,7 @@ a| Endpoints of interest of XTB:
 
 | ``trustbroker-samlmock`` simulating a SAML RP and CP to play around with.
 | RP entry points: http://localhost:7070
-| Mock service simulating RP and CP messages based on the ``xtb-gitops-demo/trustbroker-samlmock data`` to play around with the setup.
+| Mock service simulating RP and CP messages based on the ``gitops.trustbroker.swiss/trustbroker-samlmock data`` to play around with the setup.
 |===
 
 TLS engineering:
@@ -74,9 +74,9 @@ chmod 555 /usr/local/bin/docker-compose
 
 The demo setup should run out of the box as follows:
 
-- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/docker/docker-compose.yml[docker-compose.yml]
-- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/env-vault.conf[env-vault.conf]
-- Download https://github.com/swiss/trustbroker-swiss/blob/main/trustbroker-install/run.sh[run.sh]
+- Download https://github.com/swiss/trustbroker.swiss/blob/main/trustbroker-install/docker/docker-compose.yml[docker-compose.yml]
+- Download https://github.com/swiss/trustbroker.swiss/blob/main/trustbroker-install/env-vault.conf[env-vault.conf]
+- Download https://github.com/swiss/trustbroker.swiss/blob/main/trustbroker-install/run.sh[run.sh]
 
 Run the setup:
 
@@ -125,7 +125,7 @@ include::../../../../trustbroker-install/docker/setup-ssh.sh[]
 
 == Setup Gitea Server
 
-For trials, you can use the Gitea server as shown in the docker-compose setup, you need to switch from the github to the gitea URL for the xtb-gitops-demo repository..
+For trials, you can use the Gitea server as shown in the docker-compose setup, you need to switch from the github to the gitea URL for the gitops.trustbroker.swiss repository..
 
 [source,bash]
 ----
@@ -137,7 +137,7 @@ Setup manually:
 - Connect to http://localhost:3000/ and confirm the default server setup.
 - Register user ``trustbroker-swiss`` and login.
 - Add content of ``ssh/id_rsa.pub`` (and/or your own) to: User >> Settings >> SSH/PGP Keys >> Manage SSH Keys >> Add Key
-- Create a repository ``xtb-gitops-demo``.
+- Create a repository ``gitops.trustbroker.swiss``.
 - Optional: For http access: User >> Settings >> Applications >> Manage Access Tokens >> Generate Token
 
 The resulting access token can be set along the ``GIT_URL`` as ``GIT_TOKEN`` or mapped to ``/etc/trustbroker/keys/git_token``.
@@ -150,8 +150,8 @@ Clone the public demo repository:
 
 [source,bash]
 ----
-git clone -b main https://github.com/swiss/xtb-gitops-demo.git
-cd xtb-gitops-demo
+git clone -b main https://github.com/swiss/gitops.trustbroker.swiss.git
+cd gitops.trustbroker.swiss
 ----
 
 Before doing so you might want to have your own new signer (see SetupRP/ProfileRP Certificates for use):
@@ -167,7 +167,7 @@ Import your initial trial repository:
 
 [source,bash]
 ----
-git remote set-url origin ssh://git@localhost:222/trustbroker-swiss/xtb-gitops-demo.git
+git remote set-url origin ssh://git@localhost:222/trustbroker-swiss/gitops.trustbroker.swiss.git
 git push -u origin main
 ----
 
@@ -175,12 +175,12 @@ Alternatively, use HTTP:
 
 [source,bash]
 ----
-git remote set-url origin http://git@localhost:3000/trustbroker-swiss/xtb-gitops-demo.git
+git remote set-url origin http://git@localhost:3000/trustbroker-swiss/gitops.trustbroker.swiss.git
 git push
 ----
 
 Run the services in the directory where you stored the tweaked ``docker-compose.yml`` and ``env-vault.conf`` using the following
-https://github.com/swiss/trustbroker-swiss/trustbroker-install/docker/run.sh[run.sh]:
+https://github.com/swiss/trustbroker.swiss/trustbroker-install/docker/run.sh[run.sh]:
 
 [source,bash]
 ----

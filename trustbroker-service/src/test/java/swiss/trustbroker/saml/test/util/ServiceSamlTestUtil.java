@@ -79,6 +79,9 @@ public class ServiceSamlTestUtil implements SamlHttpTestBase {
 
 	public static final String AUTHN_REQUEST_ISSUER_ID = "urn:test:TESTRP";
 
+	public static final String RP_AUTHN_REQUEST_ID = "sp-requestid";
+
+	public static final String CP_AUTHN_REQUEST_ID = "idp-requestid";
 
 	public static AuthnRequest loadAuthnRequest() {
 		String authnRequestFilePath = SamlTestBase.filePathFromClassPath(TEST_AUTHN_REQUEST);
@@ -198,13 +201,13 @@ public class ServiceSamlTestUtil implements SamlHttpTestBase {
 
 		StateData spStateData = StateData.builder()
 				.lifecycle(Lifecycle.builder().lifecycleState(LifecycleState.INIT).build())
-				.id("sp-requestid")
+				.id(RP_AUTHN_REQUEST_ID)
 				.issuer(AUTHN_REQUEST_ISSUER_ID)
 				.relayState("sp-relaystate")
 				.build();
 		return StateData.builder()
 				.lifecycle(Lifecycle.builder().lifecycleState(LifecycleState.INIT).build())
-				.id("idp-requestid")
+				.id(CP_AUTHN_REQUEST_ID)
 				.issuer("urn:test:TESTCP")
 				.relayState("idp-relay-state")
 				.issueInstant(now.toString())

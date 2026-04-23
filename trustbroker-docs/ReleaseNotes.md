@@ -1,12 +1,27 @@
 # Unreleased Versions
 
-# 1.14.0
+# 1.15.0 (2026-08)
+
+### Improvements
+- SAML:
+  - Validation improvements.
+- Security:
+  - Disable API controllers of unused features. SSO, profile selection, announcements, monitoring need to be enabled explicitly if used.
+  - Server-side rendering of skinny HRD.
+- Config:
+  - Improved profile merging for attributes with defaults.
+
+### Bugfixes
+- Config:
+  - Fix duplicated Gauge registration warning.
+
+# 1.14.0 (2026-05)
 
 ### Dependency upgrades
 
 - Backend:
   - JDK 21.0.10
-  - Spring Boot 3.5.7
+  - Spring Boot 3.5.13
   - Spring Cloud 2025.0.1
   - nimbus-jose-jwt 9.48
   - JGit 7.5.0.202512021534-r
@@ -33,18 +48,50 @@
 ### Improvements
 - OIDC:
   - Improvements for grant type token exchange.
+- LDAP:
+  - Organizational profile selection.
+  - Switch to osixia openldap image.
 - Attributes:
   - Option to make individual attributes mandatory.
 - Cookies:
   - Same site now also considers Sec-Fetch-Site.
 - UI:
   - Remove unused fonts.scss.
+- Config:
+  - Support Spring property references in XML configuration files.
+  - Support loading certificates from paths outside the Git configuration.
+- Security:
+  - Hardening of protocol endpoints: WS-Trust and WS-FED are now disabled by default and need to be enabled explicitly.
 
 ### Bugfixes
 -OIDC:
  - Fix handling of missing userinfo endpoint in CP.
+ - Fix warnings in logs on configuration reload.
+ - Allow token introspection between clients in the same SetupRP.
 - WSTrust:
   - Accept RST ISSUE envelope signed by assertion issuer.
+- DB:
+  - Fixed BLOB type for PostgreSQL.
+
+## 1.13.0.20260317T170552Z
+
+### Features
+- Git:
+  - Aligned source, doc, and GitOps repository names.
+
+### Bugfixes
+- SAML:
+  - Fixed InResponseTo validation, can be disabled via configuration.
+
+## 1.13.0.20260316T084959Z
+
+### Improvements
+- UI: 
+  - Skinny HRD files are now blocked if not enabled. Dropped old variants. Skinny HRD is disabled by default now.
+
+### Bugfixes
+- UI:
+  - Fixed injection issue.
 
 # Released Versions
 
@@ -62,7 +109,7 @@
 
 ### Features
 - OIDC:
-  - Support for grant type token exchange (disabled by default).
+  - Support for grant type token exchange (disabled by default). This feature is still in beta stage with 1.13.0, do not enable it in production.
 - WS-Fed:
   - Basic support for SignIn / SignOut (disabled by default).
 - Database:
@@ -326,7 +373,7 @@
   - Configurable banners on top.
   - Tiles grouped by configured order.
   - Disabled per default (GUI feature HRD_BANNERS, ClaimsProvider.order).
-  -- The old layout will be removed earliest in 1.12.0.
+  - The old layout will be removed earliest in 1.12.0.
 
 - QoA mapping and optional enforcement from/to RP and CP:
   - QoA element for ClaimsParty/RelyingParty.

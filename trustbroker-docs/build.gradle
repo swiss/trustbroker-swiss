@@ -30,10 +30,10 @@ asciidoctorj {
 
 // asciidoc is slow so build it with an optional task and populate public doc project
 task publishHtml(type: Copy) {
-	description 'Compile asciidoc markup files and publish HTML to trustbroker.swiss checkout'
+	description 'Compile asciidoc markup files and publish HTML to doc.trustbroker.swiss checkout'
 	group 'publishing'
 	from 'build/docs/asciidoc'
 	exclude '.asciidoctor'
-	into "${rootProject.rootDir}/trustbroker.swiss/html"
+	into "${rootProject.rootDir}/doc.trustbroker.swiss/html"
 	dependsOn 'asciidoctor'
 }

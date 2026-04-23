@@ -48,7 +48,7 @@ class SkinnyHrdTest {
 
 	private static final String NAME_2_SHORT = "another";
 
-	private static final String IMAGE = "image1";
+	private static final String IMAGE = "image1"; // not included
 
 	@Test
 	void buildSkinnyHrdPage() {
@@ -63,14 +63,13 @@ class SkinnyHrdTest {
 						TILE_TITLE + SkinnyHrd.ATTRIBUTE_SEPARATOR +
 						SHORTCUT + SkinnyHrd.ATTRIBUTE_SEPARATOR +
 						COLOR_ENCODED + SkinnyHrd.ATTRIBUTE_SEPARATOR +
-						NAME + SkinnyHrd.ATTRIBUTE_SEPARATOR +
-						IMAGE + SkinnyHrd.ENTRY_SEPARATOR +
+						NAME + SkinnyHrd.ENTRY_SEPARATOR +
 				// entry 2:
 				ApiSupport.encodeUrlParameter(SkinnyHrd.DEFAULT_CPURN) + SkinnyHrd.ATTRIBUTE_SEPARATOR +
 						TILE_TITLE_2_ENCODED + SkinnyHrd.ATTRIBUTE_SEPARATOR +
 						TILE_TITLE_2_SHORT + SkinnyHrd.ATTRIBUTE_SEPARATOR +
 						SkinnyHrd.DEFAULT_SHORT_COLOR + SkinnyHrd.ATTRIBUTE_SEPARATOR +
-						NAME_2_SHORT + SkinnyHrd.ATTRIBUTE_SEPARATOR // + empty image
+						NAME_2_SHORT
 		));
 	}
 

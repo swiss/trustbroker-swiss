@@ -18,7 +18,7 @@ You can use error, warn, info, debug and trace methods with parameter binding:
 
 [source,groovy]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/DebugRpRequest.groovy[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/scripts/DebugRpRequest.groovy[]
 ----
 
 == RPRequest
@@ -32,7 +32,7 @@ Example:
 
 [source,java]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/HrdAutoSelectClaimsProvider.groovy[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/scripts/HrdAutoSelectClaimsProvider.groovy[]
 ----
 
 == HTTPRequest
@@ -70,6 +70,6 @@ If not mentioned in this section, you might produce some unwanted results.
 
 [source,java]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/scripts/OidcAttachAddressClaim.groovy[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/scripts/OidcAttachAddressClaim.groovy[]
 ----
 

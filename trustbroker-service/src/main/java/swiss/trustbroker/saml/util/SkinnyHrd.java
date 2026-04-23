@@ -78,9 +78,7 @@ public class SkinnyHrd {
 			log.warn("Missing name in uiObject={}", uiObject);
 		}
 		var cpName = uiObject.getName() != null ? uiObject.getName().replaceAll(" .*", "") : "";
-		pageContent.append(cpName).append(ATTRIBUTE_SEPARATOR);
-		var cpImage = uiObject.getImage() != null ? uiObject.getImage() : "";
-		pageContent.append(cpImage);
+		pageContent.append(cpName);
 	}
 
 }

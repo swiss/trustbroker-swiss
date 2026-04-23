@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import swiss.trustbroker.common.config.RegexNameValue;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.WebSupport;
@@ -67,6 +68,11 @@ public class AccessFilter implements Filter {
 				.stream()
 				.map(Pattern::quote) // escape regex characters
 				.collect(Collectors.joining("|"));
+		var htmlPathRegex = trustBrokerProperties.getSkinnyHrdTriggers() == null ? "" :
+				trustBrokerProperties.getSkinnyHrdTriggers()
+						.stream()
+						.map(RegexNameValue::getValue)
+						.collect(Collectors.joining("|"));
 		return "^("
 				// SPA - see app-routing-module and AppController code
 				+ "/app|/app/.*"
@@ -79,7 +85,9 @@ public class AccessFilter implements Filter {
 				// default SAML endpoints
 				+ "|/adfs/.*|/FederationMetadata/.*|/federationmetadata/.*"
 				// assets referenced by UI (some of which are unfortunately in the context root)
-				+ "|/assets/.*|/js/.*|/[^/]*.(js|css|woff2?|ttf|eot|svg|html)"
+				+ "|/assets/.*|/js/.*|/[^/]*.(js|css|woff2?|ttf|eot|svg)"
+				+ "|/index.html"
+				+ "|" + htmlPathRegex
 				+ "|/favicon.ico"
 				+ "|/robots.txt"
 				// OIDC services (spring-authorization-server and Keycloak compatibility)

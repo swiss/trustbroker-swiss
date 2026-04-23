@@ -58,7 +58,7 @@ XTB consists of the following modules:
 |N/A
 |This AsciiDoc documentation.
 
-|``xtb-gitops-demo``
+|``gitops.trustbroker.swiss``
 |N/A
 |GIT repository with sample XTB configuration.
 

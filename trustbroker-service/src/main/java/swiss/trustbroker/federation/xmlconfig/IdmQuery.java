@@ -106,6 +106,8 @@ public class IdmQuery implements Serializable, IdmRequest {
 
 	/**
 	 * Sub resource parameter for the IDM (baseDN in case of LDAP).
+	 *
+	 * @since 1.13.0
 	 */
 	@XmlElement(name = "SubResource")
 	private String subResource;

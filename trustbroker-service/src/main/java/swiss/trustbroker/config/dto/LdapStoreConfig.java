@@ -40,6 +40,8 @@ public class LdapStoreConfig {
 
 	/**
 	 * Default value for undefined IDMQuery.AppFilter value
+	 *
+	 * @since 1.13.0
 	 */
 	private String undefined;
 

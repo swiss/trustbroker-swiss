@@ -469,12 +469,11 @@ trustbroker:
         #maxAge: -1
         #secure: ${trustbroker.config.secureBrowserHeaders}
         #sameSite: 'Lax'
-    # Workaround: MSIE backward compat for SPS19
-    # NOTE: Other variants skinnyHRD, skinnyImgHRD and skinnyHRDV2 are trails and will be removed
-    skinnyHrdTriggers:
-      - name: 'User-Agent'
-        regex: '.*Trident/7.*'
-        value: '/skinnyColHRD.html'
+    # MSIE workaround using a hard-coded HRD handling instead of the standard application:
+    #skinnyHrdTriggers:
+    #  - name: 'User-Agent'
+    #    regex: '.*Trident/7.*'
+    #    value: '/skinnyColHRD.html'
     monitoringHints:
       - name: 'X-Simulated-Forwarded-For'
         regex: '10\.10\.10\.[2-254]*'

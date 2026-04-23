@@ -8,5 +8,5 @@ out
 .iml
 
 # external repo required for ascidoc generation
-xtb-gitops-demo
+gitops.trustbroker.swiss
 

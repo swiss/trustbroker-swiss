@@ -18,6 +18,8 @@ package swiss.trustbroker.waf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.util.List;
+
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,6 +27,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import swiss.trustbroker.common.config.RegexNameValue;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
@@ -48,6 +51,7 @@ class AccessFilterTest {
 		trustBrokerProperties.setSaml(new SamlProperties());
 		trustBrokerProperties.getSaml().setConsumerUrl("https://localhost/custom/consumer");
 		trustBrokerProperties.setPerimeterUrl("https://localhost/custom/perimeter");
+		trustBrokerProperties.setSkinnyHrdTriggers(List.of(new RegexNameValue("", "", "/skinnyColHRD.html")));
 		accessFilter = new AccessFilter(trustBrokerProperties);
 	}
 
@@ -84,6 +88,10 @@ class AccessFilterTest {
 			// assets referenced by UI
 			"/assets/images/logo.svg,200",
 			"/assets/images/favicon.ico,200",
+			"/index.html,200",
+			"/skinnyColHRD.html,200",
+			"/skinnyHRD.html,404",
+			"/other.html,404",
 			"/favicon.ico,200",
 			"/runtime.a26ed6ea895c0fcf5af2.js,200",
 			"/styles.58751f05ac77ca4b10bf.css,200",

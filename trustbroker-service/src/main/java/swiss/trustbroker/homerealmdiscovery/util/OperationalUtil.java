@@ -25,7 +25,7 @@ import swiss.trustbroker.util.WebSupport;
 @Slf4j
 public class OperationalUtil {
 
-	public static final String SKINNY_HRD_DEFAULT = "/skinnyHRD.html";
+	public static final String SKINNY_HRD_DEFAULT = "/skinnyColHRD.html";
 
 	private OperationalUtil() {}
 

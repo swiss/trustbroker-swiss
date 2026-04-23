@@ -221,6 +221,7 @@ public class AssertionValidator {
 		// session dependent checks (stateful)
 		validateRelayState(expectedValues.expectedRelayState, responseData.getRelayState(), properties, response);
 		validateResponseIssuer(response, expectedValues.expectedIssuer, properties);
+		validateInResponseTo(response, expectedValues.expectedRequestId, properties);
 		if (expectedValues.expectSuccess) {
 			if (expectedValues.expectedRequestId == null) {
 				expectedValues.setExpectedRequestId(response.getInResponseTo());
@@ -415,6 +416,21 @@ public class AssertionValidator {
 			}
 			// in discontinued stealth mode this would pop up in PROD, se reduce log level, signature is checked anyway first
 			log.debug("trustbroker.config.security.validateResponseIssuer=false: CP-IdP issuer not checked!!!");
+		}
+	}
+
+	static void validateInResponseTo(Response response, String expectedRequestId, TrustBrokerProperties properties) {
+		// InResponseTo must be present if the Response is a reply to a Request
+		var inResponseTo = response.getInResponseTo();
+		if (expectedRequestId != null && !expectedRequestId.equals(inResponseTo)) {
+			var message = String.format("Invalid response with ID='%s' InResponseTo='%s' not matching requestId='%s'",
+					response.getID(), inResponseTo, expectedRequestId);
+			if (properties.getSecurity().isValidateInResponseTo()) {
+				throw new RequestDeniedException(message);
+			}
+			else {
+				log.warn(message);
+			}
 		}
 	}
 
@@ -1081,7 +1097,7 @@ public class AssertionValidator {
 		}
 	}
 
-	// Subject created in response to AuthnRequest? Setting inResponseTo is optional (it's usally empty)
+	// Subject created in response to AuthnRequest? Setting inResponseTo is optional (it's usually empty)
 	static void validateSubjectConfirmationData(SubjectConfirmationData subjectConfirmationData,
 			Instant nowOffsetDateTime, String expectedRequestId, boolean renew, String expectedRecipient,
 			TrustBrokerProperties properties, XMLObject xmlObject) {

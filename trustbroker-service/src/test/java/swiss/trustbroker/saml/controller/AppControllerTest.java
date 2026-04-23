@@ -534,6 +534,7 @@ class AppControllerTest {
 	private void handleIncomingResponseWithStatus(Status status) throws Exception {
 		Response authnResponse = ServiceSamlTestUtil.loadAuthnResponse();
 		authnResponse.setIssueInstant(Instant.now());
+		authnResponse.setInResponseTo(ServiceSamlTestUtil.CP_AUTHN_REQUEST_ID);
 
 		authnResponse.setStatus(status);
 
@@ -915,6 +916,7 @@ class AppControllerTest {
 	void handleIncomingMessagesValidResponseTest(String entryUrl) throws Exception {
 		Response authnResponse = ServiceSamlTestUtil.loadAuthnResponse();
 		authnResponse.setIssueInstant(Instant.now());
+		authnResponse.setInResponseTo(ServiceSamlTestUtil.CP_AUTHN_REQUEST_ID);
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
 		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);

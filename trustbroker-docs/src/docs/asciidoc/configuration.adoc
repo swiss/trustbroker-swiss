@@ -20,7 +20,7 @@ The following annotated demo file shows insights:
 
 [source,yaml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/config/application.yml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/config/application.yml[]
 ----
 
 == Claims Provider Definitions
@@ -34,7 +34,7 @@ The DEMO setup uses the SAML mock in 2 instances.
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/ClaimsProviderDefinition.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/ClaimsProviderDefinition.xml[]
 ----
 
 == Single Sign On Groups
@@ -44,7 +44,7 @@ A login with the same CP is then not required anymore.
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupSSOGroups.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/SetupSSOGroups.xml[]
 ----
 
 == Claims Party Setup
@@ -57,7 +57,7 @@ The incoming assertion attributes are declared to also document the expected inp
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-1.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-1.xml[]
 ----
 
 == Relying Party Profile
@@ -80,7 +80,7 @@ The order reflects the processing model (see architecture) so reading a ProfileR
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/ProfileRP_DemoDefaults.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/ProfileRP_DemoDefaults.xml[]
 ----
 
 == Relying Party Setup
@@ -93,7 +93,7 @@ Broken configurations are ignored for resilience.
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupRP_SAML-Demo.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/SetupRP_SAML-Demo.xml[]
 ----
 
 == Qoa Setup
@@ -110,14 +110,14 @@ RP Qoa example (validating/mapping inbound acr value and mapping back outbound v
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupRP_QOA-Demo.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/SetupRP_QOA-Demo.xml[]
 ----
 
 CP Qoa example (mapping inbound acr values and validating/mapping outbound values):
 
 [source,xml]
 ----
-include::../../../../xtb-gitops-demo/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-2.xml[]
+include::../../../../gitops.trustbroker.swiss/trustbroker-inventories/DEMO/definition/SetupCP_SAML-Mock-2.xml[]
 ----
 
 == PKI Setup
@@ -179,7 +179,7 @@ Text handling:
 
 === Theme Customizing
 
-See ``xtb-gitops-demo`` for assets and check the CSS to see if the styling of the interactive parts of XTB (usually HRD and error screen) fits your needs.
+See ``gitops.trustbroker.swiss`` for assets and check the CSS to see if the styling of the interactive parts of XTB (usually HRD and error screen) fits your needs.
 
 == Reconfiguration Process
 
@@ -198,5 +198,5 @@ Changes are also ``INFO`` logged in the console.
 During development the following script speeds up the re-configuration process:
 
 ----
-include::../../../../xtb-gitops-demo/reconfig.sh[]
+include::../../../../gitops.trustbroker.swiss/reconfig.sh[]
 ----

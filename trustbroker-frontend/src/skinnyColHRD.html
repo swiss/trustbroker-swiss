@@ -8,30 +8,44 @@
 		<link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
 		<link rel="stylesheet" href="skinnyUIStyles.css" />
 		<script>
-			function jsEscape(str) {
+			function uriDecode(str) {
+				if (str == null) {
+					return "";
+				}
+				return decodeURI(str);
+			}
+			function uriEncode(str) {
+				str = uriDecode(str);
+				if (!str.match(/^[A-Za-z0-9_-]*$/)) {
+					return "";
+				}
+				return encodeURIComponent(str);
+			}
+			function htmlEncode(str) {
+				str = uriDecode(str);
 				return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;").replace(/_+/g, " ");
 			}
 			function hrdSelect(cpUrl) {
 				window.location.href = cpUrl;
 			}
-			var queryString = window.location.href.split("?")[1];
+			var url = window.location.href.split("#")[0];
+			var queryString = url.split("?")[1];
 			var queryPrams = queryString.split("&");
-			var requestId = encodeURIComponent(queryPrams[0]);
+			var requestId = uriEncode(queryPrams[0]);
 			var pageContent = queryPrams[1];
-			var versionInfo = queryPrams[2];
+			var versionInfo = htmlEncode(queryPrams[2]);
 			var uiElements = pageContent.split(";");
 			var cont = '<h1 class="skinnyH1">Logins</h1>';
 			cont += '<div class="skinnyContainer skinnyContainerList">';
 			for (var i = 0; i < uiElements.length; i++) {
 				var elements = uiElements[i].split(",");
-				var cpId = encodeURIComponent(elements[0]);
-				var cpId2 = cpId; // atob(elements[0]); // MSIE10 or above
+				var cpId = uriEncode(elements[0]);
 				var cpLocation = "/api/v1/hrd/claimsproviders/" + cpId + "?sid=" + requestId;
-				var longTitle = jsEscape(decodeURI(elements[1]));
-				var shortTitle = encodeURIComponent(elements[2].toUpperCase());
-				var shortColor = encodeURIComponent(decodeURI(elements[3]));
-				var cpName = jsEscape(decodeURI(elements[4]));
-				cont += '<div class="skinnyCard skinnyCardList" id="' + cpId2 + '" onclick="hrdSelect(\'' + cpLocation + "')\">";
+				var longTitle = htmlEncode(elements[1]);
+				var shortTitle = htmlEncode(elements[2]).toUpperCase();
+				var shortColor = uriEncode(elements[3]);
+				var cpName = uriEncode(elements[4]);
+				cont += '<div class="skinnyCard skinnyCardList" id="' + cpId + '" onclick="hrdSelect(\'' + cpLocation + "')\">";
 				cont += '	<div class="skinnyButton" style="background-color:#' + shortColor + '">';
 				cont += '		<span class="buttonText">' + shortTitle + "</span>";
 				cont += "	</div>";
@@ -42,7 +56,7 @@
 			}
 			cont += "</div>";
 			cont += '<div class="skinnyVersionInfo">';
-			cont += jsEscape(versionInfo);
+			cont += versionInfo;
 			cont += "</div>";
 			document.write(cont);
 		</script>

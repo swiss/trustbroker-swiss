@@ -51,7 +51,7 @@ bootRun {
 	systemProperty 'logging.level.swiss.trustbroker.saml.util.SamlTracer', 'DEBUG'
 	// switch to external frontend service running in node server
 	systemProperty 'trustbroker.config.frontendBaseUrl', 'http://localhost:4200'
-	// override xtb-gitops-demo.git database default using H2 in instead so we can run without additional services in DEV mode
+	// override gitops.trustbroker.swiss.git database default using H2 in instead so we can run without additional services in DEV mode
 	systemProperty 'spring.flyway.url', 'jdbc:h2:mem:TBSS16;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS TBSS16'
 	systemProperty 'spring.flyway.user', 'sa'
 	systemProperty 'spring.flyway.schemas', 'TBSS16'
@@ -107,7 +107,7 @@ jib {
 		// NOTE: Bootstrap environment within the docker container (all parameters are MUST, these are the prod defaults)
 		// NOTE: SSH_KEY can be passed by value (base64 encoded SSH private key), see top README.md
 		environment = [
-				GIT_URL         : 'https://github.com/swiss/xtb-gitops-demo',
+				GIT_URL         : 'https://github.com/swiss/gitops.trustbroker.swiss',
 				CONFIG_BRANCH   : 'master',
 				TRUSTBROKER_HOME: '/etc/trustbroker'
 		]

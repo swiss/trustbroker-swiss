@@ -88,7 +88,7 @@ jib {
 				'--spring.config.location=optional:classpath:/,file:${TRUSTBROKER_HOME}/configCache/trustbroker-samlmock/${SPRING_PROFILES_ACTIVE}/config/'
 		]
 		environment = [
-				GIT_URL         : 'https://github.com/swiss/xtb-gitops-demo.git',
+				GIT_URL         : 'https://github.com/swiss/gitops.trustbroker.swiss.git',
 				CONFIG_BRANCH   : 'master',
 				TRUSTBROKER_HOME: '/etc/trustbroker',
 				XDG_CONFIG_HOME : '/etc/trustbroker' // https://bugs.eclipse.org/bugs/show_bug.cgi?id=582064

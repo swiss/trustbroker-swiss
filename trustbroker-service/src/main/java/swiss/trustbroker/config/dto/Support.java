@@ -44,6 +44,8 @@ public class Support {
 
 	/**
 	 * Extends debug support with web message dumping on configured servlet path
+	 *
+	 * @since 1.13.0
 	 */
 	private String webDumpPathRegEx;
 

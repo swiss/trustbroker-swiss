@@ -323,7 +323,7 @@ class AssertionConsumerServiceTest {
 		// response
 		var response = SamlFactory.createResponse(Response.class, TEST_CP);
 		response.getAssertions().add(OpenSamlUtil.buildAssertionObject());
-		response.setInResponseTo("authnRequestId");
+		response.setInResponseTo(RELAY_STATE);
 		var status = SamlFactory.createResponseStatus(StatusCode.RESPONDER, "message", StatusCode.UNKNOWN_PRINCIPAL);
 		response.setStatus(status);
 		// state
@@ -576,7 +576,7 @@ class AssertionConsumerServiceTest {
 
 	private StateData mockState(String relayState) {
 		var stateData = StateData.builder()
-				.id("sessionId")
+				.id(relayState)
 				.spStateData(StateData.builder().id("spSessionId").build())
 				.build();
 		doReturn(stateData).when(stateCacheService).find(relayState, AssertionConsumerService.class.getSimpleName());

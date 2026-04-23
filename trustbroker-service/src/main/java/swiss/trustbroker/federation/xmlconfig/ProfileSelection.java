@@ -131,18 +131,24 @@ public class ProfileSelection implements Serializable, ProfileSelectionPropertie
 
 	/**
 	 * Attribute used as selector (kind of unique Primary Key) for profile selection.
+	 *
+	 * @since 1.13.0
 	 */
 	@XmlAttribute(name = "profileSelector")
 	private String profileSelector;
 
 	/**
 	 * Attribute used as displayName for profile selection UI.
+	 *
+	 * @since 1.13.0
 	 */
 	@XmlAttribute(name = "displayName")
 	private String displayName;
 
 	/**
 	 * Additional information to be displayed for profile selection.
+	 *
+	 * @since 1.13.0
 	 */
 	@XmlAttribute(name = "displayClaims")
 	@XmlJavaTypeAdapter(StringListAdapter.class)

@@ -471,6 +471,8 @@ public class TrustBrokerProperties {
 	/**
 	 * PEN testing cookie that can be used to implement penetration testing scenarios on the OnMessage hook.
 	 * If not configured, the OnMessage hook is disabled.
+	 *
+	 * @since 1.13.0
 	 */
 	private String publicPenTestCookie;
 

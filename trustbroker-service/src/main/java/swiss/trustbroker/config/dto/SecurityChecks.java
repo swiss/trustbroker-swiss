@@ -199,6 +199,15 @@ public class SecurityChecks {
 	private boolean validateResponseIssuer = true;
 
 	/**
+	 * Check response inResponseTo.
+	 * <br/>
+	 * Default: true
+	 * @since 1.13.0
+	 */
+	@Builder.Default
+	private boolean validateInResponseTo = true;
+
+	/**
 	 * In WS-Trust RST case we per default require a valid subject confirmation.
 	 * <br/>
 	 * Default: true

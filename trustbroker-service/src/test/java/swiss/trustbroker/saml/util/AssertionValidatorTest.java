@@ -109,13 +109,15 @@ class AssertionValidatorTest {
 
 	private static final String ARTIFACT_ID = "artifactId";
 
+	private static final String AUTHN_REQUEST_ID = "authn12345";
+
 	private static final Optional<List<Credential>> NO_CREDENTIALS = Optional.empty();
 
 	TrustBrokerProperties properties;
 
 	private MemoryAppender memoryAppender;
 
-	private void enableDebug(Class clazz, MemoryAppender memoryAppender) {
+	private void enableDebug(Class<?> clazz, MemoryAppender memoryAppender) {
 		Logger logger = (Logger) LoggerFactory.getLogger(clazz);
 		logger.setLevel(Level.DEBUG);
 		logger.addAppender(memoryAppender);
@@ -281,6 +283,38 @@ class AssertionValidatorTest {
 		assertThrows(RequestDeniedException.class, () -> {
 			AssertionValidator.validateResponseIssueInstant(response, now, properties);
 		});
+	}
+
+	@Test
+	void validateInResponseTo() {
+		var response = givenSamlResponse();
+		response.setInResponseTo(AUTHN_REQUEST_ID);
+		assertDoesNotThrow(() -> AssertionValidator.validateInResponseTo(response, AUTHN_REQUEST_ID, properties));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"null",
+			AUTHN_REQUEST_ID,
+			"differing12345"
+	}, nullValues = "null")
+	void validateInResponseToDisabled(String inResponseTo) {
+		properties.getSecurity().setValidateInResponseTo(false);
+		var response = givenSamlResponse();
+		response.setInResponseTo(inResponseTo);
+		assertDoesNotThrow(() -> AssertionValidator.validateInResponseTo(response, AUTHN_REQUEST_ID, properties));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"null",
+			"differing12345"
+	}, nullValues = "null")
+	void validateResponseToWrong(String inResponseTo) {
+		var response = givenSamlResponse();
+		response.setInResponseTo(inResponseTo);
+		assertThrows(RequestDeniedException.class,
+				() -> AssertionValidator.validateInResponseTo(response, AUTHN_REQUEST_ID, properties));
 	}
 
 	@Test
