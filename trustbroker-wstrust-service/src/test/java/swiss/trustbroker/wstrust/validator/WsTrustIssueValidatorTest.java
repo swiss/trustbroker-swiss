@@ -16,16 +16,21 @@
 package swiss.trustbroker.wstrust.validator;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -36,15 +41,21 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
+import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.config.dto.WsTrustConfig;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
+import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.SecurityPolicies;
+import swiss.trustbroker.federation.xmlconfig.WsTrust;
 import swiss.trustbroker.federation.xmlconfig.WsTrustBinding;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.script.service.ScriptService;
+import swiss.trustbroker.test.saml.util.SamlTestBase;
 import swiss.trustbroker.wstrust.util.WsTrustTestUtil;
 import swiss.trustbroker.wstrust.util.WsTrustUtil;
 
@@ -107,55 +118,57 @@ class WsTrustIssueValidatorTest {
 
 	@ParameterizedTest
 	@MethodSource
-	void requireSignedRequest(ClaimsParty cp, RelyingParty rp, WsTrustConfig config, boolean expected) {
-		assertThat(WsTrustIssueValidator.requireSignedRequest(cp, rp, config), is(expected));
+	void requireSignedRequests(ClaimsParty cp, RelyingParty rp, WsTrustConfig config,
+			Function<WsTrustConfig, Boolean> configGetter, BiFunction<CounterParty, Boolean, Boolean> policyGetter,
+			boolean expected) {
+		var defaultValue = configGetter.apply(config);
+		assertThat(WsTrustIssueValidator.calculateProperty(cp, rp, defaultValue, policyGetter, "requireSignedRequests"),
+				is(expected));
 	}
 
-	static Object[][] requireSignedRequest() {
-		var defaultPolicies = new SecurityPolicies();
-		var defaultConfig = new  WsTrustConfig();
-		return new Object[][] {
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), defaultConfig, true }, // default
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), givenConfig(true, null), true }, //  global
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), givenConfig(false, null), false }, //  global
-				{ givenCp(givenSecurityPolicies(true, null)), givenRp(defaultPolicies), defaultConfig, true }, // CP
-				{ givenCp(givenSecurityPolicies(true, null)), givenRp(defaultPolicies), givenConfig(false, null), true }, // CP
-				{ givenCp(givenSecurityPolicies(false, null)), givenRp(defaultPolicies), defaultConfig, false }, // CP
-				{ givenCp(givenSecurityPolicies(true, null)), givenRp(givenSecurityPolicies(false, null)),
-						defaultConfig, false }, // RP
-				{ givenCp(defaultPolicies), givenRp(givenSecurityPolicies(false, null)),
-						defaultConfig, false }, // RP
-				{ givenCp(givenSecurityPolicies(false, null)), givenRp(givenSecurityPolicies(true, null)),
-						defaultConfig, true }, // RP
-				{ givenCp(givenSecurityPolicies(false, null)), givenRp(givenSecurityPolicies(true, null)),
-						givenConfig(false, null), true } // RP
-		};
+	static Object[][] requireSignedRequests() {
+		return givenMockData(
+				WsTrustConfig::setIssueRequireSignedRequests, WsTrustConfig::isIssueRequireSignedRequests,
+				SecurityPolicies::setWsTrustIssueRequireSignedRequest, CounterParty::wsTrustIssueRequireSignedRequest);
 	}
 
 	@ParameterizedTest
 	@MethodSource
-	void requireSignedAssertion(ClaimsParty cp, RelyingParty rp, WsTrustConfig config, boolean expected) {
-		assertThat(WsTrustIssueValidator.requireSignedAssertion(cp, rp, config), is(expected));
+	void requireSignedRequestAssertions(ClaimsParty cp, RelyingParty rp, WsTrustConfig config,
+			Function<WsTrustConfig, Boolean> configGetter, BiFunction<CounterParty, Boolean, Boolean> policyGetter,
+			boolean expected) {
+		var defaultValue = configGetter.apply(config);
+		assertThat(WsTrustIssueValidator.calculateProperty(cp, rp, defaultValue, policyGetter, "requireSignedRequestAssertions"),
+				is(expected));
 	}
 
-	static Object[][] requireSignedAssertion() {
+	static Object[][] requireSignedRequestAssertions() {
+		return givenMockData(
+				WsTrustConfig::setIssueRequireSignedAssertions, WsTrustConfig::isIssueRequireSignedAssertions,
+				SecurityPolicies::setWsTrustIssueRequireSignedAssertion, CounterParty::wsTrustIssueRequireSignedAssertion);
+	}
+
+	private static Object[][] givenMockData(
+			BiConsumer<WsTrustConfig, Boolean> configSetter, Function<WsTrustConfig, Boolean> configGetter,
+			BiConsumer<SecurityPolicies, Boolean> policySetter, BiFunction<CounterParty, Boolean, Boolean> policyGetter) {
 		var defaultPolicies = new SecurityPolicies();
-		var defaultConfig = new  WsTrustConfig();
+		var defaultConfig = new WsTrustConfig();
+		var truePolicy = givenSecurityPolicies(true, policySetter);
+		var falsePolicy = givenSecurityPolicies(false, policySetter);
+		var trueConfig = givenConfig(true, configSetter);
+		var falseConfig = givenConfig(false, configSetter);
 		return new Object[][] {
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), defaultConfig, true }, // default
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), givenConfig(null, false), false }, // default
-				{ givenCp(defaultPolicies), givenRp(defaultPolicies), givenConfig(null, true), true }, // default
-				{ givenCp(givenSecurityPolicies(null, true)), givenRp(defaultPolicies), defaultConfig, true }, // CP
-				{ givenCp(givenSecurityPolicies(null, true)), givenRp(defaultPolicies), givenConfig(null, false), true }, // CP
-				{ givenCp(givenSecurityPolicies(null, false)), givenRp(defaultPolicies), defaultConfig, false }, // CP
-				{ givenCp(defaultPolicies), givenRp(givenSecurityPolicies(null, false)), defaultConfig, false }, // RP
-				{ givenCp(defaultPolicies), givenRp(givenSecurityPolicies(null, true)), defaultConfig, true }, // RP
-				{ givenCp(givenSecurityPolicies(null, true)),
-						givenRp(givenSecurityPolicies(null, false)), defaultConfig, false }, // RP
-				{ givenCp(givenSecurityPolicies(null, false)),
-						givenRp(givenSecurityPolicies(null, true)), defaultConfig, true }, // RP
-				{ givenCp(givenSecurityPolicies(null, false)),
-						givenRp(givenSecurityPolicies(null, true)), givenConfig(null, false), true }, // RP
+				{ givenCp(defaultPolicies), givenRp(defaultPolicies), defaultConfig, configGetter, policyGetter, true }, // default
+				{ givenCp(defaultPolicies), givenRp(defaultPolicies), falseConfig, configGetter, policyGetter, false }, // global
+				{ givenCp(defaultPolicies), givenRp(defaultPolicies), trueConfig, configGetter, policyGetter, true }, // global
+				{ givenCp(truePolicy), givenRp(defaultPolicies), defaultConfig, configGetter, policyGetter, true }, // CP
+				{ givenCp(truePolicy), givenRp(defaultPolicies), falseConfig, configGetter, policyGetter, true }, // CP
+				{ givenCp(falsePolicy), givenRp(defaultPolicies), defaultConfig, configGetter, policyGetter, false }, // CP
+				{ givenCp(truePolicy), givenRp(falsePolicy), defaultConfig, configGetter, policyGetter, false }, // RP
+				{ givenCp(defaultPolicies), givenRp(falsePolicy), defaultConfig, configGetter, policyGetter, false }, // RP
+				{ givenCp(defaultPolicies), givenRp(truePolicy), defaultConfig, configGetter, policyGetter, true }, // RP
+				{ givenCp(falsePolicy), givenRp(truePolicy), defaultConfig, configGetter, policyGetter, true }, // RP
+				{ givenCp(falsePolicy), givenRp(truePolicy), falseConfig, configGetter, policyGetter, true } // RP
 		};
 	}
 
@@ -173,37 +186,117 @@ class WsTrustIssueValidatorTest {
 						   .build();
 	}
 
-	private static SecurityPolicies givenSecurityPolicies(Boolean requireSignedRequest, Boolean requireSignedAssertion) {
-		return SecurityPolicies.builder()
-							   .wsTrustIssueRequireSignedRequest(requireSignedRequest)
-							   .wsTrustIssueRequireSignedAssertion(requireSignedAssertion)
-							   .build();
-	}
-
-	private static WsTrustConfig givenConfig(Boolean requireSignedRequest, Boolean requireSignedAssertion) {
-		var config = new WsTrustConfig();
-		if (requireSignedRequest != null) {
-			config.setIssueRequireSignedRequests(requireSignedRequest);
-		}
-		if (requireSignedAssertion != null) {
-			config.setIssueRequireSignedAssertions(requireSignedAssertion);
+	private static SecurityPolicies givenSecurityPolicies(Boolean value, BiConsumer<SecurityPolicies, Boolean> attribute) {
+		var config = new SecurityPolicies();
+		if (value != null) {
+			attribute.accept(config, value);
 		}
 		return config;
 	}
 
-	@Test
-	@Disabled
-	void validate() {
-		var cp = ClaimsParty.builder()
-							.id(WsTrustTestUtil.XTB_ISSUER_ID)
-							.build();
-		when(relyingPartySetupService.getClaimsProviderSetupByIssuerId(WsTrustTestUtil.XTB_ISSUER_ID, null)).thenReturn(cp);
-		when(trustBrokerProperties.getIssuer()).thenReturn(WsTrustTestUtil.TEST_TO);
+	private static WsTrustConfig givenConfig(Boolean value, BiConsumer<WsTrustConfig, Boolean> attribute) {
+		var config = new WsTrustConfig();
+		if (value != null) {
+			attribute.accept(config, value);
+		}
+		return config;
+	}
+
+	@ParameterizedTest
+	@MethodSource
+	void validateInvalidTimestamp(Instant now, Instant created, Instant expires,
+			SecurityPolicies rpPolicies, SecurityPolicies cpPolicies, String expected) {
+		mockProperties();
+		when(clock.instant()).thenReturn(now);
 		var assertion = WsTrustTestUtil.givenAssertion();
-		var header = WsTrustTestUtil.givenRequestHeader(assertion);
+		var header = WsTrustTestUtil.givenRequestHeader(assertion, created, expires);
 		var rst = WsTrustTestUtil.givenIssueRstRequest();
+		rst.getUnknownXMLObjects().add(WsTrustTestUtil.givenAddress(WsTrustTestUtil.RP_ISSUER_ID));
+		SamlIoUtil.marshalXmlObject(rst); // produce DOM for address resolution
+		mockRpIssuer(rpPolicies);
+		mockCpIssuer(cpPolicies);
+		var result = assertThrows(RequestDeniedException.class, () -> wsTrustIssueValidator.validate(rst, header));
+		assertThat(result.getInternalMessage(), containsString(expected));
+	}
+
+	static Object[][] validateInvalidTimestamp() {
+		var now = WsTrustTestUtil.NOW;
+		var timestampOk = "Audience missing"; // timestamp check override: error after timestamp validation due to test data
+		// overrides for some cases are just either CP or RP as the code is the same
+		return new Object[][] {
+				{ now, null, null, null, null, "Timestamp missing" },
+				{ now, null, null, SecurityPolicies.builder().wsTrustIssueRequireTimestamp(false).build(), null, timestampOk },
+				{ now, null, null, null, SecurityPolicies.builder().wsTrustIssueRequireTimestamp(false).build(), timestampOk },
+				{ now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_BEFORE_SEC - 1),
+						now.plusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC), null, null, "Timestamp invalid" },
+				{ now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_BEFORE_SEC - 1),
+						now.plusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC),
+						SecurityPolicies.builder().wsTrustIssueRequireTimestamp(false).build(), null, timestampOk },
+				{ now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_BEFORE_SEC - 1),
+						now.plusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC), null,
+						SecurityPolicies.builder()
+										.wsTrustIssueNotBeforeToleranceSec(SecurityChecks.TOLERANCE_NOT_BEFORE_SEC - 2)
+										.build(),
+						timestampOk },
+				{ now, now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 1),
+						null, null, "Timestamp invalid" },
+				{ now, now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 1),
+						null, SecurityPolicies.builder().wsTrustIssueRequireTimestamp(false).build(), timestampOk },
+				{ now, now, now.minusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 1),
+						SecurityPolicies.builder()
+										.wsTrustIssueNotOnOrAfterToleranceSec(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 1)
+										.build(),
+						null, timestampOk }
+		};
+	}
+
+	@Test
+	void validate() {
+		mockCpIssuer(null);
+		mockRpIssuer(null);
+		mockProperties();
+		var now = WsTrustTestUtil.NOW;
+		when(clock.instant()).thenReturn(now);
+		var assertion = WsTrustTestUtil.givenAssertion(WsTrustTestUtil.TEST_TO);
+		SamlTestBase.signSamlObject(assertion);
+		var header = WsTrustTestUtil.givenRequestHeader(assertion, now, now.plusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC));
+		var rst = WsTrustTestUtil.givenIssueRstRequest();
+		SamlIoUtil.marshalXmlObject(rst); // produce DOM for address resolution
 		var result = wsTrustIssueValidator.validate(rst, header);
 		assertThat(result.getValidatedAssertion(), is(assertion));
+	}
+
+	private void mockProperties() {
+		var wsTrust = WsTrustConfig.builder()
+								   .enabled(true)
+								   .bindings(List.of(WsTrustBinding.ISSUE.name()))
+								   // If true requires a SoapMessage signed with private key for RelyingParty.SignerTrustStore:
+								   .issueRequireSignedRequests(false)
+								   .build();
+		when(trustBrokerProperties.getWstrust()).thenReturn(wsTrust);
+		when(trustBrokerProperties.getIssuer()).thenReturn(WsTrustTestUtil.TEST_TO);
+		when(trustBrokerProperties.getSecurity()).thenReturn(new SecurityChecks());
+	}
+
+	private void mockCpIssuer(SecurityPolicies securityPolicies) {
+		var trustCredential = SamlTestBase.dummyCredential();
+		var trustCredentials = List.of(trustCredential);
+		var cp = ClaimsParty.builder()
+							.id(WsTrustTestUtil.XTB_ISSUER_ID)
+							.wsTrust(WsTrust.builder().enabled(true).build())
+							.securityPolicies(securityPolicies)
+							.cpTrustCredential(trustCredentials)
+							.build();
+		when(relyingPartySetupService.getClaimsProviderSetupByIssuerId(WsTrustTestUtil.XTB_ISSUER_ID, null)).thenReturn(cp);
+	}
+
+	private void mockRpIssuer(SecurityPolicies securityPolicies) {
+		var rp = RelyingParty.builder()
+							 .id(WsTrustTestUtil.RP_ISSUER_ID)
+							 .wsTrust(WsTrust.builder().enabled(true).build())
+							 .securityPolicies(securityPolicies)
+							 .build();
+		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(WsTrustTestUtil.RP_ISSUER_ID, null)).thenReturn(rp);
 	}
 
 }

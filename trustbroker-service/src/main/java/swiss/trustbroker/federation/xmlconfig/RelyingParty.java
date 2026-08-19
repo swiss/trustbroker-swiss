@@ -64,6 +64,19 @@ import swiss.trustbroker.common.saml.dto.SignatureParameters;
 @SuppressWarnings("java:S6539") // the main configuration class containing quite a number of sub elements, hence many references
 public class RelyingParty extends CounterParty implements RelyingPartyConfig {
 
+	/**
+	 * RP ID.
+	 * <br/>
+	 * Notes:
+	 * <ul>
+	 *   <li>RP IDs must be unique within the configuration of each environment
+	 *       (<code>trustbroker-inventories/environment</code>)</li>
+	 *   <li>RP IDs may overlap with CP IDs.</li>
+	 *   <li>For SAML this ID is also used by the actual RP.</li>
+	 *   <li>For OIDC this just an internal ID.</li>
+	 * </ul>
+	 *
+	 */
 	@XmlAttribute(name = "id")
 	private String id;
 
@@ -79,6 +92,11 @@ public class RelyingParty extends CounterParty implements RelyingPartyConfig {
 	@Builder.Default
 	private FeatureEnum enabled = FeatureEnum.TRUE;
 
+	/**
+	 * Base profile.
+	 * <br/>
+	 * The full file name of the <code>ProfileRP_name.xml</code>.
+	 */
 	@XmlAttribute(name = "base")
 	private String base;
 
@@ -328,7 +346,7 @@ public class RelyingParty extends CounterParty implements RelyingPartyConfig {
 			throw new TechnicalException(String.format("Invalid RelyingParty id=%s expected single OidcClient, but count=%s",
 					id, oidcClientCount));
 		}
-		return oidc.getClients().get(0);
+		return oidc.getClients().getFirst();
 	}
 
 	// XmlTransient not allowed on transient fields (the Javadoc does not say transient is considered XmlTransient):
@@ -350,8 +368,8 @@ public class RelyingParty extends CounterParty implements RelyingPartyConfig {
 
 	// derived
 
-	public boolean isSsoEnabled() {
-		return sso != null && sso.isEnabled();
+	public boolean isSsoEnabled(boolean ssoGloballyEnabled) {
+		return ssoGloballyEnabled && sso != null && sso.isEnabled();
 	}
 
 	public boolean hasAccessRequest() {

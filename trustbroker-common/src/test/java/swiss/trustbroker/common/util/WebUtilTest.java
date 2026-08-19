@@ -19,6 +19,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -41,6 +42,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import swiss.trustbroker.common.dto.CookieParameters;
+import swiss.trustbroker.common.exception.TechnicalException;
 
 class WebUtilTest {
 
@@ -196,6 +198,19 @@ class WebUtilTest {
 						Pair.of("c", "d"), Pair.of("c", "f")
 				) }
 		};
+	}
+
+	@ParameterizedTest
+	@CsvSource(
+			value = {
+					"null,null",
+					",", // empty URL accepted
+					"url?param?,url", // invalid URL accepted
+					"http://localhost:1234/path/to/file?query=param&query=param,http://localhost:1234/path/to/file"
+			}, nullValues = "null"
+	)
+	void testRemoveQueryParameters(String url, String expectedUrl) {
+		assertThat(WebUtil.removeQueryParameters(url), is(expectedUrl));
 	}
 
 	@ParameterizedTest
@@ -402,7 +417,9 @@ class WebUtilTest {
 		var cookies = WebUtil.cookiesToStrings(List.of(cookie));
 		assertThat(cookies, hasSize(1));
 		for (var check : new String[] { name, path, value, domain,
-				WebUtil.COOKIE_SAME_SITE_LAX, "HttpOnly=true", "Secure=true" }) {
+				// boolean flags only stored if true, with empty value (implementation detail of Cookie class, subject to change)
+				WebUtil.COOKIE_SAME_SITE + '=' + WebUtil.COOKIE_SAME_SITE_LAX, "HttpOnly=", "Secure="
+		}) {
 			assertThat(cookies.getFirst(), containsString(check));
 		}
 	}
@@ -506,11 +523,21 @@ class WebUtilTest {
 
 	@ParameterizedTest
 	@CsvSource(value = {
-			"https://trustbroker.swiss,secret:1,Basic aHR0cHMlM0ElMkYlMkZ0cnVzdGJyb2tlci5zd2lzczpzZWNyZXQlM0Ex",
+			"trustbroker.swiss,secret:1,Basic dHJ1c3Ricm9rZXIuc3dpc3M6c2VjcmV0OjE=",
 			"client,1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890,Basic Y2xpZW50OjEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTA="
 	})
 	void testGetBasicAuthorizationHeader(String clientId, String secret, String expected) {
 		assertThat(WebUtil.getBasicAuthorizationHeader(clientId, secret), CoreMatchers.is(expected));
+	}
+
+	@Test
+	void testGetBasicAuthorizationHeaderInvalid() {
+		assertThrows(TechnicalException.class,
+				() -> WebUtil.getBasicAuthorizationHeader(null, "any"));
+		assertThrows(TechnicalException.class,
+				() -> WebUtil.getBasicAuthorizationHeader("any", null));
+		assertThrows(TechnicalException.class,
+				() -> WebUtil.getBasicAuthorizationHeader("https://trustbroker.swiss/client","any"));
 	}
 
 	@ParameterizedTest

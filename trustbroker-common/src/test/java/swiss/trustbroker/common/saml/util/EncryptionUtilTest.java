@@ -47,7 +47,7 @@ class EncryptionUtilTest {
 	@CsvSource(value = { "true", "false" } )
 	void encryptAssertionTest(boolean useSki) {
 		var inputAssertion = givenAssertion();
-		var encryptedAssertion = EncryptionUtil.encryptAssertion(inputAssertion, givenCredentials().get(0),
+		var encryptedAssertion = EncryptionUtil.encryptAssertion(inputAssertion, givenCredentials().getFirst(),
 				EncryptionConstants.ALGO_ID_BLOCKCIPHER_AES128, EncryptionConstants.ALGO_ID_KEYTRANSPORT_RSAOAEP,
 				Encrypter.KeyPlacement.PEER,"issuer:TEST", useSki);
 		assertNotNull(encryptedAssertion);
@@ -88,7 +88,7 @@ class EncryptionUtilTest {
 	}
 
 	private EncryptedAssertion givenEncryptedAssertion(Assertion assertion) {
-		return EncryptionUtil.encryptAssertion(assertion, givenCredentials().get(0),
+		return EncryptionUtil.encryptAssertion(assertion, givenCredentials().getFirst(),
 				EncryptionConstants.ALGO_ID_BLOCKCIPHER_AES128, EncryptionConstants.ALGO_ID_KEYTRANSPORT_RSAOAEP,
 				Encrypter.KeyPlacement.PEER,"issuer:TEST", false);
 	}

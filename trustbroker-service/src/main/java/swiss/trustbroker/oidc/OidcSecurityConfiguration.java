@@ -15,8 +15,6 @@
 
 package swiss.trustbroker.oidc;
 
-import static org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher;
-
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.AllArgsConstructor;
@@ -24,23 +22,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.velocity.app.VelocityEngine;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
@@ -54,7 +53,7 @@ import org.springframework.security.saml2.provider.service.web.RelyingPartyRegis
 import org.springframework.security.saml2.provider.service.web.authentication.Saml2AuthenticationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
-import swiss.trustbroker.audit.service.AuditService;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
@@ -89,13 +88,11 @@ public class OidcSecurityConfiguration {
 
 	private final ServerProperties serverProperties;
 
-	private final ApiSupport apiSupport;
-
 	private final ScriptService scriptService;
 
 	private final ClaimsMapperService claimsMapperService;
 
-	private final AuditService auditService;
+	private final OidcAuditService auditService;
 
 	private final SsoService ssoService;
 
@@ -115,7 +112,7 @@ public class OidcSecurityConfiguration {
 	}
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) {
 		// CORS support with Access-Control-Allow-Origin=* unusable for OIDC, we override in CorsSupport on the wire
 		// check WebConfiguration for setup and org.springframework.web.cors.DefaultCorsProcessor for behavior
 		http.cors(AbstractHttpConfigurer::disable);
@@ -130,9 +127,9 @@ public class OidcSecurityConfiguration {
 		http.authorizeHttpRequests(authorizeRequests ->
 				// require authentication for all requests used for OIDC handling
 				authorizeRequests.requestMatchers(
-										 antMatcher(ApiSupport.SPRING_OAUTH2 + "/**"),
-										 antMatcher(ApiSupport.SPRING_SAML_LOGIN_CTXPATH + "/**"),
-										 antMatcher(ApiSupport.KEYCLOAK_REALMS + "/**")
+										 PathPatternRequestMatcher.pathPattern(ApiSupport.SPRING_OAUTH2 + "/**"),
+										 PathPatternRequestMatcher.pathPattern(ApiSupport.SPRING_SAML_LOGIN_CTXPATH + "/**"),
+										 PathPatternRequestMatcher.pathPattern(ApiSupport.KEYCLOAK_REALMS + "/**")
 								 )
 								 .authenticated()
 								 .anyRequest()// anything else allowed (default anyway but be explicit)
@@ -144,7 +141,7 @@ public class OidcSecurityConfiguration {
 				.failureHandler(new CustomFailureHandler("saml2", relyingPartyDefinitions, properties))
 				.authenticationConverter(new OpenSaml5AuthenticationTokenConverter(relyingPartyRegistrationRepository))
 				.authenticationManager(new ProviderManager(customAuthenticationProvider())).
-									  loginPage(apiSupport.getErrorPageUrl()));
+									  loginPage(ApiSupport.ERROR_PAGE));
 
 		// logout disabled on IdP side as we act as a federation service
 		http.saml2Logout(AbstractHttpConfigurer::disable);
@@ -156,10 +153,7 @@ public class OidcSecurityConfiguration {
 			.logoutUrl(logoutPath()) // LogoutFilter currently ignores this and always uses /logout
 			.clearAuthentication(true)
 			.invalidateHttpSession(true)
-			.deleteCookies(serverProperties.getServlet()
-										   .getSession()
-										   .getCookie()
-										   .getName()));
+			.deleteCookies(serverProperties.getServlet().getSession().getCookie().getName()));
 
 		// for K8S resilience and multi web-session support we need a special tomcat session manager
 		http.sessionManagement(sessionManage -> sessionManage
@@ -234,8 +228,27 @@ public class OidcSecurityConfiguration {
 	@Bean
 	public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(JWKSource<SecurityContext> jwkSource) {
 		// Customize OAuth2Token payload
-		return new JwtTokenCustomizer(properties, relyingPartyDefinitions, scriptService, claimsMapperService, auditService,
+		JwtTokenCustomizer jwtTokenCustomizer = new JwtTokenCustomizer(properties, relyingPartyDefinitions, scriptService, claimsMapperService, auditService,
 				qoaService, jwkSource);
+		TokenExchangeResponseCustomizer tokenExchangeResponseCustomizer = new TokenExchangeResponseCustomizer(relyingPartyDefinitions, properties, jwkSource, auditService);
+		return context -> {
+			if (isTokenExchangeGrant(context)) {
+				tokenExchangeResponseCustomizer.customize(context);
+				return;
+			}
+			jwtTokenCustomizer.customize(context);
+		};
+	}
+
+	boolean isTokenExchangeGrant(JwtEncodingContext context) {
+		if (AuthorizationGrantType.TOKEN_EXCHANGE.equals(context.getAuthorizationGrantType())) {
+			return true;
+		}
+		if (context.getAuthorization() != null) {
+			AuthorizationGrantType authorizationGrantType = context.getAuthorization().getAuthorizationGrantType();
+			return AuthorizationGrantType.TOKEN_EXCHANGE.equals(authorizationGrantType) && AuthorizationGrantType.REFRESH_TOKEN.equals(context.getAuthorizationGrantType());
+		}
+		return false;
 	}
 
 	/**

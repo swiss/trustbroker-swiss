@@ -21,6 +21,7 @@ import static org.mockito.Mockito.doReturn;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,11 +83,11 @@ class XmlConfigStatusServiceTest {
 		var invalidRps = List.of(
 				ConfigElementStatus.builder()
 								   .id(invalidRp.getId())
-								   .errors(List.of("rp3 invalid", "Invalid xml for rp3"))
+								   .errors(Set.of("rp3 invalid", "Invalid xml for rp3"))
 								   .build(),
 				ConfigElementStatus.builder()
 								   .id(rpWithErrors.getId())
-								   .errors(List.of("rp4 invalid"))
+								   .errors(Set.of("rp4 invalid"))
 								   .build());
 
 		var cpSetup = givenCpSetup();
@@ -107,11 +108,11 @@ class XmlConfigStatusServiceTest {
 		var invalidCps = List.of(
 				ConfigElementStatus.builder()
 								   .id(invalidCp.getId())
-								   .errors(List.of("cp3 invalid", "Invalid xml for cp3"))
+								   .errors(Set.of("cp3 invalid", "Invalid xml for cp3"))
 								   .build(),
 				ConfigElementStatus.builder()
 								   .id(cpWithErrors.getId())
-								   .errors(List.of("cp4 invalid"))
+								   .errors(Set.of("cp4 invalid"))
 								   .build());
 
 		testGetConfigStatus(rpSetup, cpSetup, ConfigStatus.WARN, invalidRps, invalidCps);

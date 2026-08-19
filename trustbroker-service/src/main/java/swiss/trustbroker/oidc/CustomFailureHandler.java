@@ -76,29 +76,30 @@ public class CustomFailureHandler implements AuthenticationFailureHandler {
 
 		// exception from sub-systems
 		String errMsg;
-		if (exception instanceof OAuth2AuthenticationException authException) {
-			// OIDC sub-system https://openid.net/specs/openid-connect-core-1_0.html#AuthError
-			var error = authException.getError();
-			errMsg = String.format("Failed OIDC %s for oidcClient=%s of rpIssuerId=%s and httpReferer=%s"
-							+ " with errorCode=%s exceptionMessage='%s' exceptionClass=%s description='%s' oidcData='%s'",
-					type, clientId, rpIssuerId, referrer, error.getErrorCode(),
-					exception.getMessage(), exception.getClass().getSimpleName(),
-					getDescription(exception, error.getDescription()), OidcUtil.getGrantOrToken(request));
-		}
-		else if (exception instanceof Saml2AuthenticationException authException) {
-			// federation handling using SAML
-			var error = authException.getSaml2Error();
-			errMsg = String.format("Failed SAML %s for oidcClient=%s of rpIssuerId=%s and httpReferer=%s"
-							+ " with errorCode=%s exceptionMessage='%s' exceptionClass=%s description='%s'",
-					type, clientId, rpIssuerId, referrer, error.getErrorCode(),
-					exception.getMessage(), exception.getClass().getSimpleName(),
-					getDescription(exception, error.getDescription()));
-		}
-		else {
-			// anything else
-			errMsg = String.format("Failed %s for oidcClient=%s of rpIssuerId=%s httpReferer=%s"
-							+ " with exceptionMessage='%s' exceptionClass=%s",
-					type, clientId, rpIssuerId, referrer, exception.getMessage(), exception.getClass().getName());
+		switch (exception) {
+			case OAuth2AuthenticationException authException -> {
+				// OIDC sub-system https://openid.net/specs/openid-connect-core-1_0.html#AuthError
+				var error = authException.getError();
+				errMsg = String.format("Failed OIDC %s for oidcClient=%s of rpIssuerId=%s and httpReferer=%s"
+								+ " with errorCode=%s exceptionMessage='%s' exceptionClass=%s description='%s' oidcData='%s'",
+						type, clientId, rpIssuerId, referrer, error.getErrorCode(),
+						exception.getMessage(), exception.getClass().getSimpleName(),
+						getDescription(exception, error.getDescription()), OidcUtil.getGrantOrToken(request));
+			}
+			case Saml2AuthenticationException authException -> {
+				// federation handling using SAML
+				var error = authException.getSaml2Error();
+				errMsg = String.format("Failed SAML %s for oidcClient=%s of rpIssuerId=%s and httpReferer=%s"
+								+ " with errorCode=%s exceptionMessage='%s' exceptionClass=%s description='%s'",
+						type, clientId, rpIssuerId, referrer, error.getErrorCode(),
+						exception.getMessage(), exception.getClass().getSimpleName(),
+						getDescription(exception, error.getDescription()));
+			}
+			default ->
+				// anything else
+				errMsg = String.format("Failed %s for oidcClient=%s of rpIssuerId=%s httpReferer=%s"
+								+ " with exceptionMessage='%s' exceptionClass=%s",
+						type, clientId, rpIssuerId, referrer, exception.getMessage(), exception.getClass().getName());
 		}
 
 		// construct redirect to OIDC client or service with service context

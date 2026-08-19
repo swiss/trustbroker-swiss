@@ -26,6 +26,7 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlTransient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,8 +49,15 @@ import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 public class IdmQuery implements Serializable, IdmRequest {
 
 	/**
-	 * 	A query needs an ID when its name is not unique and its execution needs to be controlled via a custom script based
-	 * 	on CP input usually.
+	 * The order of the execution of the query.
+	 * @since 1.15.0
+	 */
+	@XmlAttribute(name = "order")
+	private Integer order;
+
+	/**
+	 * A query needs an ID when its name is not unique and its execution needs to be controlled via a custom script based
+	 * on CP input usually.
  	 */
 	@XmlAttribute(name = "id")
 	private String id;
@@ -117,6 +125,9 @@ public class IdmQuery implements Serializable, IdmRequest {
 	 */
 	@XmlElement(name = "UserDetailsSelection")
 	private AttributesSelection userDetailsSelection;
+
+	@XmlTransient
+	private boolean sortByName;
 
 	public StatusPolicy statusPolicyWithDefault() {
 		return statusPolicy != null ? statusPolicy : StatusPolicy.FETCH_ACTIVE_ONLY;

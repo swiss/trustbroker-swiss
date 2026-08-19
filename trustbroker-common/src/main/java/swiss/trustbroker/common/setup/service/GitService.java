@@ -293,7 +293,7 @@ public class GitService {
 				log.error("{} commit error", gitBranch);
 			}
 
-			var ref = collect.get(0);
+			var ref = collect.getFirst();
 			if (ref != null) {
 				var objectId = ref.getObjectId();
 				if (objectId != null) {

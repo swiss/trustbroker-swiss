@@ -198,26 +198,26 @@ class ClaimsMapperServiceTest {
 		var stringInput = "anything";
 		var result = claimsMapperService.applyMappers(attr, List.of(stringInput), "test");
 		assertEquals(1 , result.size());
-		assertThat(result.get(0) instanceof String, is(true));
-		assertEquals(stringInput, result.get(0));
+		assertThat(result.getFirst() instanceof String, is(true));
+		assertEquals(stringInput, result.getFirst());
 
 		var now = LocalDate.now();
 		result = claimsMapperService.applyMappers(attr, List.of(now), "test");
 		assertEquals(1 , result.size());
-		assertThat(result.get(0) instanceof String, is(true));
-		assertEquals(now.toString(), result.get(0));
+		assertThat(result.getFirst() instanceof String, is(true));
+		assertEquals(now.toString(), result.getFirst());
 
 		var longInput = 123L;
 		result = claimsMapperService.applyMappers(attr, List.of(longInput), "test");
 		assertEquals(1 , result.size());
-		assertThat(result.get(0) instanceof String, is(true));
-		assertEquals(String.valueOf(longInput), result.get(0));
+		assertThat(result.getFirst() instanceof String, is(true));
+		assertEquals(String.valueOf(longInput), result.getFirst());
 
 		var booleanInput = true;
 		result = claimsMapperService.applyMappers(attr, List.of(booleanInput), "test");
 		assertEquals(1 , result.size());
-		assertThat(result.get(0) instanceof String, is(true));
-		assertEquals(String.valueOf(booleanInput), result.get(0));
+		assertThat(result.getFirst() instanceof String, is(true));
+		assertEquals(String.valueOf(booleanInput), result.getFirst());
 	}
 
 	@Test
@@ -232,7 +232,7 @@ class ClaimsMapperServiceTest {
 		var result = claimsMapperService.applyMappers(inputs, "test");
 
 		assertEquals(1 , result.size());
-		assertEquals(String.valueOf(TimeUnit.DAYS.toSeconds(now.toEpochDay())), result.get(attr).get(0));
+		assertEquals(String.valueOf(TimeUnit.DAYS.toSeconds(now.toEpochDay())), result.get(attr).getFirst());
 	}
 
 	@Test
@@ -405,7 +405,7 @@ class ClaimsMapperServiceTest {
 				break;
 			case CONFIG:
 				selection.getDefinitions()
-						 .get(0)
+						 .getFirst()
 						 .setValue(defValue);
 				relyingParty.setPropertiesSelection(selection);
 				break;

@@ -58,4 +58,22 @@ class StringUtilTest {
 		assertThat(StringUtil.maskSecrets("one,two,three,four,five","two", "five"),
 				is("one," + StringUtil.MASKED + ",three,four," + StringUtil.MASKED));
 	}
+
+	@Test
+	void testMaskSecretByKey() {
+		assertThat(StringUtil.maskSecret("client_secret", "verySecretValue"), is("veryS***"));
+		assertThat(StringUtil.maskSecret("ACCESS_TOKEN", "abc123token"), is("abc12***"));
+		assertThat(StringUtil.maskSecret("auth_code", "abcd"), is("abcd***"));
+		assertThat(StringUtil.maskSecret("scope", "openid profile"), is("openid profile"));
+		assertThat(StringUtil.maskSecret("scope", null), is(""));
+	}
+
+	@Test
+	void testCleanForNameValueMultipleUseCases() {
+		assertThat(StringUtil.cleanForNameValue(null), is(""));
+		assertThat(StringUtil.cleanForNameValue("plainText123"), is("plainText123"));
+		assertThat(StringUtil.cleanForNameValue("line1\nline2\r\tend"), is("line1?line2??end"));
+		assertThat(StringUtil.cleanForNameValue("<script>alert('x')</script>"), is("?script?alert(?x?)?/script?"));
+		assertThat(StringUtil.cleanForNameValue("name=va\\lue;\"test\""), is("name=va?lue??test?"));
+	}
 }

@@ -40,6 +40,7 @@ import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.exception.GlobalExceptionHandler;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderDefinitions;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
+import swiss.trustbroker.util.DefaultUtil;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
 import swiss.trustbroker.homerealmdiscovery.service.WebResourceProvider;
@@ -138,6 +139,9 @@ public class ApplicationInitializer {
 
 		appConfigService.filterInvalidRelyingParties(relyingPartySetup);
 		appConfigService.filterInvalidClaimsParties(claimsProviderSetup);
+
+		DefaultUtil.applyRpDefaults(relyingPartySetup);
+		DefaultUtil.applyCpDefaults(claimsProviderSetup);
 
 		// assembly
 		relyingPartyDefinitions.setClaimsProviderDefinitions(claimsProviderDefinitions);

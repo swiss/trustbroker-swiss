@@ -23,7 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.opensaml.saml.saml2.core.AuthnRequest;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
@@ -49,7 +49,7 @@ import swiss.trustbroker.wsfed.util.WsFedUtil;
 @Component
 @Slf4j
 @AllArgsConstructor
-@ConditionalOnProperty(value = "trustbroker.config.wsfed.enabled", havingValue = "true")
+@ConditionalOnBooleanProperty(value = "trustbroker.config.wsfed.enabled")
 public class WsFedService {
 
 	private final RelyingPartySetupService relyingPartySetupService;
@@ -84,7 +84,7 @@ public class WsFedService {
 						relyingParties.stream().map(RelyingParty::getId).toList()));
 			}
 			if (!relyingParties.isEmpty()) {
-				relyingParty = relyingParties.get(0);
+				relyingParty = relyingParties.getFirst();
 				log.debug("Missing RP by realm='{}' or referer='{}' but found {} by replyUrl='{}' rpIssuerId={}",
 						requestData.getRealm(), referer, relyingParties.size(), requestData.getReplyUrl(), relyingParty.getId());
 			}

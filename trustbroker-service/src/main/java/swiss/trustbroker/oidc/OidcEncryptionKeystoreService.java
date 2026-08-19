@@ -61,7 +61,7 @@ public class OidcEncryptionKeystoreService {
 				var encryptionKeystore = oidcClient.getCertificates().getEncryptionTruststore();
 				var encKeystore = credentialService.checkAndLoadTrustCredential(encryptionKeystore, id, subPath);
 				if (encKeystore != null) {
-					oidcClient.setClientEncryptionCredential(encKeystore.get(0));
+					oidcClient.setClientEncryptionCredential(encKeystore.getFirst());
 				}
 			}
 		}
@@ -111,7 +111,7 @@ public class OidcEncryptionKeystoreService {
 				keyId = jwk.getKeyID();
 				log.debug("Found encryption kid={} for protocol endpoint={}",keyId, oidcClient.getProtocolEndpoints());
 				alg = jwk.getAlgorithm() != null ? jwk.getAlgorithm().getName() : alg;
-				encryptionCredential = new BasicX509Credential(jwk.getParsedX509CertChain().get(0));
+				encryptionCredential = new BasicX509Credential(jwk.getParsedX509CertChain().getFirst());
 			}
 			else {
 				log.warn("JWK not found for protocol endpoint={}",oidcClient.getProtocolEndpoints());

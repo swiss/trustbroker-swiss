@@ -15,10 +15,13 @@
 
 package swiss.trustbroker.config.dto;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import swiss.trustbroker.common.util.WSSConstants;
 
 /**
@@ -39,9 +42,15 @@ public class SecurityChecks {
 
 	public static final long TOLERANCE_NOT_BEFORE_SEC = -5;
 
-	public static final long TOLERANCE_NOT_AFTER_SEC = 480; // use notOnOrAfter timestamp _tolerance_ only
+	public static final long TOLERANCE_NOT_AFTER_SEC = 5; // use notOnOrAfter timestamp _tolerance_ only
 
 	public static final long RENEW_TOLERANCE_NOT_AFTER_SEC = 7200; // notOnOrAfter timestamp _tolerance_ for assertion RENEW
+
+	public static final String BEARER_SUBJECT_CONFIRMATION =
+			"urn:oasis:names:tc:SAML:2.0:cm:bearer";
+
+	public static final String HOLDER_OF_KEY_SUBJECT_CONFIRMATION =
+			"urn:oasis:names:tc:SAML:2.0:cm:holder-of-key";
 
 	/**
 	 * Reject unsigned AuthnRequest?
@@ -183,7 +192,16 @@ public class SecurityChecks {
 	private boolean validateAudience = true;
 
 	/**
-	 * Shall message contain an audience restriction? Very optional feature according to SAML2 spec.
+	 * Enforce presence and validation of audience restriction for bearer subject confirmations.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean requireAudienceRestrictionForBearerSubjectConfirmation = true;
+
+	/**
+	 * Enforce presence and validation of audience restriction for other subject confirmations (e.g. holder of key).
 	 * <br/>
 	 * Default: false
  	 */
@@ -259,13 +277,15 @@ public class SecurityChecks {
 	/**
 	 * Any timestamp clock/transfer tolerance.
 	 * <br/>
-	 * Default: 480 (a lot, might be reduced to 5)
+	 * Default: 5
+	 * <br/>
+	 * Note: Reduced from 480 with 1.15.0 - aligned with default in <code>application.yml</code>
 	 */
 	@Builder.Default
 	private long notOnOrAfterToleranceSec = TOLERANCE_NOT_AFTER_SEC;
 
 	/**
-	 * Duration after expiration of an assertion for which RENEW request is accepted.
+	 * Duration after expiration of an assertion for which WS-Trust RENEW request is accepted.
 	 * <br/>
 	 * Default: 2h
 	 * @since 1.11.0
@@ -296,8 +316,7 @@ public class SecurityChecks {
 	 * 	Default: urn:oasis:names:tc:SAML:2.0:cm:holder-of-key,urn:oasis:names:tc:SAML:2.0:cm:bearer
  	 */
 	@Builder.Default
-	private String acceptSubjectConfirmationMethods
-			= "urn:oasis:names:tc:SAML:2.0:cm:holder-of-key,urn:oasis:names:tc:SAML:2.0:cm:bearer";
+	private String acceptSubjectConfirmationMethods = HOLDER_OF_KEY_SUBJECT_CONFIRMATION + ',' + BEARER_SUBJECT_CONFIRMATION;
 
 	/**
 	 * Register state in DB even when validation fails.
@@ -398,4 +417,57 @@ public class SecurityChecks {
 	@Builder.Default
 	private boolean validateAuthnStatementIssueInstant = true;
 
+
+	/**
+	 * List of allowed message signature algorithms. (Empty list means no restriction.)
+	 * <br/>
+	 * Default: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private List<String> allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+
+	/**
+	 * Enforce allowed message signature algorithms for AuthnRequests.
+	 * <br/>
+	 * If false, the allowedSignatureAlgorithms list is just used for logging.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean enforceRequestSignatureAlgorithms = true;
+
+	/**
+	 * Enforce allowed message signature algorithms for Responses.
+	 * <br/>
+	 * If false, the allowedSignatureAlgorithms list is just used for logging.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean enforceResponseSignatureAlgorithms = true;
+
+	/**
+	 * Enforce allowed message signature algorithms for Assertions.
+	 * <br/>
+	 * If false, the allowedSignatureAlgorithms list is just used for logging.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean enforceAssertionSignatureAlgorithms = true;
+
+	/**
+	 * Enforce allowed message signature algorithms for Artifact Resolution.
+	 * <br/>
+	 * If false, the allowedSignatureAlgorithms list is just used for logging.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean enforceArtifactSignatureAlgorithms = true;
 }

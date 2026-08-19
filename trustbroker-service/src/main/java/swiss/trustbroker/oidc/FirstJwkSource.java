@@ -36,6 +36,6 @@ public class FirstJwkSource implements JWKSource<SecurityContext> {
 		if (jwks == null || jwks.isEmpty()) {
 			return Collections.emptyList();
 		}
-		return Collections.singletonList(jwks.get(0));
+		return Collections.singletonList(jwks.getFirst());
 	}
 }

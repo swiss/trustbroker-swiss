@@ -124,7 +124,7 @@ public class SamlOutputService implements OutputService {
 		// copy input parameters for modification:
 		var parameters = new HashMap<>(encodingParameters.getTemplateParameters());
 		parameters.computeIfAbsent(VelocityUtil.VELOCITY_PARAM_ACTION, key -> HTMLEncoder.encodeForHTMLAttribute(endpoint));
-		parameters.putIfAbsent(SamlIoUtil.SAML_RELAY_STATE, requestRelayState);
+		parameters.computeIfAbsent(SamlIoUtil.SAML_RELAY_STATE, key -> HTMLEncoder.encodeForHTMLAttribute(requestRelayState));
 		parameters.putIfAbsent(VelocityUtil.VELOCITY_PARAM_XTB_HTTP_METHOD, HttpMethod.GET.name());
 
 		// message

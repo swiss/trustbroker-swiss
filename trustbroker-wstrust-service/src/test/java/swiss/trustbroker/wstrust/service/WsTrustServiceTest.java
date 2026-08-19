@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Attribute;
 import org.opensaml.saml.saml2.core.Issuer;
@@ -52,7 +51,6 @@ import org.opensaml.soap.wsfed.AppliesTo;
 import org.opensaml.soap.wstrust.KeyType;
 import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestType;
-import org.opensaml.soap.wstrust.TokenType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
@@ -174,7 +172,7 @@ class WsTrustServiceTest {
 
 	@BeforeEach
 	void setup() {
-		when(clock.instant()).thenReturn(Instant.now());
+		when(clock.instant()).thenReturn(WsTrustTestUtil.NOW);
 	}
 
 	@Test
@@ -186,39 +184,40 @@ class WsTrustServiceTest {
 	@Test
 	void processSecurityTokenKeyTypeNullTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(null, null, null);
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(null, null, null);
 		assertThrows(RequestDeniedException.class, () -> wsTrustService.processSecurityToken(requestSecTokenType, requestHeader));
 	}
 
 	@Test
 	void processSecurityTokenKeyTypeInvalidTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(givenKeyType("InvalidKeyType"),
-				givenTokenType("invalidType"), null);
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType("InvalidKeyType"),
+				WsTrustTestUtil.givenTokenType("invalidType"), null);
 		assertThrows(RequestDeniedException.class, () -> wsTrustService.processSecurityToken(requestSecTokenType, requestHeader));
 	}
 
 	@Test
 	void processSecurityTokenRequestTypeNullTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(givenKeyType(KeyType.BEARER),
-				givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE), null);
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType(KeyType.BEARER),
+				WsTrustTestUtil.givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE), null);
 		assertThrows(RequestDeniedException.class, () -> wsTrustService.processSecurityToken(requestSecTokenType, requestHeader));
 	}
 
 	@Test
 	void processSecurityTokenRequestTypeInvalidTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(givenKeyType(KeyType.BEARER),
-				givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE), givenInvalidRequestType("InvalidRequestType"));
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType(KeyType.BEARER),
+				WsTrustTestUtil.givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE),
+				WsTrustTestUtil.givenInvalidRequestType("InvalidRequestType"));
 		assertThrows(RequestDeniedException.class, () -> wsTrustService.processSecurityToken(requestSecTokenType, requestHeader));
 	}
 
 	@Test
 	void processSecurityTokenTokenTypeNullTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(givenKeyType(KeyType.BEARER), null,
-				givenInvalidRequestType(RequestType.ISSUE));
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType(KeyType.BEARER), null,
+				WsTrustTestUtil.givenInvalidRequestType(RequestType.ISSUE));
 		when(trustBrokerProperties.getSecurity())
 				.thenReturn(SecurityChecks.builder()
 										  .validateSubjectConfirmationInResponseTo(true)
@@ -229,8 +228,8 @@ class WsTrustServiceTest {
 	@Test
 	void processSecurityTokenTokenTypeInvalidTest() {
 		var requestHeader = new SoapMessageHeader();
-		var requestSecTokenType = givenRequestSecToken(givenKeyType(KeyType.BEARER),
-				givenTokenType("invalidType"), givenInvalidRequestType(RequestType.ISSUE));
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType(KeyType.BEARER),
+				WsTrustTestUtil.givenTokenType("invalidType"), WsTrustTestUtil.givenInvalidRequestType(RequestType.ISSUE));
 		when(trustBrokerProperties.getSecurity())
 				.thenReturn(SecurityChecks.builder()
 										  .validateSubjectConfirmationInResponseTo(true)
@@ -240,8 +239,12 @@ class WsTrustServiceTest {
 
 	@Test
 	void processSecurityTokenValidTest() {
-		var requestSecTokenType = givenRequestSecToken(givenKeyType(KeyType.BEARER),
-				givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE), givenInvalidRequestType(RequestType.ISSUE));
+		var requestSecTokenType = WsTrustTestUtil.givenRstRequest(WsTrustTestUtil.givenKeyType(KeyType.BEARER),
+				WsTrustTestUtil.givenTokenType(WSSConstants.WSS_SAML2_TOKEN_TYPE),
+				WsTrustTestUtil.givenInvalidRequestType(RequestType.ISSUE));
+		requestSecTokenType.getUnknownXMLObjects().add(WsTrustTestUtil.givenAddress(WsTrustTestUtil.RP_ISSUER_ID));
+		SamlIoUtil.marshalXmlObject(requestSecTokenType); // produce DOM for address resolution
+		mockRpIssuer();
 		when(trustBrokerProperties.getSecurity())
 				.thenReturn(SecurityChecks.builder()
 										  .validateSubjectConfirmationInResponseTo(false)
@@ -254,12 +257,17 @@ class WsTrustServiceTest {
 		when(trustBrokerProperties.getIssuer())
 				.thenReturn(WsTrustTestUtil.TEST_TO);
 		var assertion = OpenSamlUtil.buildAssertionObject(null);
-		var requestHeader = WsTrustTestUtil.givenRequestHeader();
-		requestHeader.setAssertion(assertion);
+		var now = WsTrustTestUtil.NOW;
+		var requestHeader = WsTrustTestUtil.givenRequestHeader(assertion, now, now.plusSeconds(5));
 		var ex = assertThrows(RequestDeniedException.class, () -> {
 			wsTrustService.processSecurityToken(requestSecTokenType, requestHeader);
 		});
 		assertThat(ex.getInternalMessage(), containsString("Assertion in RSTR with assertionID='null' missing Issuer"));
+	}
+
+	private void mockRpIssuer() {
+		var rp = RelyingParty.builder().id(WsTrustTestUtil.RP_ISSUER_ID).build();
+		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(WsTrustTestUtil.RP_ISSUER_ID, null)).thenReturn(rp);
 	}
 
 	@ParameterizedTest
@@ -309,13 +317,13 @@ class WsTrustServiceTest {
 													  .build();
 		var assertion = wsTrustService.createAssertion(cpAttributes, cpResponse, "anyId", validationResult);
 		var attributeStatements = assertion.getAttributeStatements();
-		assertTrue(attributeStatements.get(0).getAttributes().size() < initialUserDetailsSize + cpAttributes.size());
+		assertTrue(attributeStatements.getFirst().getAttributes().size() < initialUserDetailsSize + cpAttributes.size());
 		assertEquals(requestHeaderAssertion.getSubject().getNameID().getValue(), assertion.getSubject().getNameID().getValue());
-		assertEquals(1, attributeOccurrenceInList(attributeStatements.get(0).getAttributes(),
+		assertEquals(1, attributeOccurrenceInList(attributeStatements.getFirst().getAttributes(),
 				CoreAttributeName.CLAIMS_NAME.getName(), "claimName", "CP1"));
 		var authnStatements = assertion.getAuthnStatements();
 		assertThat(authnStatements, is(not(empty())));
-		assertThat(authnStatements.get(0).getSessionIndex(), is(sessionId));
+		assertThat(authnStatements.getFirst().getSessionIndex(), is(sessionId));
 	}
 
 	private static RelyingParty givenRp() {
@@ -356,7 +364,7 @@ class WsTrustServiceTest {
 	private int attributeOccurrenceInList(List<Attribute> attributes, String name, String value, String originalIssuer) {
 		int count = 0;
 		for (Attribute attribute : attributes) {
-			if (attribute.getName().equals(name) && SamlUtil.getAttributeValues(attribute).get(0).equals(value) &&
+			if (attribute.getName().equals(name) && SamlUtil.getAttributeValues(attribute).getFirst().equals(value) &&
 					originalIssuer.equals(SamlUtil.getOriginalIssuerFromAttribute(attribute))) {
 				count++;
 			}
@@ -393,43 +401,4 @@ class WsTrustServiceTest {
 				{ SAMPLE_RST_REQUEST_XMLSOAP_ADDRESSING }
 		};
 	}
-
-	private KeyType givenKeyType(String keyTypeValue) {
-		KeyType keyType = (KeyType) XMLObjectSupport.buildXMLObject(KeyType.ELEMENT_NAME);
-		keyType.setURI(keyTypeValue);
-		return keyType;
-	}
-
-	private RequestType givenInvalidRequestType(String requestValue) {
-		RequestType requestType = (RequestType) XMLObjectSupport.buildXMLObject(RequestType.ELEMENT_NAME);
-		requestType.setURI(requestValue);
-
-		return requestType;
-	}
-
-	private TokenType givenTokenType(String tokenTypeValue) {
-		TokenType tokenType = (TokenType) XMLObjectSupport.buildXMLObject(TokenType.ELEMENT_NAME);
-		tokenType.setURI(tokenTypeValue);
-		return tokenType;
-	}
-
-	private RequestSecurityToken givenRequestSecToken(KeyType keyType, TokenType tokenType, RequestType requestType) {
-		RequestSecurityToken requestSecurityToken =
-				(RequestSecurityToken) XMLObjectSupport.buildXMLObject(RequestSecurityToken.ELEMENT_NAME);
-
-		if (keyType != null) {
-			requestSecurityToken.getUnknownXMLObjects().add(keyType);
-		}
-
-		if (tokenType != null) {
-			requestSecurityToken.getUnknownXMLObjects().add(tokenType);
-		}
-
-		if (requestType != null) {
-			requestSecurityToken.getUnknownXMLObjects().add(requestType);
-		}
-
-		return requestSecurityToken;
-	}
-
 }

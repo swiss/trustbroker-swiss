@@ -41,7 +41,7 @@ public class ApiSupport {
 	 */
 	public static final String FRONTEND_CONTEXT = "/app";
 
-	static final String ERROR_PAGE = "/failure";
+	public static final String ERROR_PAGE = "/failure";
 
 	public static final String ERROR_PAGE_URL = FRONTEND_CONTEXT + ERROR_PAGE;
 
@@ -78,6 +78,8 @@ public class ApiSupport {
 
 	static final String HRD_API = "/hrd";
 
+	public static final String HRD_URL = API_CONTEXT + HRD_API;
+
 	static final String HRD_RP_API = HRD_API + "/relyingparties";
 
 	public static final String HRD_RP_URL = API_CONTEXT + HRD_RP_API;
@@ -98,19 +100,27 @@ public class ApiSupport {
 
 	static final String HRD_CP_API = HRD_API + "/claimsproviders";
 
+	public static final String HRD_RP_CONTINUE_API = HRD_RP_API + CONTINUE_POSTFIX;
+
+	public static final String HRD_RP_CONTINUE_URL = API_CONTEXT + HRD_RP_CONTINUE_API;
+
 	public static final String HRD_CP_URL = API_CONTEXT + HRD_CP_API;
 
 	public static final String HRD_SID_PARAM = "sid";
 
-	static final String SSO_GROUP_API = "/sso/group";
+	static final String SSO_API = "/sso";
+
+	public static final String SSO_URL = API_CONTEXT + SSO_API;
+
+	static final String SSO_GROUP_API = SSO_API + "/group";
 
 	public static final String SSO_GROUP_URL = API_CONTEXT + SSO_GROUP_API;
 
-	static final String SSO_RP_API = "/sso/rp";
+	static final String SSO_RP_API = SSO_API + "/rp";
 
 	public static final String SSO_RP_URL = API_CONTEXT + SSO_RP_API;
 
-	static final String SSO_PARTICIPANTS_API = "/sso/participants";
+	static final String SSO_PARTICIPANTS_API = SSO_API + "/participants";
 
 	public static final String SSO_PARTICIPANTS_URL = API_CONTEXT + SSO_PARTICIPANTS_API;
 
@@ -118,19 +128,27 @@ public class ApiSupport {
 
 	public static final String DEVICE_INFO_URL = API_CONTEXT + DEVICE_INFO_API;
 
-	static final String ACCESS_REQUEST_COMPLETE_API = "/accessrequest/complete";
+	static final String ANNOUNCEMENTS_API = "/announcements";
+
+	public static final String ANNOUNCEMENTS_URL = API_CONTEXT + ANNOUNCEMENTS_API;
+
+	static final String ACCESS_REQUEST_API = "/accessrequest";
+
+	public static final String ACCESS_REQUEST_URL = API_CONTEXT + ACCESS_REQUEST_API;
+
+	static final String ACCESS_REQUEST_COMPLETE_API = ACCESS_REQUEST_API + "/complete";
 
 	public static final String ACCESS_REQUEST_COMPLETE_URL = API_CONTEXT + ACCESS_REQUEST_COMPLETE_API;
 
-	static final String ACCESS_REQUEST_INITIATE_API = "/accessrequest/initiate";
+	static final String ACCESS_REQUEST_INITIATE_API = ACCESS_REQUEST_API + INITIATE_POSTFIX; // POSTFIX is FE, should be the same
 
 	public static final String ACCESS_REQUEST_INITIATE_URL = API_CONTEXT + ACCESS_REQUEST_INITIATE_API;
 
-	static final String ACCESS_REQUEST_ABORT_API = "/accessrequest/abort";
+	static final String ACCESS_REQUEST_ABORT_API = ACCESS_REQUEST_API + ABORT_POSTFIX; // POSTFIX is FE, should be the same
 
 	public static final String ACCESS_REQUEST_ABORT_URL = API_CONTEXT + ACCESS_REQUEST_ABORT_API;
 
-	static final String ACCESS_REQUEST_TRIGGER_API = "/accessrequest/trigger";
+	static final String ACCESS_REQUEST_TRIGGER_API = ACCESS_REQUEST_API + "/trigger";
 
 	public static final String ACCESS_REQUEST_TRIGGER_URL = API_CONTEXT + ACCESS_REQUEST_TRIGGER_API;
 
@@ -203,6 +221,8 @@ public class ApiSupport {
 
 	public static final String OIDC_CHECK_3PCOOKIE = "/3p-cookies/step1";
 
+	public static final String OIDC_LOGIN_STATUS = "/login-status-iframe";
+
 	public static final String PROTOCOL_OPENIDCONNECT = "/protocol/openid-connect";
 
 	public static final String SPRING_OAUTH2_AUTHORIZE_CTXPATH = SPRING_OAUTH2 + OIDC_AUTH;
@@ -242,8 +262,6 @@ public class ApiSupport {
 	public static final String XTB_LOWER_CASE_ALTERNATE_METADATA_ENDPOINT =
 			"/federationmetadata/2007-06/federationmetadata.xml"; // must be constant
 
-	public static final String SKINNY_PATH= "/skinny";
-
 	private final TrustBrokerProperties trustBrokerProperties;
 
 	public ApiSupport(TrustBrokerProperties trustBrokerProperties) {
@@ -269,32 +287,32 @@ public class ApiSupport {
 
 	// UI
 	public static boolean isFrontendPath(String path) {
-		return path != null && (path.startsWith(FRONTEND_CONTEXT) || path.startsWith(SKINNY_PATH));
+		return path != null && (path.startsWith(FRONTEND_CONTEXT));
 	}
 
-	public static boolean isKeyloakRealmsPath(String path) {
-		return path != null && path.startsWith(ApiSupport.KEYCLOAK_REALMS);
+	public static boolean isKeycloakRealmsPath(String path) {
+		return path != null && path.startsWith(KEYCLOAK_REALMS);
 	}
 
 	public static boolean isOidcSubSystemPath(String path) {
-		return path != null && path.startsWith(ApiSupport.SPRING_OAUTH2);
+		return path != null && path.startsWith(SPRING_OAUTH2);
 	}
 
 	public static boolean isOidcAuthPath(String path) {
-		return path != null && (path.endsWith(ApiSupport.OIDC_AUTH) || path.endsWith(KEYCLOAK_AUTH));
+		return path != null && (path.endsWith(OIDC_AUTH) || path.endsWith(KEYCLOAK_AUTH));
 	}
 
 	private static boolean isOidcUserInfoPath(String path) {
-		return path != null && path.endsWith(ApiSupport.OIDC_USERINFO);
+		return path != null && path.endsWith(OIDC_USERINFO);
 	}
 
 	private static boolean isOidcLogoutPath(String path) {
-		return path != null && path.endsWith(ApiSupport.OIDC_LOGOUT);
+		return path != null && path.endsWith(OIDC_LOGOUT);
 	}
 
 	public static boolean isSpringFederationPath(String path) {
-		return path != null && (path.startsWith(ApiSupport.SPRING_SAML_LOGIN_CTXPATH)
-				|| path.startsWith(ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH));
+		return path != null && (path.startsWith(SPRING_SAML_LOGIN_CTXPATH)
+				|| path.startsWith(SPRING_SAML_AUTHENTICATE_CTXPATH));
 	}
 
 	// OIDC protocol endpoints (including SAML protocol switch) that need federation state backing (BSESSION, sid, auth_state)
@@ -304,23 +322,23 @@ public class ApiSupport {
 		// Keep in sync with OidcSecurityConfiguration.
 		return isOidcSubSystemPath(path)
 				|| isSpringFederationPath(path)
-				|| isKeyloakRealmsPath(path)
+				|| isKeycloakRealmsPath(path)
 				|| isOidcUserInfoPath(path)
 				|| isOidcLogoutPath(path)
 				|| isOidcConfigPath(path); // actually no session needed but CORS may be
 	}
 
 	public static boolean isOidcConfigPath(String path) {
-		return path != null && (path.endsWith(ApiSupport.PUBLIC_OIDC_CONFIG_PATH)
-				|| path.equals(ApiSupport.XTB_OIDC_CONFIG_PATH));
+		return path != null && (path.endsWith(PUBLIC_OIDC_CONFIG_PATH)
+				|| path.equals(XTB_OIDC_CONFIG_PATH));
 	}
 
 	public static boolean isUserInfoRequest(String path) {
-		return path != null && path.endsWith(ApiSupport.OIDC_USERINFO);
+		return path != null && path.endsWith(OIDC_USERINFO);
 	}
 
 	public static boolean isIntrospectRequest(String path) {
-		return path != null && path.endsWith(ApiSupport.OIDC_INTROSPECT);
+		return path != null && path.endsWith(OIDC_INTROSPECT);
 	}
 
 	public static boolean isReadyOnlyAccess(String path) {
@@ -328,11 +346,19 @@ public class ApiSupport {
 	}
 
 	public static boolean isLogoutRequest(String path) {
-		return path != null && path.endsWith(ApiSupport.OIDC_LOGOUT);
+		return path != null && path.endsWith(OIDC_LOGOUT);
 	}
 
 	public static boolean isOidcCheck3pCookie(String path) {
-		return path != null && path.contains(ApiSupport.OIDC_CHECK_3PCOOKIE);
+		return path != null && path.contains(OIDC_CHECK_3PCOOKIE);
+	}
+
+	public static boolean isSamlOrOidcStaticContentPath(String path) {
+		return isOidcCheck3pCookie(path) || isOidcLoginStatus(path);
+	}
+
+	public static boolean isOidcLoginStatus(String path) {
+		return path != null && path.contains(OIDC_LOGIN_STATUS);
 	}
 
 	public String getHrdUrl(String issuer, String requestId) {
@@ -464,8 +490,8 @@ public class ApiSupport {
 				+ '?' + HRD_SID_PARAM + '=' + encodeUrlParameter(authnRequestId);
 	}
 
-	public String getHrdRpContinueApi(String sessionId) {
-		return getFrontendUrl(API_CONTEXT, HRD_RP_API, encodeUrlParameter(sessionId)) + CONTINUE_POSTFIX;
+	public String getHrdRpContinueApi() {
+		return getFrontendUrl(API_CONTEXT, HRD_RP_CONTINUE_API);
 	}
 
 	public String getHrdCpApi(String issuer, String authnRequestId) {
@@ -501,6 +527,11 @@ public class ApiSupport {
 	// POST to submit selected profile
 	public String getProfileApi() {
 		return getFrontendUrl(API_CONTEXT, PROFILE_API);
+	}
+
+	// GET to fetch announcements
+	public String getAnnouncementsApi(String issuerId, String appName) {
+		return getFrontendUrl(API_CONTEXT, ANNOUNCEMENTS_API, encodeUrlParameter(issuerId), encodeUrlParameter(appName));
 	}
 
 	public String getContinueToHrdApi(String sessionId) {

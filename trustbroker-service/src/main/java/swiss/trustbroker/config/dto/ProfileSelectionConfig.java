@@ -39,6 +39,14 @@ import lombok.NoArgsConstructor;
 public class ProfileSelectionConfig {
 
 	/**
+	 * Globally enable the feature.
+	 * <br/>
+	 * Default: false
+	 * @since 1.15.0
+	 */
+	private boolean enabled;
+
+	/**
 	 * Custom attributes that might be needed by the implementation.
  	 */
 	private Map<String, Object> attributes;

@@ -24,7 +24,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 /**
  * application.yml config helper methods.
  * <br/>
- * Intended for API implementations to simplify handling of generic Map<String, Object> attributes.
+ * Intended for API implementations to simplify handling of generic <code>Map&lt;String, Object&gt;</code> attributes.
  */
 @Slf4j
 public class ConfigUtil {

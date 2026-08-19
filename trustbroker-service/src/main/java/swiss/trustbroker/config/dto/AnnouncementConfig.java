@@ -43,6 +43,8 @@ public class AnnouncementConfig {
 
 	/**
 	 * Disable the service to discard all announcements.
+	 * <br/>
+	 * Default: false
 	 */
 	private boolean enabled;
 

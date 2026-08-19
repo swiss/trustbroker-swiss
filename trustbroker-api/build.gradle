@@ -44,3 +44,15 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework:spring-web'
 }
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
+}

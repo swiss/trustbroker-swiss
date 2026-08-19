@@ -58,6 +58,10 @@ class WebSupportTest {
 
 	private static final String TEST_URL_WITH_QUERY = TEST_URL + '?' + TEST_QUERY;
 
+	private static final String PERIMETER_HOST = "https://perimeter.localdomain";
+
+	private static final String FRONTEND_HOST = "https://frontend.localdomain";
+
 	private static final String SAML_HOST = "https://saml.localdomain";
 
 	private static final String SAML_PATH = "/saml";
@@ -116,7 +120,7 @@ class WebSupportTest {
 
 	@Test
 	void testClientNetworkInjectionOnIntranet() {
-		var network = new NetworkConfig();
+		var network = givenNetworkConfig();
 
 		// no network injection
 		var request = new MockHttpServletRequest();
@@ -306,7 +310,7 @@ class WebSupportTest {
 	void getOwnOrigins() {
 		var properties = givenProperties();
 		var result = WebSupport.getOwnOrigins(properties);
-		assertThat(result, containsInAnyOrder(SAML_HOST, OIDC_HOST));
+		assertThat(result, containsInAnyOrder(PERIMETER_HOST, FRONTEND_HOST, SAML_HOST, OIDC_HOST));
 	}
 
 	@Test
@@ -320,6 +324,8 @@ class WebSupportTest {
 	@CsvSource(value = {
 			"null,false",
 			"/relative,false",
+			PERIMETER_HOST + ",true",
+			FRONTEND_HOST + ",true",
 			SAML_URL + ",true",
 			SAML_URL + "/test,true",
 			OIDC_URL + ",true",
@@ -353,6 +359,8 @@ class WebSupportTest {
 
 	private static TrustBrokerProperties givenProperties() {
 		var properties = new TrustBrokerProperties();
+		properties.setPerimeterUrl(PERIMETER_HOST);
+		properties.setFrontendBaseUrl(FRONTEND_HOST);
 		// ignored:OIDC_LOGOUT_PATH
 		properties.setSloDefaultOidcDestinationPath(TEST_URL + "/slo/destination");
 		var saml = new SamlProperties();
@@ -368,4 +376,10 @@ class WebSupportTest {
 		return properties;
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

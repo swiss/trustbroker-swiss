@@ -15,8 +15,6 @@
 
 package swiss.trustbroker.oidc;
 
-import static org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher;
-
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -24,11 +22,11 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -39,7 +37,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
@@ -50,12 +50,12 @@ import org.springframework.security.oauth2.server.authorization.authentication.J
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderMetadataClaimNames;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -63,6 +63,8 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.OidcProperties;
@@ -77,6 +79,7 @@ import swiss.trustbroker.oidc.pkce.PublicClientRefreshTokenAndTokenExchangeAuthe
 import swiss.trustbroker.oidc.pkce.PublicClientRefreshTokenAuthenticationProvider;
 import swiss.trustbroker.saml.service.RelyingPartyService;
 import swiss.trustbroker.script.service.ScriptService;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @AllArgsConstructor
@@ -113,6 +116,8 @@ public class OidcServerConfiguration {
 
 	private final QoaMappingService qoaMappingService;
 
+	private final OidcAuditService auditService;
+
 	// no in-memory session tracking
 	// note: this bean needs to be in the bean registry, see OAuth2AuthorizationServerConfigurer
 	// using OAuth2ConfigurerUtils.getOptionalBean, setting it in HttpSecurity has no effect:
@@ -126,7 +131,8 @@ public class OidcServerConfiguration {
 	@Order(Ordered.HIGHEST_PRECEDENCE)
 	public SecurityFilterChain authorizationServerSecurityFilterChain(
 			HttpSecurity http, OAuth2AuthorizationService authorizationService, JwtDecoder jwtDecoder,
-			JWKSource<SecurityContext> jwkSource, CustomOAuth2AuthorizationService customOAuth2AuthorizationService) throws Exception {
+			JWKSource<SecurityContext> jwkSource, CustomOAuth2AuthorizationService customOAuth2AuthorizationService,
+			OAuth2TokenGenerator<OAuth2Token> tokenGenerator) {
 
 		// setup spring-authorization-server for login federation
 		var authServerConfigurer = new OAuth2AuthorizationServerConfigurer();
@@ -151,8 +157,8 @@ public class OidcServerConfiguration {
 		// mandatory /token endpoint
 		authServerConfigurer.tokenEndpoint(tokenEndpoint -> tokenEndpoint
 				.authenticationProvider(new CustomOAuth2TokenExchangeAuthenticationProvider(registeredClientRepository,
-						customOAuth2AuthorizationService, oidcMetadataCacheService, relyingPartyDefinitions, trustBrokerProperties, jwkSource,
-						relyingPartyService, relyingPartySetupService, qoaMappingService))
+						customOAuth2AuthorizationService, oidcMetadataCacheService, relyingPartyDefinitions, trustBrokerProperties,
+						relyingPartyService, relyingPartySetupService, qoaMappingService, tokenGenerator))
 				.authenticationProvider(jwtClientAssertionAuthenticationProvider(registeredClientRepository, authorizationService, jwtDecoder))
 				.accessTokenRequestConverter(new CustomOAuth2TokenExchangeAuthenticationConverter())
 				.errorResponseHandler(new CustomFailureHandler(
@@ -205,13 +211,16 @@ public class OidcServerConfiguration {
 		var endpointsMatcher = authServerConfigurer.getEndpointsMatcher();
 		http.securityMatcher(endpointsMatcher)
 			.authorizeHttpRequests(authorizeRequests -> authorizeRequests
-					.requestMatchers(antMatcher("/favicon.ico"), antMatcher("/failure"))
+					.requestMatchers(
+							PathPatternRequestMatcher.pathPattern("/favicon.ico"),
+							PathPatternRequestMatcher.pathPattern("/failure"))
 					.permitAll() // skip these
 					.anyRequest()
 					.authenticated() // protect everything else
 			)
 			.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
-			.with(authServerConfigurer, Customizer.withDefaults());
+			.with(authServerConfigurer, Customizer.withDefaults())
+			.addFilterBefore(new LogTokenRequestsFilter(auditService, trustBrokerProperties), SecurityContextHolderFilter.class);
 
 		// Redirect to the login page when not authenticated from the authorization endpoint
 		http.exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint(relyingPartyDefinitions)));
@@ -271,12 +280,16 @@ public class OidcServerConfiguration {
 			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
 					OAuth2AuthorizationServerMetadataClaimNames.TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
 					oidcProperties.getTokenEndpointAuthMethods());
-			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
-					OAuth2AuthorizationServerMetadataClaimNames.INTROSPECTION_ENDPOINT_AUTH_METHODS_SUPPORTED,
-					oidcProperties.getIntrospectionEndpointAuthMethods());
-			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
-					OAuth2AuthorizationServerMetadataClaimNames.REVOCATION_ENDPOINT_AUTH_METHODS_SUPPORTED,
-					oidcProperties.getRevocationEndpointAuthMethods());
+			if (oidcProperties.isIntrospectionEnabled()) {
+				OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
+						OAuth2AuthorizationServerMetadataClaimNames.INTROSPECTION_ENDPOINT_AUTH_METHODS_SUPPORTED,
+						oidcProperties.getIntrospectionEndpointAuthMethods());
+			}
+			if (oidcProperties.isRevocationEnabled()) {
+				OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
+						OAuth2AuthorizationServerMetadataClaimNames.REVOCATION_ENDPOINT_AUTH_METHODS_SUPPORTED,
+						oidcProperties.getRevocationEndpointAuthMethods());
+			}
 			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
 					OidcProviderMetadataClaimNames.SUBJECT_TYPES_SUPPORTED,
 					oidcProperties.getSubjectTypes());
@@ -294,10 +307,12 @@ public class OidcServerConfiguration {
 					ID_TOKEN_ENCRYPTION_ALG, oidcProperties.getIdTokenEncryptionAlgorithms());
 			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
 					ID_TOKEN_ENCRYPTION_METHOD, oidcProperties.getIdTokenEncryptionMethods());
-			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
-					USERINFO_ENCRYPTION_ALG, oidcProperties.getUserInfoEncryptionAlgorithms());
-			OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
-					USERINFO_ENCRYPTION_METHOD, oidcProperties.getUserInfoEncryptionMethods());
+			if (oidcProperties.isUserInfoEnabled()) {
+				OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
+						USERINFO_ENCRYPTION_ALG, oidcProperties.getUserInfoEncryptionAlgorithms());
+				OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(providerConfiguration,
+						USERINFO_ENCRYPTION_METHOD, oidcProperties.getUserInfoEncryptionMethods());
+			}
 		};
 	}
 
@@ -311,14 +326,18 @@ public class OidcServerConfiguration {
 			if (clientConfig.isEmpty()) {
 				throw new TechnicalException("Could not find client config for " + clientId);
 			}
+			Map<String, Object> tokenClaims = null;
 			if (principal instanceof JwtAuthenticationToken jwtAuthenticationToken) {
-				var tokenClaims = jwtAuthenticationToken.getToken().getClaims();
-				claims = OidcUserInfoUtil.filterUnwantedClaims(tokenClaims, clientId,
-						relyingPartyDefinitions, scriptService, trustBrokerProperties);
+				tokenClaims = jwtAuthenticationToken.getToken().getClaims();
 			}
 			if (principal instanceof BearerTokenAuthentication bearerTokenAuthentication) {
-				claims = bearerTokenAuthentication.getTokenAttributes();
+				tokenClaims = bearerTokenAuthentication.getTokenAttributes();
 			}
+			if (tokenClaims == null) {
+				throw new TechnicalException("Missing token claims for client " + clientId);
+			}
+			claims = OidcUserInfoUtil.filterUnwantedClaims(tokenClaims, clientId,
+					relyingPartyDefinitions, scriptService, trustBrokerProperties);
 			return new OidcUserInfo(claims);
 		};
 	}
@@ -337,20 +356,20 @@ public class OidcServerConfiguration {
 			GlobalExceptionHandler globalExceptionHandler,
 			Clock clock,
 			MetricsService metricsService) {
-		var authorizationService = new CustomOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository,
-				trustBrokerProperties, globalExceptionHandler, clock, metricsService);
-		var rowMapper = new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
-		var oAuth2AuthorizationParametersMapper = new JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper();
-		var springSecObjectMapper = ObjectMapperFactory.springSecObjectMapper();
-		oAuth2AuthorizationParametersMapper.setObjectMapper(springSecObjectMapper);
-		rowMapper.setObjectMapper(springSecObjectMapper);
+		var jsonMapper = ObjectMapperFactory.springSecObjectMapper();
+		var authorizationService = new CustomOAuth2AuthorizationService(
+				jdbcTemplate, registeredClientRepository, trustBrokerProperties, globalExceptionHandler, clock, metricsService);
+		var rowMapper = new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationRowMapper(
+				registeredClientRepository, jsonMapper);
+		var paramMapper = new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationParametersMapper(
+				jsonMapper);
 		authorizationService.setAuthorizationRowMapper(rowMapper);
-		authorizationService.setAuthorizationParametersMapper(oAuth2AuthorizationParametersMapper);
+		authorizationService.setAuthorizationParametersMapper(paramMapper);
 		return authorizationService;
 	}
 
 	@Bean
-	@ConditionalOnProperty(value = "trustbroker.config.serverMultiProcessed", havingValue = "false", matchIfMissing = false)
+	@ConditionalOnBooleanProperty(value = "trustbroker.config.servermultiprocessed", havingValue = false)
 	public InMemoryOAuth2AuthorizationService authorizationServiceDev() {
 		return new InMemoryOAuth2AuthorizationService();
 	}

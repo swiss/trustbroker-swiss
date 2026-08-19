@@ -31,4 +31,8 @@ public class SignatureValidationParameters {
 
 	private List<Credential> trustCredentials;
 
+	private List<String> allowedSignatureAlgorithms;
+
+	private boolean enforceSignatureAlgorithms;
+
 }

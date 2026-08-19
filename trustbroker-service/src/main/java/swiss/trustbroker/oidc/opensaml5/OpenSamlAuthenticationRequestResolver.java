@@ -27,7 +27,6 @@ package swiss.trustbroker.oidc.opensaml5;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.BiConsumer;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,12 +57,13 @@ import org.springframework.security.saml2.provider.service.web.RelyingPartyRegis
 import org.springframework.security.saml2.provider.service.web.RelyingPartyRegistrationPlaceholderResolvers.UriResolver;
 import org.springframework.security.saml2.provider.service.web.RelyingPartyRegistrationResolver;
 import org.springframework.security.saml2.provider.service.web.authentication.Saml2AuthenticationRequestResolver;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 import org.w3c.dom.Element;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.common.tracing.TraceSupport;
+import swiss.trustbroker.oidc.session.OidcSessionSupport;
 
 /**
  * For internal use only. Intended for consolidating common behavior related to minting a
@@ -89,10 +89,10 @@ class OpenSamlAuthenticationRequestResolver {
 
 	private final NameIDPolicyBuilder nameIdPolicyBuilder;
 
-	private RequestMatcher requestMatcher = new AntPathRequestMatcher(
+	private RequestMatcher requestMatcher = PathPatternRequestMatcher.pathPattern(
 			Saml2AuthenticationRequestResolver.DEFAULT_AUTHENTICATION_REQUEST_URI);
 
-	private Converter<HttpServletRequest, String> relayStateResolver = (request) -> UUID.randomUUID().toString();
+	private Converter<HttpServletRequest, String> relayStateResolver = (request) -> OidcSessionSupport.getOidcRelayState();
 
 	/**
 	 * Construct a {@link OpenSamlAuthenticationRequestResolver} using the provided
@@ -132,6 +132,7 @@ class OpenSamlAuthenticationRequestResolver {
 		});
 	}
 
+	@SuppressWarnings("java:S2589") // false positive on relayState != null (can be null)
 	<T extends AbstractSaml2AuthenticationRequest> T resolve(HttpServletRequest request,
 			BiConsumer<RelyingPartyRegistration, AuthnRequest> authnRequestConsumer) {
 		RequestMatcher.MatchResult result = this.requestMatcher.matcher(request);
@@ -163,7 +164,7 @@ class OpenSamlAuthenticationRequestResolver {
 		}
 		authnRequestConsumer.accept(registration, authnRequest);
 		if (authnRequest.getID() == null) {
-			authnRequest.setID(TraceSupport.getOwnTraceParentForSaml());
+			authnRequest.setID(TraceSupport.getOwnTraceParentForSaml(OidcSessionSupport.getOidcSessionId()));
 		}
 		String relayState = this.relayStateResolver.convert(request);
 		Saml2MessageBinding binding = registration.getAssertingPartyMetadata().getSingleSignOnServiceBinding();

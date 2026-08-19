@@ -51,7 +51,7 @@ class SilenceRulesTest {
 	void testSilenced(String pathAndNetwork, boolean silenced) {
 		var request = new MockHttpServletRequest();
 		var tokens = pathAndNetwork.split(":");
-		var network = new NetworkConfig(); // default names INTERNET/INTRANET
+		var network = givenNetworkConfig();
 		request.setRequestURI(tokens[0]);
 		if (tokens.length > 1) {
 			request.addHeader(network.getNetworkHeader(), tokens[1]);
@@ -63,4 +63,10 @@ class SilenceRulesTest {
 				SilenceRules.isSilenced(request, true, false, network), is(silenced));
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

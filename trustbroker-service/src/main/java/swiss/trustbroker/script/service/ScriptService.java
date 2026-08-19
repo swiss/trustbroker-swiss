@@ -381,7 +381,7 @@ public class ScriptService {
 				log.trace("Executing step={} script={} using {}={} {}={}",
 						hookType, script.getKey(),
 						BEAN_HTTP_REQUEST, TraceSupport.getOwnTraceParent(),
-						BEAN_ASSERTIONS, assertions.isEmpty() ? null : OpenSamlUtil.samlObjectToString(assertions.get(0)));
+						BEAN_ASSERTIONS, assertions.isEmpty() ? null : OpenSamlUtil.samlObjectToString(assertions.getFirst()));
 			}
 			script.getValue().eval(bindings);
 		}

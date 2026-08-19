@@ -91,7 +91,15 @@ export class ErrorBoxComponent implements OnInit {
 	) {}
 
 	continueFlow(): void {
-		this.apiService.continueResponseToRp(this.sessionId);
+		this.apiService
+			.continueResponseToRp(this.sessionId)
+			.pipe(takeUntilDestroyed(this.destroyRef))
+			.subscribe({
+				next: response => this.apiService.handleFormResponse(response),
+				error: errorResponse => {
+					console.error('an error occurred', errorResponse);
+				}
+			});
 	}
 
 	relogin(): void {

@@ -51,7 +51,7 @@ public class OidcSessionController {
 		return "/3p-cookies-step1.html";
 	}
 
-	@GetMapping(value = "/login-status-iframe", produces = "text/html")
+	@GetMapping(value = ApiSupport.OIDC_LOGIN_STATUS, produces = "text/html")
 	public String getLoginStatusPage(HttpServletRequest request, HttpServletResponse response) {
 		log.debug("Incoming login-status-iframe request with url={}", request.getRequestURL());
 

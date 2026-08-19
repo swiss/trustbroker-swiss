@@ -175,15 +175,14 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 	@Override
 	public void flushBuffer() throws IOException {
 		if (output != null) {
-			log.info("HTTP flushBuffer skipped, client needs to wait");
+			log.debug("HTTP flushBuffer skipped, client needs to wait");
+			return;
 		}
-		else {
-			super.flushBuffer();
-			log.info("HTTP flushBuffer executed, client can proceed");
-		}
+		super.flushBuffer();
+		log.debug("HTTP flushBuffer executed, client can proceed");
 	}
 
-	public void catchOutputStream() {
+	public void captureOutputStream() {
 		if (output == null) {
 			output = new InMemoryServletOutputStream();
 		}
@@ -193,14 +192,15 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 		return output != null ? output.getData() : null;
 	}
 
-	public void flushOutputStream() throws IOException {
+	public void flushCapturedOutputStream() throws IOException {
 		if (writer != null) {
 			writer.flush();
 		}
-		flushOutputStream(getBody());
+		// 'output' writes to memory, no need to flush this stream
+		writeToRealOutputStream(getBody());
 	}
 
-	public void flushOutputStream(byte[] body) throws IOException {
+	public void writeToRealOutputStream(byte[] body) throws IOException {
 		writer = null;
 		output = null;
 		if (body != null) {

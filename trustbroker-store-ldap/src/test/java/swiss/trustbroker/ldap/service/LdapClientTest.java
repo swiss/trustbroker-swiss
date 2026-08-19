@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import swiss.trustbroker.api.idm.dto.IdmResult;
+import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.LdapStoreConfig;
@@ -47,6 +50,7 @@ import swiss.trustbroker.federation.xmlconfig.ProfileSelectionMode;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.ldap.model.LdapAttributeMapper;
 import swiss.trustbroker.saml.dto.CpResponse;
+import swiss.trustbroker.test.saml.util.SamlTestBase;
 
 @SpringBootTest(classes = { LdapClient.class })
 class LdapClientTest {
@@ -75,7 +79,8 @@ class LdapClientTest {
 
 		doReturn(givenLdapAttributes()).when(ldapTemplate).search(eq(base), any(), eq(SearchControls.SUBTREE_SCOPE), any(), any(LdapAttributeMapper.class));
 		List<Map<String, List<String>>> unprocessedAttributes = new LinkedList<>();
-		var ldapResult = ldapClient.search(rpConfig, cpResponse, idmRequests, unprocessedAttributes);
+		IdmResult result = IdmResult.builder().userDetails(givenUserDetails()).build();
+		var ldapResult = ldapClient.search(rpConfig, cpResponse, idmRequests, unprocessedAttributes, result);
 		assertEquals(2, ldapResult.size());
 	}
 
@@ -112,37 +117,94 @@ class LdapClientTest {
 		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
 		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
 		List<Map<String, List<String>>> unprocessedAttributes = new LinkedList<>();
+		IdmResult result = IdmResult.builder().userDetails(givenUserDetails()).build();
 		var ex = assertThrows(TechnicalException.class,
-				() -> ldapClient.queryFilterFormatter(null, cpResponse, "RP_ID", unprocessedAttributes));
+				() -> ldapClient.queryFilterFormatter(null, cpResponse, "RP_ID", unprocessedAttributes, result));
 		assertThat(ex.getInternalMessage(), containsString("AppFilter is null or empty"));
 
 		assertEquals("(&amp;(app=app1)(|(uid=uid)(attribute=attribute)))",
-				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=uid)(attribute=attribute)))", cpResponse, "RP_ID", unprocessedAttributes));
+				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=uid)(attribute=attribute)))", cpResponse, "RP_ID", unprocessedAttributes, result));
 
 		assertEquals("(&amp;(app=app1)(|(uid=uid)(attribute=attribute)))",
-				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=${IDM:uid})(attribute=${attribute})))", cpResponse, "RP_ID", unprocessedAttributes));
+				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=${IDM:uid})(attribute=${attribute})))", cpResponse, "RP_ID", unprocessedAttributes, result));
 
 		assertEquals("(&amp;(app=app1)(|(uid=uid)(id=UNDEF)))",
-				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=${IDM:uid})(id=${unknownAttr})))", cpResponse, "RP_ID", unprocessedAttributes));
+				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=${IDM:uid})(id=${unknownAttr})))", cpResponse, "RP_ID", unprocessedAttributes, result));
 
 		assertEquals("(&amp;(app=app1)(|(uid=user\\5c123)(attribute=\\2a)(value=\\29\\28test=\\2a)))",
 				ldapClient.queryFilterFormatter("(&amp;(app=app1)(|(uid=${IDM:escape})(attribute=${wildcard})"
-						+ "(value=${injection})))", cpResponse, "RP_ID", unprocessedAttributes));
+						+ "(value=${injection})))", cpResponse, "RP_ID", unprocessedAttributes, result));
+	}
+
+
+	@Test
+	void getEncodedPlaceHolderValueTest() {
+		var valuesWithNullFirst = new ArrayList<String>();
+		valuesWithNullFirst.add(null);
+		valuesWithNullFirst.add("uid2");
+		assertEquals("uid1", LdapClient.getEncodedPlaceHolderValue("uid", List.of("uid1", "uid2"), "UNDEF"));
+		assertEquals("uid2", LdapClient.getEncodedPlaceHolderValue("uid", List.of("uid2"), "UNDEF"));
+		assertEquals("UNDEF", LdapClient.getEncodedPlaceHolderValue("uid", valuesWithNullFirst, "UNDEF"));
+		assertEquals("user\\5c123", LdapClient.getEncodedPlaceHolderValue("escape", List.of("user\\123", "user2"), "UNDEF"));
+		assertEquals("\\2a", LdapClient.getEncodedPlaceHolderValue("wildcard", List.of("*", "value"), "UNDEF"));
+		assertEquals("(uid=uid1)", LdapClient.getEncodedPlaceHolderValue("LIST:IDM:query:uid", List.of("uid1"), "UNDEF"));
+		assertEquals("(uid=uid1)(uid=uid2)", LdapClient.getEncodedPlaceHolderValue("LIST:IDM:query:uid", List.of("uid1", "uid2"), "UNDEF"));
+		assertEquals("(uid=user\\5c123)(uid=\\2a)", LdapClient.getEncodedPlaceHolderValue("LIST:IDM:query:uid", List.of("user\\123", "*"), "UNDEF"));
+		List<String> noValues = Collections.emptyList();
+		var ex = assertThrows(TechnicalException.class,
+				() -> LdapClient.getEncodedPlaceHolderValue("uid", noValues, "UNDEF"));
+		assertThat(ex.getInternalMessage(), containsString("Unsupported placeholder values"));
 	}
 
 	@Test
 	void isChainedQueryTest() {
-		assertTrue(ldapClient.isChainedQuery("IDM:uid"));
-		assertFalse(ldapClient.isChainedQuery("uid"));
+		assertTrue(ldapClient.isIdmClaim("IDM:uid"));
+		assertTrue(ldapClient.isIdmClaim("LIST:IDM:LDAP:uid"));
+		assertFalse(ldapClient.isIdmClaim("uid"));
+		assertFalse(ldapClient.isIdmClaim("PROPS:attributeIDM"));
+		assertTrue(ldapClient.isPropertiesClaim("PROPS:attributeIDM"));
+		assertTrue(ldapClient.isIdmClaim("IDM:LDAP:attributeIDM"));
 	}
 
 	@Test
 	void getPlaceholderValueTest() {
+		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
+		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
+
 		var cpResponse = givenCpResponse();
 		List<Map<String, List<String>>> unprocessedAttributes = new LinkedList<>();
-		assertEquals(List.of("NAME_ID"), ldapClient.getPlaceholderValues(SUBJECT_NAME_ID, cpResponse, unprocessedAttributes));
-		assertEquals(List.of("uid"), ldapClient.getPlaceholderValues("IDM:uid", cpResponse, unprocessedAttributes));
-		assertEquals(List.of("attribute"), ldapClient.getPlaceholderValues("attribute", cpResponse, unprocessedAttributes));
+
+		IdmResult result = IdmResult.builder().userDetails(givenUserDetails()).properties(givenUserDetails()).build();
+		assertEquals(List.of(), ldapClient.getPlaceholderValues(null, cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("NAME_ID"), ldapClient.getPlaceholderValues(SUBJECT_NAME_ID, cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("uid"), ldapClient.getPlaceholderValues("IDM:uid", cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("attribute"), ldapClient.getPlaceholderValues("attribute", cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("uid"), ldapClient.getPlaceholderValues("LIST:IDM:uid", cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("property1", "property2"), ldapClient.getPlaceholderValues("PROPS:property", cpResponse, unprocessedAttributes, result));
+		assertEquals(List.of("property1", "property2"), ldapClient.getPlaceholderValues("LIST:PROPS:property", cpResponse, unprocessedAttributes, result));
+
+		// LIST placeholder resolved from attributeNameListMap
+		Map<String, List<String>> listEntry1 = new HashMap<>();
+		listEntry1.put("uid", List.of("uid1", "uid2"));
+		Map<String, List<String>> listEntry2 = new HashMap<>();
+		listEntry2.put("uid", List.of("uid3", "uid4"));
+		unprocessedAttributes.add(listEntry1);
+		unprocessedAttributes.add(listEntry2);
+		assertEquals(List.of("uid1", "uid2", "uid3", "uid4"), ldapClient.getPlaceholderValues("LIST:IDM:LDAP:uid", cpResponse, unprocessedAttributes, result));
+
+		// LIST placeholder with unknown attribute falls back to UNDEF
+		assertEquals(List.of("UNDEF"), ldapClient.getPlaceholderValues("LIST:IDM:queryName:unknownAttr", cpResponse, unprocessedAttributes, result));
+	}
+
+	private Map<AttributeName, List<String>> givenUserDetails() {
+		Map<AttributeName, List<String>> attributeValueMap = new HashMap<>();
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("uid").source("IDM").build(), List.of("uid"));
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("attribute").build(), List.of("attribute"));
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("wildcard").build(), List.of("*"));
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("escape").source("IDM").build(), List.of("user\\123"));
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("injection").build(), List.of(")(test=*"));
+		attributeValueMap.put(SamlTestBase.TestAttributeName.builder().name("property").source("PROPS").build(), List.of("property1", "property2"));
+		return attributeValueMap;
 	}
 
 	private static CpResponse givenCpResponse() {

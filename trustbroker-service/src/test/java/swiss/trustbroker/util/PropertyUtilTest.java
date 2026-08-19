@@ -292,7 +292,7 @@ class PropertyUtilTest {
 	void evaluateSecurityPolicy(Boolean input, Boolean defaultValue, Boolean expected) {
 		var securityPolicies = new SecurityPolicies();
 		securityPolicies.setDelegateOrigin(input);
-		var result = PropertyUtil.evaluatePropery(securityPolicies, SecurityPolicies::getDelegateOrigin,
+		var result = PropertyUtil.evaluateProperty(securityPolicies, SecurityPolicies::getDelegateOrigin,
 				() -> defaultValue);
 		assertThat(result, is(expected));
 	}

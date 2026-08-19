@@ -133,7 +133,7 @@ public class SamlStatusCode {
 			return addNamespace(defaultNamespace, id);
 		}
 		// fallback to first namespace
-		return addNamespace(samlProperties.getFlowPolicyNamespaces().get(0), id);
+		return addNamespace(samlProperties.getFlowPolicyNamespaces().getFirst(), id);
 	}
 
 	private static String addNamespace(SamlNamespace namespace, String id) {

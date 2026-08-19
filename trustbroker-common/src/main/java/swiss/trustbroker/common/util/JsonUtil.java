@@ -20,16 +20,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.shaded.gson.JsonArray;
 import com.nimbusds.jose.shaded.gson.JsonElement;
+import com.nimbusds.jose.shaded.gson.JsonNull;
 import com.nimbusds.jose.shaded.gson.JsonObject;
 import com.nimbusds.jose.shaded.gson.JsonParseException;
 import com.nimbusds.jose.shaded.gson.JsonParser;
 import com.nimbusds.jose.shaded.gson.JsonPrimitive;
 import lombok.extern.slf4j.Slf4j;
 import swiss.trustbroker.common.exception.TechnicalException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 public class JsonUtil {
@@ -49,6 +50,9 @@ public class JsonUtil {
 		}
 		if (element instanceof JsonPrimitive prim) {
 			return convertJsonPrimitive(prim);
+		}
+		if (element instanceof JsonNull) {
+			return null;
 		}
 		return element.getAsString();
 	}
@@ -172,7 +176,7 @@ public class JsonUtil {
 		try {
 			return objectMapper.writeValueAsString(dto);
 		}
-		catch (JsonProcessingException ex) {
+		catch (JacksonException ex) {
 			throw new TechnicalException("Could not serialize JSON", ex);
 		}
 	}

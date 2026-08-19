@@ -15,19 +15,20 @@
 
 package swiss.trustbroker.homerealmdiscovery.controller;
 
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -37,15 +38,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import java.util.Optional;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
@@ -53,25 +53,20 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
-import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
-import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
 import swiss.trustbroker.api.saml.service.OutputService;
+import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
-import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 import swiss.trustbroker.federation.xmlconfig.Flow;
 import swiss.trustbroker.federation.xmlconfig.FlowPolicies;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
-import swiss.trustbroker.homerealmdiscovery.dto.ProfileRequest;
+import swiss.trustbroker.homerealmdiscovery.dto.SessionRequest;
 import swiss.trustbroker.homerealmdiscovery.dto.SupportInfo;
-import swiss.trustbroker.homerealmdiscovery.service.RedirectOutputService;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.homerealmdiscovery.service.WebResourceProvider;
 import swiss.trustbroker.saml.dto.CpResponse;
@@ -88,6 +83,7 @@ import swiss.trustbroker.sso.service.SsoService;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.SamlValidator;
 import swiss.trustbroker.util.WebSupport;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(SpringExtension.class)
 @WebMvcTest
@@ -112,8 +108,6 @@ class HrdControllerTest {
 
 	private static final String URL = "https://localhost";
 
-	private static final String PROFILE_ID = "id1";
-
 	@MockitoBean
 	TrustBrokerProperties trustBrokerProperties;
 
@@ -136,9 +130,6 @@ class HrdControllerTest {
 	private SsoService ssoService;
 
 	@MockitoBean
-	private AnnouncementService announcementService;
-
-	@MockitoBean
 	private StateCacheService stateCacheService;
 
 	@MockitoBean
@@ -146,9 +137,6 @@ class HrdControllerTest {
 
 	@MockitoBean
 	private WebResourceProvider resourceProvider;
-
-	@MockitoBean
-	private RedirectOutputService redirectOutputService;
 
 	@Autowired
 	private WebApplicationContext webApplicationContext;
@@ -181,28 +169,25 @@ class HrdControllerTest {
 
 	@Test
 	void handleCheckDeviceInfoNoSsoSingleCp() throws Exception {
-		var cpRp = ClaimsProvider.builder().build();
 		var stateDataByAuthnReq = buildStateByAuthnReq();
-		handleCheckDeviceInfo(List.of(cpRp), Optional.empty(), stateDataByAuthnReq, false, null, null);
+		handleCheckDeviceInfo(Optional.empty(), stateDataByAuthnReq, false, null, null);
 		verify(stateCacheService).save(stateDataByAuthnReq, HrdController.class.getSimpleName());
 		verify(claimsProviderService).sendAuthnRequestToCp(any(), any(), eq(stateDataByAuthnReq), any());
 	}
 
 	@Test
 	void handleCheckDeviceInfoNoSsoMultipleCp() throws Exception {
-		var cpRp = ClaimsProvider.builder().build();
 		// just more than one ClaimsProvider
 		var stateDataByAuthnReq = buildStateByAuthnReq();
-		handleCheckDeviceInfo(List.of(cpRp, cpRp), Optional.empty(), stateDataByAuthnReq, false, null, null);
+		handleCheckDeviceInfo(Optional.empty(), stateDataByAuthnReq, false, null, null);
 		verify(stateCacheService, never()).save(stateDataByAuthnReq, "Test");
 	}
 
 	@Test
 	void handleCheckDeviceInfoInvalidSsoStateSingleCp() throws Exception {
-		var cpRp = ClaimsProvider.builder().build();
 		var stateDataByAuthnReq = buildStateByAuthnReq();
 		var ssoStateData = buildSsoState();
-		handleCheckDeviceInfo(List.of(cpRp), Optional.of(ssoStateData), stateDataByAuthnReq, false, null, null);
+		handleCheckDeviceInfo(Optional.of(ssoStateData), stateDataByAuthnReq, false, null, null);
 		// no SSO established, device info not set
 		assertThat(ssoStateData.getDeviceId(), is(nullValue()));
 		verify(stateCacheService, never()).save(ssoStateData, "Test");
@@ -211,10 +196,9 @@ class HrdControllerTest {
 
 	@Test
 	void handleCheckDeviceInfoValidSsoStateSingleNoAccessRequestNoProfile() throws Exception {
-		var cpRp = ClaimsProvider.builder().build();
 		var stateDataByAuthnReq = buildStateByAuthnReq();
 		var ssoStateData = buildSsoState();
-		handleCheckDeviceInfo(List.of(cpRp), Optional.of(ssoStateData), stateDataByAuthnReq, true, null, null);
+		handleCheckDeviceInfo(Optional.of(ssoStateData), stateDataByAuthnReq, true, null, null);
 		verify(stateCacheService, never()).save(stateDataByAuthnReq, "Test");
 		verifyNoInteractions(claimsProviderService);
 		verify(relyingPartyService).sendAuthnResponseToRpFromState(any(), any(), any(),
@@ -224,11 +208,10 @@ class HrdControllerTest {
 	@Test
 	void handleCheckDeviceInfoValidSsoStateSingleAccessRequest() throws Exception {
 		var arRedirect = apiSupport.getAccessRequestInitiateApi(AUTHN_REQUEST_ID);
-		var cpRp = ClaimsProvider.builder().build();
 		ClaimsParty claimsParty = buildCp();
 		var ssoStateData = buildSsoState();
 		var stateDataByAuthnReq = buildStateByAuthnReq();
-		handleCheckDeviceInfo(List.of(cpRp), Optional.of(ssoStateData), stateDataByAuthnReq, true, arRedirect, null);
+		handleCheckDeviceInfo(Optional.of(ssoStateData), stateDataByAuthnReq, true, arRedirect, null);
 		verify(stateCacheService, never()).save(stateDataByAuthnReq, "Test");
 		verifyNoInteractions(claimsProviderService);
 		verify(relyingPartyService).performAccessRequestWithDataRefreshIfRequired(
@@ -238,10 +221,9 @@ class HrdControllerTest {
 	@Test
 	void handleCheckDeviceInfoValidSsoStateSingleProfileSelection() throws Exception {
 		var profileRedirect = apiSupport.getProfileSelectionUrl(SSO_SESSION_ID);
-		var cpRp = ClaimsProvider.builder().build();
 		var ssoStateData = buildSsoState();
 		var stateDataByAuthnReq = buildStateByAuthnReq();
-		handleCheckDeviceInfo(List.of(cpRp), Optional.of(ssoStateData), stateDataByAuthnReq, true, null,
+		handleCheckDeviceInfo(Optional.of(ssoStateData), stateDataByAuthnReq, true, null,
 				profileRedirect);
 		verify(stateCacheService, never()).save(stateDataByAuthnReq, "Test");
 		verifyNoInteractions(claimsProviderService);
@@ -250,9 +232,8 @@ class HrdControllerTest {
 	}
 
 
-	private void handleCheckDeviceInfo(List<ClaimsProvider> cpRpList, Optional<StateData> ssoStateData,
-                                       StateData stateDataByAuthnReq, boolean ssoStateValid, String accessRequestRedirect, String profileSelectionRedirect)
-			throws Exception {
+	private void handleCheckDeviceInfo(Optional<StateData> ssoStateData, StateData stateDataByAuthnReq, boolean ssoStateValid,
+			String accessRequestRedirect, String profileSelectionRedirect) throws Exception {
 		var rp = buildRp();
 		var cp = buildCp();
 		mockLookups(rp, cp, ssoStateData, stateDataByAuthnReq, ssoStateValid);
@@ -267,12 +248,8 @@ class HrdControllerTest {
 					any(), any(), any(), eq(ssoStateData.get()),
 					eq(stateDataByAuthnReq));
 		}
-		var rpRequest = RpRequest.builder().claimsProviders(cpRpList).build();
-		doReturn(rpRequest).when(assertionConsumerService).getRpRequestDetails(eq(RP_ISSUER_ID), eq(URL), any(), any(),
-				eq(null), eq(stateDataByAuthnReq));
 		var json = buildDeviceInfoJsonString();
-		var resultRedirect = accessRequestRedirect != null ? accessRequestRedirect : (
-				profileSelectionRedirect != null ? profileSelectionRedirect : null);
+		var resultRedirect = accessRequestRedirect != null ? accessRequestRedirect : profileSelectionRedirect;
 		var resultJson = resultRedirect != null ? buildProfileJsonString(resultRedirect) : null;
 		this.mockMvc.perform(post(apiSupport.getDeviceInfoApi())
 						.header(WebSupport.HTTP_HEADER_DEVICE_ID, DEVICE_ID)
@@ -325,7 +302,11 @@ class HrdControllerTest {
 		mockLookups(rp, null, Optional.empty(), stateByAuthnReq, false);
 		doReturn(true).when(trustBrokerProperties).isSecureBrowserHeaders();
 		var cookies = buildCookies();
-		this.mockMvc.perform(get(apiSupport.getHrdRpContinueApi(AUTHN_REQUEST_ID)).cookie(cookies))
+		var sessionJson = buildSessionJsonString(AUTHN_REQUEST_ID);
+		this.mockMvc.perform(post(apiSupport.getHrdRpContinueApi())
+					.contentType(MediaType.APPLICATION_JSON_VALUE)
+				    .content(sessionJson)
+				    .cookie(cookies))
 				.andExpect(status().isOk())
 				.andExpect(header().doesNotExist(HttpHeaders.LOCATION));
 		verify(relyingPartyService).sendResponseToRpFromSessionState(any(), any(), any(), any(), any());
@@ -333,45 +314,24 @@ class HrdControllerTest {
 	}
 
 	@Test
-	void handleProfiles() throws Exception {
-		var mockProfileSelectionService = mock(ProfileSelectionService.class);
-		var result = ProfileResponse.builder().redirectUrl(URL).id(PROFILE_ID).build();
-		var resultJson = new ObjectMapper().writeValueAsString(result);
-		var stateData = StateData.builder().id(PROFILE_ID).build();
+	void handleContinueToRpInvalidState() {
+		var stateByAuthnReq = buildStateByAuthnReq();
 		var cpResponse = CpResponse.builder().build();
-		stateData.setCpResponse(cpResponse);
-		doReturn(stateData).when(stateCacheService).find(PROFILE_ID, HrdController.class.getSimpleName());
-		var profileSelectionData = ProfileSelectionData.builder().selectedProfileId(PROFILE_ID).ignoreEmptyProfiles(true).build();
-		when(relyingPartyService.getProfileSelectionService(any())).thenReturn(mockProfileSelectionService);
-		doReturn(result).when(mockProfileSelectionService).buildProfileResponse(profileSelectionData, stateData.getCpResponse());
-		this.mockMvc.perform(get(apiSupport.getProfilesApi()).header(WebSupport.HTTP_HEADER_XTB_PROFILE_ID, PROFILE_ID))
-				.andExpect(status().isOk())
-				.andExpect(content().json(resultJson));
-	}
-
-	@Test
-	void handleSelectProfile() throws Exception {
-		this.mockMvc.perform(postSelectedProfile(null))
-			.andExpect(status().isOk());
-	}
-
-	@Test
-	void handleSelectProfileWithRedirect() throws Exception {
-		this.mockMvc.perform(postSelectedProfile(URL))
-			.andExpect(status().is3xxRedirection())
-			.andExpect(header().string(HttpHeaders.LOCATION, URL));
-	}
-
-	private RequestBuilder postSelectedProfile(String redirectUrl) throws JsonProcessingException {
-		var request = new ProfileRequest(PROFILE_ID, SESSION_ID);
-		var requestJson = new ObjectMapper().writeValueAsString(request);
-		doReturn(redirectUrl).when(relyingPartyService)
-							 .sendResponseWithSelectedProfile(eq(outputServices), eq(request), any(), any());
-		when(redirectOutputService.handleRedirect(any(), any(), eq(redirectUrl)))
-				.thenReturn(redirectUrl);
-		return post(apiSupport.getProfileApi())
-				.content(requestJson)
-				.contentType(MediaType.APPLICATION_JSON_VALUE);
+		assertFalse(cpResponse.showErrorPage());
+		stateByAuthnReq.setCpResponse(cpResponse);
+		doReturn(stateByAuthnReq).when(stateCacheService)
+		                         .findMandatoryValidState(AUTHN_REQUEST_ID, HrdController.class.getSimpleName());
+		var cookies = buildCookies();
+		var sessionJson = buildSessionJsonString(AUTHN_REQUEST_ID);
+		var ex = assertThrows(ServletException.class,
+				() -> this.mockMvc.perform(
+						post(apiSupport.getHrdRpContinueApi())
+								.contentType(MediaType.APPLICATION_JSON_VALUE)
+								.content(sessionJson)
+								.cookie(cookies)));
+		assertThat(ex.getCause(), is(instanceOf(RequestDeniedException.class)));
+		var rex = (RequestDeniedException) ex.getCause();
+		assertThat(rex.getInternalMessage(), containsString("Cannot continue to RP"));
 	}
 
 	@Test
@@ -481,7 +441,7 @@ class HrdControllerTest {
 		return new Cookie[] { new Cookie("name", "value") };
 	}
 
-	private static String buildDeviceInfoJsonString() throws JsonProcessingException {
+	private static String buildDeviceInfoJsonString() {
 		var deviceInfo = new DeviceInfoReq();
 		deviceInfo.setId(AUTHN_REQUEST_ID);
 		deviceInfo.setCpUrn(ApiSupport.encodeUrlParameter(CP_ISSUER_ID));
@@ -489,10 +449,16 @@ class HrdControllerTest {
 		return new ObjectMapper().writeValueAsString(deviceInfo);
 	}
 
-	private String buildProfileJsonString(String redirectUrl) throws JsonProcessingException {
+	private String buildProfileJsonString(String redirectUrl) {
 		var url = apiSupport.relativeUrl(redirectUrl);
 		var profileResponse = ProfileResponse.builder().redirectUrl(url).build();
 		return new ObjectMapper().writeValueAsString(profileResponse);
+	}
+
+	private String buildSessionJsonString(String sessionId) {
+		var session = new SessionRequest();
+		session.setSid(ApiSupport.encodeUrlParameter(sessionId));
+		return new ObjectMapper().writeValueAsString(session);
 	}
 
 }

@@ -37,6 +37,7 @@ import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.NameIDType;
 import org.opensaml.saml.saml2.core.Response;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
@@ -47,18 +48,12 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import swiss.trustbroker.api.saml.dto.DestinationType;
-import swiss.trustbroker.audit.dto.AuditDto;
-import swiss.trustbroker.audit.dto.EventType;
-import swiss.trustbroker.audit.service.AuditService;
-import swiss.trustbroker.audit.service.OutboundAuditMapper;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.oidc.JwkUtil;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.util.OidcUtil;
-import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -85,7 +80,7 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
 	private final ClaimsMapperService claimsMapperService;
 
-	private final AuditService auditService;
+	private final OidcAuditService auditService;
 
 	private final QoaMappingService qoaService;
 
@@ -124,7 +119,8 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 			var assertions = getResponseAssertion(response, relyingParty, conversationId);
 			addAuthTimeClaim(cpResponse, assertions, response.getIssueInstant()); // from original SAML Response Assertion
 			addAcrClaim(cpResponse, assertions, client, relyingParty); // from original SAML Response Assertion
-			addSidClaim(context.getPrincipal(), cpResponse);
+			addSidClaim(context.getPrincipal(), cpResponse, context.getAuthorizationGrantType(), context.getAuthorizationGrant(),
+					context.getAuthorization());
 		}
 
 		// Note: id_token.nonce is handled by spring, refresh_token.nonce is handled by CustomRefreshTokenGenerator
@@ -167,7 +163,9 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 		setTypeHeader(context);
 
 		// audit
-		auditTokenClaims(clientId, context, kid, cpResponse, conversationId);
+		var ssoSessionId = cpResponse.getAttribute(CoreAttributeName.SSO_SESSION_ID.getNamespaceUri());
+		auditService.auditTokenClaims(clientId, context, kid, ssoSessionId, conversationId, properties,
+				HttpExchangeSupport.getRunningHttpSession(), HttpExchangeSupport.getRunningHttpRequest());
 	}
 
 	private List<Assertion> getResponseAssertion(Response response, RelyingParty relyingParty, String conversationId) {
@@ -223,7 +221,7 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 			var audClaims = Arrays.stream(audiences.toArray())
 					.toList();
 			if (audClaims.size() == 1) {
-				cpResponse.setClaim(OidcUtil.OIDC_AUDIENCE, audClaims.get(0));
+				cpResponse.setClaim(OidcUtil.OIDC_AUDIENCE, audClaims.getFirst());
 			}
 		}
 	}
@@ -239,49 +237,6 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 			   });
 	}
 
-	private void auditTokenClaims(String clientId, JwtEncodingContext context, String kid,
-			CpResponse cpResponse, String conversationId) {
-		// OIDC claims in data section
-		var auditDtoBuilder = new OutboundAuditMapper(properties);
-		context.getClaims()
-			   .claims(attrMap ->
-					   auditDtoBuilder.mapFromClaims(attrMap, AuditDto.AttributeSource.OIDC_RESPONSE)
-			   );
-
-		// add referer and other helpful stuff
-		auditDtoBuilder.mapFrom(HttpExchangeSupport.getRunningHttpRequest());
-
-		// kid header so we can track key rotation
-		var auditDto = auditDtoBuilder.build();
-		if (kid != null) {
-			auditDtoBuilder.mapFromClaims(Map.of(OidcUtil.OIDC_HEADER_KEYID, kid), AuditDto.AttributeSource.OIDC_RESPONSE);
-		}
-
-		// overwrite referer with the original caller, so we can better correlate the application
-		auditDto.setReferrer(getCurrentReferrer());
-
-		// correlation with SAML side sending ssoSessionId usually
-		var ssoSessionId = cpResponse.getAttribute(CoreAttributeName.SSO_SESSION_ID.getNamespaceUri());
-		auditDto.setSsoSessionId(ssoSessionId);
-
-		// correlated with initial OIDC session
-		auditDto.setConversationId(conversationId);
-
-		// correlation by message marker
-		auditDto.setMessageId(getCurrentMessageId());
-
-		// token type influences log level as access_token and id_token are mostly the same
-		var tokenType = context.getTokenType()
-							   .equals(OAuth2TokenType.ACCESS_TOKEN) ?
-				EventType.OIDC_TOKEN : EventType.OIDC_IDTOKEN;
-		auditDto.setEventType(tokenType);
-		auditDto.setSide(DestinationType.RP.getLabel());
-
-		auditDto.setOidcClientId(clientId);
-
-		auditService.logOutboundFlow(auditDto);
-	}
-
 	private boolean isEnabledTokenClaim(String claim) {
 		return properties.getOidc()
 						 .getAddTokenClaims()
@@ -293,28 +248,12 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 		return properties.getOidc().getAddTokenHeader().contains(header);
 	}
 
-	private static String getCurrentReferrer() {
-		var session = HttpExchangeSupport.getRunningHttpSession();
-		if (session != null) {
-			return session.getStateData().getRpReferer();
-		}
-		return null;
-	}
-
-	private static String getCurrentMessageId() {
-		var request = HttpExchangeSupport.getRunningHttpRequest();
-		if (request != null) {
-			// at the moment we log this, the code is consumed and invalidated
-			return StringUtil.clean(request.getParameter(OidcUtil.OIDC_CODE));
-		}
-		return null;
-	}
-
-	private void addSidClaim(Authentication principal, CpResponse cpResponse) {
+	private void addSidClaim(Authentication principal, CpResponse cpResponse, AuthorizationGrantType authorizationGrantType,
+	                         Authentication authorizationGrant, OAuth2Authorization authorization) {
 		if (!isEnabledTokenClaim(OidcUtil.OIDC_SESSION_ID)) {
 			return;
 		}
-		var oidcSessionId = getSidClaim(principal);
+		var oidcSessionId = getSidClaim(principal, authorizationGrantType, authorizationGrant, authorization);
 		if (oidcSessionId != null) {
 			cpResponse.setClaim(OidcUtil.OIDC_SESSION_ID, oidcSessionId);
 			if (isEnabledTokenClaim(OidcUtil.OIDC_SESSION_STATE)) {
@@ -326,11 +265,15 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 		}
 	}
 
-	static String getSidClaim(Authentication principal) {
+	static String getSidClaim(Authentication principal, AuthorizationGrantType authorizationGrantType, Authentication authorizationGrant,
+	                          OAuth2Authorization authorization) {
+		if (AuthorizationGrantType.TOKEN_EXCHANGE.equals(authorizationGrantType) || refreshTokenExchangeAuthorization(authorizationGrantType, authorization)) {
+			return getTokenExchangeSid(authorizationGrant, authorization);
+		}
 		// by attaching to the SAML side we also get data when e.g. /token endpoint is not under session management
 		var sessionIds = OidcSessionSupport.getSessionIdsFromAuthentication(principal);
 		if (sessionIds != null && sessionIds.size() > 1) {
-			var ssoSessionId = sessionIds.get(0);
+			var ssoSessionId = sessionIds.getFirst();
 			var oidcSessionId = sessionIds.get(1);
 			log.debug("Setting sid claim from ssoSessionId={} to sid={}", ssoSessionId, oidcSessionId);
 			return oidcSessionId;
@@ -339,6 +282,36 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 			log.error("Adding 'sid' claim ignored as principal does not contain at least 2 session indexes");
 		}
 		return null;
+	}
+
+	private static boolean refreshTokenExchangeAuthorization(AuthorizationGrantType authorizationGrantType, OAuth2Authorization authorization) {
+		if (!AuthorizationGrantType.REFRESH_TOKEN.equals(authorizationGrantType)) {
+			return false;
+		}
+		return authorization != null && AuthorizationGrantType.TOKEN_EXCHANGE.equals(authorization.getAuthorizationGrantType());
+	}
+
+	private static String getTokenExchangeSid(Authentication authorizationGrant, OAuth2Authorization authorization) {
+		String sidValue = null;
+		// TokenExchange
+		if (authorizationGrant != null) {
+			Object details = authorizationGrant.getDetails();
+			if (details instanceof Map<?, ?> detailsMap) {
+				Object sid = detailsMap.get(OidcUtil.OIDC_SESSION_ID);
+				sidValue = sid instanceof String sidString ? sidString : null;
+			}
+		}
+		// Refresh TokenExchange
+		if (authorization != null) {
+			Map<String, Object> attributes = authorization.getAttributes();
+			if (attributes != null && attributes.get(OidcUtil.OIDC_SID) != null) {
+				sidValue = attributes.get(OidcUtil.OIDC_SID) instanceof String sidString ? sidString : null;
+			}
+		}
+		if (sidValue == null) {
+			log.error("Missing 'sid' for Token Exchange");
+		}
+		return sidValue;
 	}
 
 	private void addIssClaim(CpResponse cpResponse, OidcClient client) {
@@ -539,7 +512,7 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 		return null;
 	}
 
-	private static String addKeyIdFromJwkSource(JWKSource<SecurityContext> jwkSource, JwtEncodingContext context) {
+	public static String addKeyIdFromJwkSource(JWKSource<SecurityContext> jwkSource, JwtEncodingContext context) {
 		var kid = JwkUtil.getKeyIdFromJwkSource(jwkSource);
 		if (kid != null) {
 			context.getJwsHeader().keyId(kid);

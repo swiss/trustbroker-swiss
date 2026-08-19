@@ -202,4 +202,7 @@ public class AuthorizedApplication implements Serializable {
 				(clientId == null || this.clientId == null) && (applicationName == null || name == null);
 	}
 
+	public boolean validateAssertion() {
+		return Boolean.TRUE.equals(validateAssertion);
+	}
 }

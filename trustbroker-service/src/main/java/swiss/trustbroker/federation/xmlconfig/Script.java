@@ -29,7 +29,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * Groovy script hook configuration. The following script hooks are supported:
- * <ul>>
+ * <ul>
  *     <li>OnRequest: Inbound validation hook on RP request</li>
  *     <li>BeforeHrd: Allows to pre-select programmatically a CP based on RP information and network topology
  *     parameters (access to HTTP request layer according to J2EE servlet API).</li>

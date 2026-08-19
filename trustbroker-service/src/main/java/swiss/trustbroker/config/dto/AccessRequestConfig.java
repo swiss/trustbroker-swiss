@@ -47,6 +47,8 @@ public class AccessRequestConfig {
 
 	/**
 	 * Globally enable the feature.
+	 * <br/>
+	 * Default: false
 	 */
 	private boolean enabled;
 

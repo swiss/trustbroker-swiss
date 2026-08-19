@@ -260,12 +260,12 @@ class ClaimsProviderServiceTest {
 		// context class
 		assertThat(authnRequest.getRequestedAuthnContext(), is(not(nullValue())));
 		assertThat(authnRequest.getRequestedAuthnContext().getAuthnContextClassRefs(), hasSize(1));
-		assertThat(authnRequest.getRequestedAuthnContext().getAuthnContextClassRefs().get(0).getURI(), is(contextClass));
+		assertThat(authnRequest.getRequestedAuthnContext().getAuthnContextClassRefs().getFirst().getURI(), is(contextClass));
 
 		// delegateOrigin
 		assertThat(authnRequest.getScoping(), is(not(nullValue())));
 		assertThat(authnRequest.getScoping().getRequesterIDs(), hasSize(1));
-		assertThat(authnRequest.getScoping().getRequesterIDs().get(0).getURI(), is(rpIssuer));
+		assertThat(authnRequest.getScoping().getRequesterIDs().getFirst().getURI(), is(rpIssuer));
 
 		// verify audit
 		var auditDto = auditCaptor.getValue();

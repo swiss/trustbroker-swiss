@@ -4,8 +4,8 @@ plugins {
 }
 
 node {
-	version = '22.21.1'
-	npmVersion = '11.7.0'
+	version = '22.22.3'
+	npmVersion = '11.15.0'
 	// If true, it will download node using above parameters.
 	// If false, it will try to use globally installed node.
 	download = true

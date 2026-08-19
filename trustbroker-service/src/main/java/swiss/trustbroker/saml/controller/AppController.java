@@ -27,7 +27,7 @@ import org.opensaml.saml.saml2.core.LogoutRequest;
 import org.opensaml.saml.saml2.core.LogoutResponse;
 import org.opensaml.saml.saml2.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +39,7 @@ import swiss.trustbroker.common.saml.dto.SignatureContext;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.homerealmdiscovery.service.RedirectOutputService;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.saml.dto.ResponseData;
 import swiss.trustbroker.saml.service.ArtifactResolutionService;
@@ -56,7 +57,7 @@ import swiss.trustbroker.util.WebSupport;
  * compat and to possibly get out of the ADFS's way for migration if running on same host name.
  */
 @Controller
-@ConditionalOnProperty(value = "trustbroker.config.saml.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnBooleanProperty(value = "trustbroker.config.saml.enabled", matchIfMissing = true)
 public class AppController extends AbstractSamlController {
 
 	private final RelyingPartyService relyingPartyService;
@@ -71,6 +72,8 @@ public class AppController extends AbstractSamlController {
 
 	private final List<OutputService> outputServices;
 
+	private final RedirectOutputService redirectOutputService;
+
 	@Autowired
 	public AppController(
 			RelyingPartyService relyingPartyService,
@@ -80,6 +83,7 @@ public class AppController extends AbstractSamlController {
 			SsoService ssoService,
 			ArtifactResolutionService artifactResolutionService,
 			AuthenticationService authenticationService,
+			RedirectOutputService redirectOutputService,
 			List<OutputService> outputServices) {
 		super(trustBrokerProperties, samlValidator);
 		this.relyingPartyService = relyingPartyService;
@@ -87,6 +91,7 @@ public class AppController extends AbstractSamlController {
 		this.ssoService = ssoService;
 		this.artifactResolutionService = artifactResolutionService;
 		this.authenticationService = authenticationService;
+		this.redirectOutputService = redirectOutputService;
 		this.outputServices = outputServices;
 	}
 
@@ -189,29 +194,31 @@ public class AppController extends AbstractSamlController {
 		var message = decodeAndValidateMessage(messageContext);
 		validateProtocolRestrictionsForMessage(message, signatureContext.getBinding());
 
-		if (message instanceof AuthnRequest authnRequest) {
-			var relayState = SAMLBindingSupport.getRelayState(messageContext);
-			var redirectUrl = authenticationService.handleAuthnRequest(outputServices, authnRequest, relayState,
-					request, response, signatureContext);
-			return WebSupport.getViewRedirectResponse(redirectUrl);
-		}
-		else if (message instanceof Response samlResponse) {
-			var relayState = OpenSamlUtil.extractRelayStateAsSessionId(messageContext);
-			var redirectUrl =  authenticationService.handleSamlResponse(outputServices,
-					ResponseData.of(samlResponse, relayState, signatureContext), request, response);
-			return WebSupport.getViewRedirectResponse(redirectUrl);
-		}
-		else if (message instanceof LogoutResponse logoutResponse) {
-			var relayState = OpenSamlUtil.extractRelayStateAsSessionId(messageContext);
-			ssoService.handleLogoutResponse(logoutResponse, relayState, request);
-		}
-		else if (message instanceof LogoutRequest logoutRequest) {
-			var relayState = SAMLBindingSupport.getRelayState(messageContext);
-			relyingPartyService.handleLogoutRequest(outputServices, logoutRequest, relayState,
-					request, response, signatureContext);
-		}
-		else {
-			handleUnsupportedMessage(message);
+		switch (message) {
+			case AuthnRequest authnRequest -> {
+				var relayState = SAMLBindingSupport.getRelayState(messageContext);
+				var redirectUrl = authenticationService.handleAuthnRequest(outputServices, authnRequest, relayState,
+						request, response, signatureContext);
+				redirectUrl = redirectOutputService.handleRedirect(request, response, redirectUrl);
+				return WebSupport.getViewRedirectResponse(redirectUrl);
+			}
+			case Response samlResponse -> {
+				var relayState = OpenSamlUtil.extractRelayStateAsSessionId(messageContext);
+				var redirectUrl = authenticationService.handleSamlResponse(outputServices,
+						ResponseData.of(samlResponse, relayState, signatureContext), request, response);
+				redirectUrl = redirectOutputService.handleRedirect(request, response, redirectUrl);
+				return WebSupport.getViewRedirectResponse(redirectUrl);
+			}
+			case LogoutResponse logoutResponse -> {
+				var relayState = OpenSamlUtil.extractRelayStateAsSessionId(messageContext);
+				ssoService.handleLogoutResponse(logoutResponse, relayState, request);
+			}
+			case LogoutRequest logoutRequest -> {
+				var relayState = SAMLBindingSupport.getRelayState(messageContext);
+				relyingPartyService.handleLogoutRequest(outputServices, logoutRequest, relayState,
+						request, response, signatureContext);
+			}
+			default -> handleUnsupportedMessage(message);
 		}
 		return null;
 	}

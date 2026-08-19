@@ -67,7 +67,7 @@ public class OidcTxRequestWrapper extends HttpServletRequestWrapper {
 			return ApiSupport.PUBLIC_OIDC_CONFIG_PATH;
 		}
 		// Keycloak namespace validation
-		if (ApiSupport.isKeyloakRealmsPath(securePath)) {
+		if (ApiSupport.isKeycloakRealmsPath(securePath)) {
 			for (var suffix : SUFFIX_LIST) {
 				if (securePath.endsWith(suffix.getKey())) {
 					log.trace("Apply mapping {} for path={}", suffix, securePath);
@@ -210,6 +210,17 @@ public class OidcTxRequestWrapper extends HttpServletRequestWrapper {
 	@Override
 	public boolean isRequestedSessionIdValid() {
 		return oidcSubSession != null;
+	}
+
+	@Override
+	public String changeSessionId() {
+		try {
+			return super.changeSessionId();
+		}
+		catch (IllegalStateException ex) {
+			// concurrent OIDC login federations can lead to this (
+			throw new RequestDeniedException(String.format("Concurrent OIDC login attempt aborted (%s)", ex.getMessage()));
+		}
 	}
 
 	public void setSubSession(HttpSession oidcSubSession) {

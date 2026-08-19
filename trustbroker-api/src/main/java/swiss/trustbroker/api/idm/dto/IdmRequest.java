@@ -36,6 +36,12 @@ public interface IdmRequest {
 	 */
 	String getStore();
 
+	/**
+	 * @return The order of the execution of the query.
+	 * @since 1.15.0
+	 */
+	Integer getOrder();
+
 	// attribute filters
 
 	AttributeName getIssuerNameIdAttribute();

@@ -22,7 +22,7 @@ package swiss.trustbroker.federation.xmlconfig;
  */
 public enum EncryptionKeyPlacement {
 	/**
-	 * <code>EncryptedKey</code> is placed as peer of code>KeyInfo</code>.
+	 * <code>EncryptedKey</code> is placed as peer of <code>KeyInfo</code>.
 	 */
 	PEER,
 	/**

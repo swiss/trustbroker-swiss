@@ -39,7 +39,7 @@ import org.opensaml.soap.wstrust.RequestType;
 import org.opensaml.soap.wstrust.TokenType;
 import org.opensaml.soap.wstrust.WSTrustConstants;
 import org.opensaml.soap.wstrust.WSTrustObject;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.audit.service.AuditService;
@@ -58,6 +58,7 @@ import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.homerealmdiscovery.util.DefaultIdmStatusPolicyCallback;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
+import swiss.trustbroker.homerealmdiscovery.util.RelyingPartyUtil;
 import swiss.trustbroker.mapping.service.ClaimsMapperService;
 import swiss.trustbroker.mapping.util.AttributeFilterUtil;
 import swiss.trustbroker.oidc.session.HttpExchangeSupport;
@@ -74,7 +75,7 @@ import swiss.trustbroker.wstrust.validator.WsTrustValidator;
 @Service
 @AllArgsConstructor
 @Slf4j
-@ConditionalOnProperty(value = "trustbroker.config.wstrust.enabled", havingValue = "true")
+@ConditionalOnBooleanProperty(value = "trustbroker.config.wstrust.enabled")
 public class WsTrustService {
 
 	private final TrustBrokerProperties trustBrokerProperties;
@@ -382,8 +383,8 @@ public class WsTrustService {
 	private static String getOriginalIssuerFromInput(List<AttributeStatement> requestAttributeStatements,
 			String definitionNamespaceUri) {
 		if (requestAttributeStatements != null && !requestAttributeStatements.isEmpty()
-				&& requestAttributeStatements.get(0) != null) {
-			var assertionAttributes = requestAttributeStatements.get(0).getAttributes();
+				&& requestAttributeStatements.getFirst() != null) {
+			var assertionAttributes = requestAttributeStatements.getFirst().getAttributes();
 			for (Attribute attribute : assertionAttributes) {
 				var namespaceUri = attribute.getName();
 				if (namespaceUri != null && namespaceUri.equals(definitionNamespaceUri)) {
@@ -410,11 +411,9 @@ public class WsTrustService {
 		var relyingPartyConfig = RelyingParty.builder().id(recipientIssuerId).build();
 		var callback = new DefaultIdmStatusPolicyCallback(cpResponse);
 
-		for (var idmService : idmQueryServices) {
-			var queryResponse = idmService.getAttributes(relyingPartyConfig, cpResponse, cpResponse.getIdmLookup(), callback);
-			if (queryResponse.isPresent()) {
-				DefinitionUtil.mapAttributeList(queryResponse.get().getUserDetails(), cpResponse.getUserDetails());
-			}
+		var result = RelyingPartyUtil.performIdmLookups(cpResponse, relyingPartyConfig, false, callback, idmQueryServices);
+		if (result.isPresent()) {
+			DefinitionUtil.mapAttributeList(result.get().getUserDetails(), cpResponse.getUserDetails());
 		}
 	}
 
@@ -438,7 +437,7 @@ public class WsTrustService {
 
 		// AttributeStatements
 		if (requestAssertion.getAttributeStatements() != null && !requestAssertion.getAttributeStatements().isEmpty()) {
-			var assertionAttributes = requestAssertion.getAttributeStatements().get(0).getAttributes();
+			var assertionAttributes = requestAssertion.getAttributeStatements().getFirst().getAttributes();
 			for (Attribute attribute : assertionAttributes) {
 				var namespaceUri = attribute.getName();
 				var values = SamlUtil.getValuesFromAttribute(attribute);
@@ -455,11 +454,7 @@ public class WsTrustService {
 		}
 
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(validationResult.getIssuerId(), "");
-		var idmLookUp = relyingPartySetupService.getIdmLookUp(relyingParty);
-		if (idmLookUp.isPresent()) {
-			cpResponse.setIdmLookup(idmLookUp.get().shallowClone());
-		}
-
+		cpResponse.cloneIdmLookup(relyingParty.getIdmLookup());
 		cpResponse.setClientExtId(relyingPartySetupService.getRpClientExtId(relyingParty));
 		cpResponse.setClientName(relyingPartySetupService.getRpClientName(relyingParty));
 

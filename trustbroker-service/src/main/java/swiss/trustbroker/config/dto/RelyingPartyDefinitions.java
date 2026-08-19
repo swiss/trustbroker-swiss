@@ -15,8 +15,6 @@
 
 package swiss.trustbroker.config.dto;
 
-import static org.springframework.security.saml2.core.Saml2X509Credential.Saml2X509CredentialType.VERIFICATION;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
@@ -85,7 +83,7 @@ public class RelyingPartyDefinitions {
 		return relyingParty.getClaimsProviderMappings() != null
 				&& relyingParty.getClaimsProviderMappings().getClaimsProviderList() != null
 				&& relyingParty.getClaimsProviderMappings().getClaimsProviderList().size() == 1 ?
-				relyingParty.getClaimsProviderMappings().getClaimsProviderList().get(0)
+				relyingParty.getClaimsProviderMappings().getClaimsProviderList().getFirst()
 				: null;
 	}
 	private static String getClientKey(String clientId, String cpId) {
@@ -241,7 +239,8 @@ public class RelyingPartyDefinitions {
 		var signer = oidcProperties.getIdentityProvider().getSigner();
 		var credential = CredentialReader.createCredential(signer);
 		var certificate = ((X509Credential)credential).getEntityCertificate();
-		var verificationCertificate = new Saml2X509Credential(certificate, VERIFICATION);
+		var verificationCertificate = new Saml2X509Credential(certificate,
+				Saml2X509Credential.Saml2X509CredentialType.VERIFICATION);
 		var signing = Saml2X509Credential.signing(credential.getPrivateKey(), certificate);
 
 		OidcIdpCredential idpCredential = new OidcIdpCredential();
@@ -325,7 +324,7 @@ public class RelyingPartyDefinitions {
 		if (clients.isEmpty()) {
 			return Optional.empty();
 		}
-		return Optional.of(clients.get(0));
+		return Optional.of(clients.getFirst());
 	}
 
 	public List<OidcClient> getOidcClientsByPredicate(Predicate<OidcClient> predicate) {

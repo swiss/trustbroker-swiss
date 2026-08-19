@@ -81,7 +81,15 @@ public class TomcatSessionManager extends ManagerBase {
 	public void startInternal() throws LifecycleException {
 		setState(LifecycleState.STARTING);
 		super.startInternal();
-		super.generateSessionId();
+
+		// assert session ID generation (not configurable yet)
+		getSessionIdGenerator().setSessionIdLength(OidcSessionSupport.OIDC_SESSION_ID_LENGTH);
+		var sessId= super.generateSessionId();
+		if (sessId.length() != OidcSessionSupport.OIDC_SESSION_ID_LENGTH_HEX) {
+			throw new IllegalStateException(String.format("Tomcat sessionId=%s does not match expected length=%s",
+					sessId, OidcSessionSupport.OIDC_SESSION_ID_LENGTH));
+		}
+
 		// set an upper limit to work against (D)DOS in BOTH and IN_MEMORY mode
 		super.setMaxActive(trustBrokerProperties.getStateCache().getTargetMaxEntries() * 2);
 		super.setPersistAuthentication(true); // principal to/from DB for logout
@@ -169,18 +177,26 @@ public class TomcatSessionManager extends ManagerBase {
 
 	@Override
 	public TomcatSession findSession(String id) {
-		// session check without a key? no way
-		if (id == null) {
-			id = OidcSessionSupport.getOidcSessionId(null, relyingPartyDefinitions, trustBrokerProperties.getNetwork());
-		}
-		if (id == null) {
+		// initial sessions do not have an id (yet), if an id is passed in then an existing session is addressed...
+		var sid = OidcSessionSupport.getOidcSessionId(null, relyingPartyDefinitions, trustBrokerProperties.getNetwork());
+		if (id == null && sid == null) {
 			return null;
 		}
 		if (!HttpExchangeSupport.isRunningOidcExchange()) {
 			log.trace("SESSMGR.findSession sessionId={} not yet ready assuming getSession(false)", id);
 			return null;
 		}
-
+		// ...and id needs to be validated for the correct sub-session (in case 2 concurrent logins are by-passing each other)
+		if (id != null && sid != null && !id.equals(sid)) {
+			var clientId = OidcSessionSupport.getOidcClientId(null, relyingPartyDefinitions, trustBrokerProperties.getNetwork());
+			log.info("Switching back from concurrent {}={} to initiating {}={}",
+					OidcSessionSupport.getClientIdRelatedCookieName(null), id,
+					OidcSessionSupport.getClientIdRelatedCookieName(clientId), sid);
+			id = sid;
+		}
+		else if (id == null) {
+			id = sid;
+		}
 		// cache for faster processing, update triggered by isValid()
 		var session = (TomcatSession) sessions.get(id);
 		if (session == null && mode != TomcatSessionMode.IN_MEMORY) {
@@ -473,16 +489,16 @@ public class TomcatSessionManager extends ManagerBase {
 				request, relyingPartyDefinitions, trustBrokerProperties.getNetwork());
 		var sessionClient = session.getAttribute(OidcSessionSupport.OIDC_SESSION_CLIENT_ID);
 		if (sessionClient != null && messageClient != null && !sessionClient.equals(messageClient)) {
-			log.info("Ignoring sessionClientId={} sessionId={} for messageClient={}",
-					sessionClient, session.getId(), messageClient);
-			return null; // session does not match current exchange
+			log.info("Ignoring sessionClientId={} sessionId={} for messageClientId={} on requestUri={}",
+					sessionClient, session.getId(), messageClient, request != null ? request.getRequestURI() : null);
+			return null; // session does not match current exchange e.g. BE client doing /introspect on FE token
 		}
 
 		// found, cache for further processing
 		sessions.put(session.getIdInternal(), session);
 
 		// session invalidate if forced, otherwise continue with it
-		return OidcSessionSupport.invalidateSessionOnPromptLoginOrStepup(session,
+		return OidcSessionSupport.invalidateSessionOnPromptLoginOrAcrValueChange(session,
 				messageClient, trustBrokerProperties.getNetwork());
 	}
 
@@ -625,7 +641,7 @@ public class TomcatSessionManager extends ManagerBase {
 		}
 		var sessionIds = OidcSessionSupport.getSessionIdsFromAuthentication(((SecurityContext) context).getAuthentication());
 		if (sessionIds != null && sessionIds.size() == 2) {
-			var ssoSessionId = sessionIds.get(0);
+			var ssoSessionId = sessionIds.getFirst();
 			var oidcSessionId = sessionIds.get(1);
 			log.debug("Attach sessionId={} for clientId={} oidcSessionId={} to ssoSessionId={}",
 					session.getId(), clientId, oidcSessionId, ssoSessionId);

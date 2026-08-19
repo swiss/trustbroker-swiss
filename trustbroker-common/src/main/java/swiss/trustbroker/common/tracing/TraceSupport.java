@@ -28,8 +28,10 @@ import swiss.trustbroker.common.util.WebUtil;
  * <ul>
  *   <li>MDC traceId to tag every log line with the OpenTelemetry compatible traceId.spanId where spanId is our own root</li>
  *   <li>OpTrace logs are tagged with trID=traceId.spanId for request based tracing</li>
- *       The related W3C specification (see <a href=""/> lists these propagations:
- *   <li>traceparanet is set by XTB if not received from client, we derive traceId from x-request-id if it's compliant.</li>
+ * </ul>
+ * The related <a href="https://www.w3.org/TR/trace-context/">W3C</a> specification lists these propagations:
+ * <ul>
+ *   <li>traceparent is set by XTB if not received from client, we derive traceId from x-request-id if it's compliant.</li>
  *   <li>tracestate is not (yet) supported</li>
  * </ul>
  * Note that the ID displayed in error screen are either based on current requests or the related login conversation
@@ -62,6 +64,10 @@ public class TraceSupport {
 	// x-request-id is default, alternatives are transferId, x-request-id, uber-trace-id, x-b3-traceid, ot-tracer-traceid
 	private static String httpHeaderTraceId = HTTP_REQUEST_ID;
 
+	private static final int OTEL_PART1_LENGTH = 32;
+
+	private static final int OTEL_PART2_LENGTH = 16;
+
 	private TraceSupport() {
 	}
 
@@ -86,7 +92,8 @@ public class TraceSupport {
 	 * @return OpenTelemetry compliant HTTP traceparent header.
 	 */
 	public static String getOwnTraceParentForHttp() {
-		return getOwnTraceParentForWire("00-", "-01");
+		var otelToks = getMdcTraceId().split("\\.");
+		return "00-" + otelToks[0] + "-" + otelToks[1] + "-01"; // c2-o32-o16-c2
 	}
 
 	/**
@@ -95,14 +102,24 @@ public class TraceSupport {
 	 * @return SAML compliant traceparent representation.
 	 */
 	public static String getOwnTraceParentForSaml() {
-		// postfix for security and to get 4 tokens like traceparent
-		return getOwnTraceParentForWire(PREFIX_SAML, "-" + generateRandomId(24));
+		var otelToks = getMdcTraceId().split("\\.");
+		var randomTok = generateRandomId(OTEL_PART2_LENGTH);
+		return PREFIX_SAML + otelToks[0] + "-" + otelToks[1] + "-" + randomTok; // c2-o32-o16-r16
 	}
 
-	// On the wire we use - as separator, in MDC and logs we use .
-	private static String getOwnTraceParentForWire(String prefix, String postfix) {
-		var traceId = getMdcTraceId().replace(".", "-"); // log uses x.y wire uses x-y
-		return prefix + traceId + postfix;
+	public static String getOwnTraceParentForSaml(String tmpFedSession) {
+		if (tmpFedSession == null) {
+			return getOwnTraceParentForSaml();
+		}
+		var otelToks = getMdcTraceId().split("\\.");
+		var randomTok = generateRandomId(OTEL_PART2_LENGTH);
+		return PREFIX_SAML + otelToks[0] + "-" + tmpFedSession.toLowerCase() + "-" + randomTok; // c2-o32-s40-r16
+	}
+
+	// Allow conversation based matching where initial redirect using c2-r32-r32-c16 only matches the first 3 tokens
+	public static boolean matchOwnTraceParentForSaml(String lastMsgId, String firstMsgId) {
+		var checkLen = lastMsgId != null ? lastMsgId.length() - OTEL_PART2_LENGTH : 1;
+		return lastMsgId != null && firstMsgId != null && firstMsgId.startsWith(lastMsgId.substring(0, checkLen));
 	}
 
 	// NOTE: TraceIds pop up on XTB error screen and are used to correlate the request in the logs across services.
@@ -161,13 +178,13 @@ public class TraceSupport {
 		// save original value for reference even though it's not OpenTelemetry compliant without parentSpan
 		MDC.put(W3C_TRACEPARENT, ret);
 		var len = ret.length();
-		if (len > 32) {
-			log.debug("Truncating traceId from {}={} to 32 chars", headerName, ret);
-			ret = ret.substring(0, 32); // we accept hex uppercase and make it OpenTelemtry compliant
+		if (len > OTEL_PART1_LENGTH) {
+			log.debug("Truncating traceId from {}={} to {} chars", headerName, ret, OTEL_PART1_LENGTH);
+			ret = ret.substring(0, OTEL_PART1_LENGTH); // we accept hex uppercase and make it OpenTelemtry compliant
 		}
-		else if (len < 32) {
-			log.debug("Padding traceId from {}={} to 32 chars", headerName, ret);
-			ret = StringUtils.leftPad(ret, 32, "0");
+		else if (len < OTEL_PART1_LENGTH) {
+			log.debug("Padding traceId from {}={} to {} chars", headerName, ret, OTEL_PART1_LENGTH);
+			ret = StringUtils.leftPad(ret, OTEL_PART1_LENGTH, "0");
 		}
 		ret = ret.toLowerCase();
 		return ret;
@@ -181,12 +198,12 @@ public class TraceSupport {
 				   .toLowerCase();
 	}
 
-	private static String generateInitialTraceId() {
-		return appendInitialSpanId(generateRandomId(32));
+	static String generateInitialTraceId() {
+		return appendInitialSpanId(generateRandomId(OTEL_PART1_LENGTH));
 	}
 
 	private static String appendInitialSpanId(String traceId) {
-		return traceId + "." + generateRandomId(16);
+		return traceId + "." + generateRandomId(OTEL_PART2_LENGTH);
 	}
 
 	public static String getHttpTraceIdHeaderName() {

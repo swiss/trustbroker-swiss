@@ -54,6 +54,7 @@ import org.opensaml.saml.saml2.core.StatusResponseType;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.soap.soap11.Body;
 import org.opensaml.soap.soap11.Envelope;
+import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -160,6 +161,7 @@ class ArtifactResolutionServiceTest {
 		var hexSourceId = Hex.encodeHexString(artifactId.getSourceID());
 		var artifactIdEncoded = encodeType04ArtifactId(artifactId);
 		var rpTrustCredentials = SamlTestBase.dummyCredentials();
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
 		var saml = buildSaml();
 		var rp = buildRelyingParty(saml);
 		doReturn(Optional.of(rp)).when(relyingPartySetupService).getRelyingPartyByArtifactSourceIdOrReferrer(hexSourceId, null);
@@ -172,7 +174,7 @@ class ArtifactResolutionServiceTest {
 		SamlFactory.signSignableObject(artifactResponse, rp.getSignatureParametersBuilder().build());
 		var envelope = SoapUtil.buildSoapEnvelope(artifactResponse);
 		var envelopeStr = OpenSamlUtil.samlObjectToString(envelope);
-		mockArtifactResolveSoapResponse(envelopeStr, artifactIdEncoded, rpTrustCredentials);
+		mockArtifactResolveSoapResponse(envelopeStr, artifactIdEncoded, rpTrustCredentials, allowedSignatureAlgorithms);
 
 		// run
 		var context = artifactResolutionService.decodeSamlArtifactRequest(request, Optional.of(httpClient));
@@ -255,20 +257,21 @@ class ArtifactResolutionServiceTest {
 	}
 
 	private void mockArtifactResolveSoapResponse(String responseContent, String artifactIdEncoded,
-			List<Credential> trustCredentials) throws IOException {
+			List<Credential> trustCredentials, List<String> allowedSignatureAlgorithms) throws IOException {
 		doReturn(new ByteArrayInputStream(responseContent.getBytes(StandardCharsets.UTF_8))).when(httpEntity).getContent();
 		doReturn(HttpStatus.SC_OK).when(httpStatusLine).getStatusCode();
 		doReturn(HttpStatus.SC_OK).when(httpResponse).getCode();
 		doReturn(httpEntity).when(httpResponse).getEntity();
 		doReturn(httpResponse).when(httpClient).executeOpen(eq(null),
 				argThat(
-					request -> validateInboundArtifactResolve(request, artifactIdEncoded, trustCredentials)
+					request -> validateInboundArtifactResolve(request,
+							artifactIdEncoded, trustCredentials, allowedSignatureAlgorithms)
 				),
 				eq(null));
 	}
 
 	private static boolean validateInboundArtifactResolve(ClassicHttpRequest request, String artifactIdEncoded,
-			List<Credential> trustCredentials) {
+			List<Credential> trustCredentials, List<String> allowedSignatureAlgorithms) {
 		try {
 			assertThat(request.getUri().toString(), is(AR_SERVICE_URL));
 			assertThat(request, instanceOf(HttpPost.class));
@@ -277,7 +280,9 @@ class ArtifactResolutionServiceTest {
 					SoapUtil.extractSamlObjectFromEnvelope(postRequest.getEntity().getContent(), ArtifactResolve.class);
 			assertThat(artifactResolve.getArtifact().getValue(), is(artifactIdEncoded));
 			assertThat(artifactResolve.isSigned(), is(true));
-			assertThat(SamlUtil.isSignatureValid(artifactResolve.getSignature(), trustCredentials), is(true));
+			assertThat(SamlUtil.isSignatureValid(
+					artifactResolve.getSignature(), trustCredentials, allowedSignatureAlgorithms,true),
+					is(true));
 			return true;
 		}
 		catch (IOException | URISyntaxException | UnsupportedOperationException ex) {

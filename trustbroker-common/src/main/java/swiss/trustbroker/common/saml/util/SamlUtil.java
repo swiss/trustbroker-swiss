@@ -68,9 +68,8 @@ import org.opensaml.xmlsec.signature.Signature;
 import org.opensaml.xmlsec.signature.support.SignatureException;
 import org.opensaml.xmlsec.signature.support.SignatureValidator;
 import org.opensaml.xmlsec.signature.support.Signer;
+import org.slf4j.event.Level;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 import swiss.trustbroker.common.exception.ExceptionUtil;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.tracing.TraceSupport;
@@ -147,36 +146,36 @@ public class SamlUtil {
 			log.error("Attribute with name={} has no value(s)", attribute.getName());
 			return "";
 		}
-		var xsString = (XSString) values.get(0);
+		var xsString = (XSString) values.getFirst();
 		return xsString.getValue();
 	}
 
 	public static List<String> getAttributeValues(Attribute attribute) {
 		List<String> ret = new ArrayList<>();
 		for (XMLObject o : attribute.getAttributeValues()) {
-			if (o instanceof XSString s) {
-				ret.add(s.getValue());
-			}
-			else if (o instanceof XSBase64Binary bin) {
-				ret.add(bin.getValue());
-			}
-			else if (o instanceof XSBooleanValue bool) {
-				ret.add(String.valueOf(bool.getValue()));
-			}
-			else if (o instanceof XSInteger integer) {
-				ret.add(String.valueOf(integer.getValue()));
-			}
-			else if (o instanceof XSAny any) {
-				ret.add(any.getTextContent());
-			}
-			else {
-				throw new TechnicalException("Cannot extract value from type " + o.getClass().getName());
+			switch (o) {
+				case XSString s -> ret.add(s.getValue());
+				case XSBase64Binary bin -> ret.add(bin.getValue());
+				case XSBooleanValue bool -> ret.add(String.valueOf(bool.getValue()));
+				case XSInteger integer -> ret.add(String.valueOf(integer.getValue()));
+				case XSAny any -> ret.add(any.getTextContent());
+				default -> throw new TechnicalException(String.format("Cannot extract value from type=%s",
+						o.getClass().getName()));
 			}
 		}
 		return ret;
 	}
 
-	public static boolean isSignatureValid(Signature signature, List<Credential> credentials) {
+	public static boolean isSignatureValid(Signature signature, List<Credential> credentials,
+			List<String> allowedSignatureAlgorithms, boolean enforceAllowedSignatureAlgorithms) {
+		if (!AlgorithmSupport.validateAlgorithmURI(signature.getSignatureAlgorithm(), allowedSignatureAlgorithms, null)) {
+			var level = enforceAllowedSignatureAlgorithms ? Level.ERROR : Level.WARN;
+			log.atLevel(level).log("Signature algorithm={} not in allowedSignatureAlgorithms={} enforced={}",
+					signature.getSignatureAlgorithm(), allowedSignatureAlgorithms, enforceAllowedSignatureAlgorithms);
+			if (enforceAllowedSignatureAlgorithms) {
+				return false;
+			}
+		}
 		if (credentials == null) {
 			return false;
 		}
@@ -213,8 +212,17 @@ public class SamlUtil {
 		});
 	}
 
-	public static boolean isRedirectSignatureValid(List<Credential> credentials, String signatureAlgorithm,
-			String queryString, byte[] signatureBytes, boolean redirectBindingSignatureWarning) {
+	public static boolean isRedirectSignatureValid(List<Credential> credentials, List<String> allowedSignatureAlgorithms,
+			boolean enforceAllowedSignatureAlgorithms,
+			String signatureAlgorithm, String queryString, byte[] signatureBytes, boolean redirectBindingSignatureWarning) {
+		if (!AlgorithmSupport.validateAlgorithmURI(signatureAlgorithm, allowedSignatureAlgorithms, null)) {
+			var level = enforceAllowedSignatureAlgorithms ? Level.ERROR : Level.WARN;
+			log.atLevel(level).log("Redirect signature algorithm={} not in allowedSignatureAlgorithms={} enforced={}",
+					signatureAlgorithm, allowedSignatureAlgorithms, enforceAllowedSignatureAlgorithms);
+			if (enforceAllowedSignatureAlgorithms) {
+				return false;
+			}
+		}
 		if (credentials == null) {
 			return false;
 		}
@@ -304,19 +312,6 @@ public class SamlUtil {
 		}
 	}
 
-	public static void removeNewLinesFromCertificates(Element domDescriptor) {
-		NodeList certList = domDescriptor.getElementsByTagName("ds:X509Certificate");
-		int nodeListLength = certList.getLength();
-		String certValue;
-		for (var i = 0; i < nodeListLength; i++) {
-			if (certList.item(i).getNodeType() == Node.ELEMENT_NODE) {
-				Element cert = (Element) certList.item(i);
-				certValue = cert.getTextContent().replace("\n", "");
-				cert.setTextContent(certValue);
-			}
-		}
-	}
-
 	public static String getAssertionNameIDFormat(Assertion assertion) {
 		if (assertion == null) {
 			throw new TechnicalException("Assertion is missing or invalid");
@@ -360,15 +355,15 @@ public class SamlUtil {
 		try {
 			var x509Datas = signature.getKeyInfo().getX509Datas();
 			// we do not expect multiple KeyInfo entries anywhere
-			if (!CollectionUtils.isEmpty(x509Datas.get(0).getX509Certificates())) {
+			if (!CollectionUtils.isEmpty(x509Datas.getFirst().getX509Certificates())) {
 				var certificate = getCertificateFromSignature(signature);
 				if (certificate != null) { // testing only
 					check.append("X509Certificate");
 					return x509Credential.getEntityCertificate().equals(certificate);
 				}
 			}
-			if (!CollectionUtils.isEmpty(x509Datas.get(0).getX509SKIs())) {
-				var sigSkiEl = x509Datas.get(0).getX509SKIs().get(0);
+			if (!CollectionUtils.isEmpty(x509Datas.getFirst().getX509SKIs())) {
+				var sigSkiEl = x509Datas.getFirst().getX509SKIs().getFirst();
 				if (sigSkiEl != null && sigSkiEl.getValue() != null) {
 					var sigSki = Base64.getDecoder().decode(sigSkiEl.getValue().getBytes());
 					var certSki = getSkiOid(x509Credential.getEntityCertificate());
@@ -412,7 +407,7 @@ public class SamlUtil {
 		return sb.toString();
 	}
 
-	// e.g. HexEncode(Base64.decode(signature.getKeyInfo().getX509Datas().get(0).getX509SKIs().get(0)))
+	// e.g. HexEncode(Base64.decode(signature.getKeyInfo().getX509Datas().getFirst().getX509SKIs().getFirst()))
 	// ...and in the function below the certs need to expose the same information (X509 V.3 SubjectKeyIdentifier)
 	// ...and maybe we should only dump the KeyInfo here, the rest of the signature is less interesting.
 	public static String getKeyInfoHintFromSignature(Signature signature) {
@@ -425,14 +420,14 @@ public class SamlUtil {
 		var x509Datas = signature.getKeyInfo().getX509Datas();
 
 		// X509
-		if (!CollectionUtils.isEmpty(x509Datas.get(0).getX509Certificates())) {
+		if (!CollectionUtils.isEmpty(x509Datas.getFirst().getX509Certificates())) {
 			// single cert already on the XML-security level so we do not have to PEM decode X509 cert again
 			var certificate = getCertificateFromSignature(signature);
 			return getKeyInfoHintFromCertificate(certificate);
 		}
 
 		// X509SKI
-		else if (!CollectionUtils.isEmpty(x509Datas.get(0).getX509SKIs())) {
+		else if (!CollectionUtils.isEmpty(x509Datas.getFirst().getX509SKIs())) {
 			var sb = new StringBuilder("[");
 			x509Datas.forEach(sd -> sd.getX509SKIs().forEach(ski -> {
 				sb.append(Hex.encodeHexString(Base64.getDecoder().decode(ski.getValue().getBytes())));
@@ -454,7 +449,7 @@ public class SamlUtil {
 	}
 
 	public static String getKeyInfoHintFromCertificate(java.security.cert.X509Certificate certificate) {
-		var ret = new StringBuilder("");
+		var ret = new StringBuilder();
 		try {
 			if (certificate != null) {
 				ret.append(certificate.getSubjectX500Principal().toString());
@@ -528,7 +523,7 @@ public class SamlUtil {
 		if (assertion.getAttributeStatements().isEmpty()) {
 			return Collections.emptyList();
 		}
-		var assertionAttributes = assertion.getAttributeStatements().get(0).getAttributes();
+		var assertionAttributes = assertion.getAttributeStatements().getFirst().getAttributes();
 		for (Attribute attribute : assertionAttributes) {
 			if (attributeName.equals(attribute.getName())) {
 				return getValuesFromAttribute(attribute);
@@ -669,7 +664,7 @@ public class SamlUtil {
 	public static Map<String, Object> extractAttributesFromAssertion(Assertion assertion) {
 		Map<String, Object> samlAttributes = new HashMap<>();
 		if (!assertion.getAttributeStatements().isEmpty()) {
-			var assertionAttributes = assertion.getAttributeStatements().get(0).getAttributes();
+			var assertionAttributes = assertion.getAttributeStatements().getFirst().getAttributes();
 			for (Attribute attribute : assertionAttributes) {
 				var namespaceUri = attribute.getName();
 				var values = SamlUtil.getValuesFromAttribute(attribute);

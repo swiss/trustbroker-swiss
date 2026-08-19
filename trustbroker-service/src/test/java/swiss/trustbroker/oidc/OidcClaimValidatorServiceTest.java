@@ -24,19 +24,31 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.QualityOfAuthenticationConfig;
 import swiss.trustbroker.config.dto.SecurityChecks;
+import swiss.trustbroker.federation.xmlconfig.AcClass;
+import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.federation.xmlconfig.Qoa;
+import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 
 class OidcClaimValidatorServiceTest {
+
+	private static final String CLIENT_ID = "client-123";
+	private static final String COUNTERPARTY = "cp-001";
+	private static final String TOKEN_TYPE = "id_token";
 
 	private TrustBrokerProperties trustBrokerProperties;
 
@@ -156,6 +168,226 @@ class OidcClaimValidatorServiceTest {
 						OidcMockTestData.SUBJECT,  OidcMockTestData.CLIENT_ID, null, OidcMockTestData.NONCE) },
 
 		};
+	}
+
+	@Test
+	void validateSubAudAzpTest() {
+		var client = givenOidcClient();
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateSubAudAzp(null, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+
+		final JWTClaimsSet claims = new JWTClaimsSet.Builder().build();
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						claims, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+
+		final JWTClaimsSet missingAud = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.build();
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						missingAud, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+		assertDoesNotThrow(() ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						missingAud, COUNTERPARTY, client, TOKEN_TYPE, false)
+		);
+
+		final JWTClaimsSet wrongAud = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.audience("other-client")
+				.build();
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						wrongAud, COUNTERPARTY, client, TOKEN_TYPE, false)
+		);
+
+		final JWTClaimsSet correctAud = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.audience(CLIENT_ID)
+				.build();
+		assertDoesNotThrow(() ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						correctAud, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+
+		final JWTClaimsSet wrongAzp = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.audience(CLIENT_ID)
+				.claim(OidcUtil.OIDC_AUTHORIZED_PARTY, "other-client")
+				.build();
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						wrongAzp, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+
+		final JWTClaimsSet missingAzp = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.audience(CLIENT_ID)
+				.build();
+		assertDoesNotThrow(() ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						missingAzp, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+
+		final JWTClaimsSet correctAzp = new JWTClaimsSet.Builder()
+				.subject("user123")
+				.audience(CLIENT_ID)
+				.claim(OidcUtil.OIDC_AUTHORIZED_PARTY, CLIENT_ID)
+				.build();
+		assertDoesNotThrow(() ->
+				OidcClaimValidatorService.validateSubAudAzp(
+						correctAzp, COUNTERPARTY, client, TOKEN_TYPE, true)
+		);
+	}
+
+	@Test
+	void validateAcrsReturnsEmptyListWithoutAcrAndWithoutQoa() {
+		var claims = new JWTClaimsSet.Builder().build();
+		var cpClient = OidcClient.builder().id("cp-client").build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		var relyingParty = RelyingParty.builder().id("rp").build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		var acrs = OidcClaimValidatorService.validateAcrs(claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties);
+
+		assertThat(acrs, is(List.of()));
+	}
+
+	@Test
+	void validateAcrsReturnsAcrStringAsSingleElementList() {
+		var claims = new JWTClaimsSet.Builder().claim(OidcUtil.OIDC_ACR, "acr-1").build();
+		var cpClient = OidcClient.builder().id("cp-client").build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		var relyingParty = RelyingParty.builder().id("rp").build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		var acrs = OidcClaimValidatorService.validateAcrs(claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties);
+
+		assertThat(acrs, is(List.of("acr-1")));
+	}
+
+	@Test
+	void validateAcrsReturnsCollectionWithStringConversion() {
+		var claims = new JWTClaimsSet.Builder().claim(OidcUtil.OIDC_ACR, List.of("acr-1", 20)).build();
+		var cpClient = OidcClient.builder().id("cp-client").build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		var relyingParty = RelyingParty.builder().id("rp").build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		var acrs = OidcClaimValidatorService.validateAcrs(claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties);
+
+		assertThat(acrs, is(List.of("acr-1", "20")));
+	}
+
+	@Test
+	void validateAcrsThrowsWhenCpQoaIsEnforcedAndAcrMissing() {
+		trustBrokerProperties.setQoa(QualityOfAuthenticationConfig.builder().mapping(Map.of("acr-1", 10)).build());
+		var claims = new JWTClaimsSet.Builder().build();
+		var cpQoa = Qoa.builder().enforce(true).classes(List.of(AcClass.builder().contextClass("acr-1").build())).build();
+		var cpClient = OidcClient.builder().id("cp-client").qoa(cpQoa).build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		var relyingParty = RelyingParty.builder().id("rp").build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		assertThrows(RequestDeniedException.class, () ->
+				OidcClaimValidatorService.validateAcrs(claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties));
+	}
+
+	@Test
+	void validateAcrsUsesRpQoaFallbackFromRelyingParty() {
+		trustBrokerProperties.setQoa(QualityOfAuthenticationConfig.builder().mapping(Map.of("acr-1", 10)).build());
+		var claims = new JWTClaimsSet.Builder().claim(OidcUtil.OIDC_ACR, "acr-1").build();
+		var cpClient = OidcClient.builder().id("cp-client").build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		var rpQoa = Qoa.builder()
+				.enforce(true)
+				.classes(List.of(AcClass.builder().contextClass("acr-1").order(10).build()))
+				.build();
+		var relyingParty = RelyingParty.builder().id("rp").qoa(rpQoa).build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		assertDoesNotThrow(() -> OidcClaimValidatorService.validateAcrs(
+				claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties));
+	}
+
+	@Test
+	void validateAcrsUsesCpClientQoaBeforeClaimsPartyQoa() {
+		var claims = new JWTClaimsSet.Builder().claim(OidcUtil.OIDC_ACR, "acr-1").build();
+		var cpQoaOnClient = Qoa.builder().enforce(false).classes(List.of(AcClass.builder().contextClass("other").build())).build();
+		var cpClient = OidcClient.builder().id("cp-client").qoa(cpQoaOnClient).build();
+		var claimsParty = OidcMockTestData.givenCpWithOidcClient(cpClient);
+		claimsParty.setQoa(Qoa.builder().enforce(true).classes(List.of(AcClass.builder().contextClass("must-match-party").build())).build());
+		var relyingParty = RelyingParty.builder().id("rp").build();
+		var rpOidcClient = OidcClient.builder().id("rp-client").build();
+
+		assertDoesNotThrow(() -> OidcClaimValidatorService.validateAcrs(
+				claims, claimsParty, relyingParty, rpOidcClient, trustBrokerProperties));
+	}
+
+	@ParameterizedTest
+	@MethodSource
+	void getAcrStringListReturnsExpected(Object acrInput, List<String> expected) {
+		assertThat(OidcClaimValidatorService.getAcrStringList(acrInput), is(expected));
+	}
+
+	static Object[][] getAcrStringListReturnsExpected() {
+		return new Object[][] {
+				{ null, List.of() },
+				{ "acr-1", List.of("acr-1") },
+				{ List.of("acr-1", 20), List.of("acr-1", "20") },
+				{ 42, List.of() }
+		};
+	}
+
+	@Test
+	void validateQoaAllowsNullQoa() {
+		var counterParty = ClaimsParty.builder().id("cp").build();
+
+		assertDoesNotThrow(() -> OidcClaimValidatorService.validateQoa(counterParty, trustBrokerProperties, null, List.of("acr-1")));
+	}
+
+	@Test
+	void validateQoaThrowsWhenAcrMissingAndEnforced() {
+		var counterParty = ClaimsParty.builder().id("cp").build();
+		var qoa = Qoa.builder().enforce(true).classes(List.of(AcClass.builder().contextClass("acr-1").order(10).build())).build();
+		List<String> acrList = List.of();
+
+		assertThrows(RequestDeniedException.class,
+				() -> OidcClaimValidatorService.validateQoa(counterParty, trustBrokerProperties, qoa, acrList));
+	}
+
+	@Test
+	void validateQoaThrowsForInvalidAcrWhenEnforced() {
+		trustBrokerProperties.setQoa(QualityOfAuthenticationConfig.builder().mapping(Map.of("acr-1", 10, "acr-2", 20)).build());
+		var counterParty = ClaimsParty.builder().id("cp").build();
+		var qoa = Qoa.builder().enforce(true).classes(List.of(AcClass.builder().contextClass("acr-1").order(10).build())).build();
+		List<String> acrList = List.of("acr-2");
+
+		assertThrows(RequestDeniedException.class,
+				() -> OidcClaimValidatorService.validateQoa(counterParty, trustBrokerProperties, qoa, acrList));
+	}
+
+	@Test
+	void validateQoaAcceptsMatchingAcrWhenEnforced() {
+		trustBrokerProperties.setQoa(QualityOfAuthenticationConfig.builder().mapping(Map.of("acr-1", 10)).build());
+		var counterParty = ClaimsParty.builder().id("cp").build();
+		var qoa = Qoa.builder().enforce(true).classes(List.of(AcClass.builder().contextClass("acr-1").order(10).build())).build();
+
+		assertDoesNotThrow(() -> OidcClaimValidatorService.validateQoa(counterParty, trustBrokerProperties, qoa, List.of("acr-1")));
+	}
+
+	private OidcClient givenOidcClient() {
+		return OidcClient.builder()
+						 .id(CLIENT_ID)
+						 .clientSecret("secret1")
+						 .redirectUris(AcWhitelist.builder()
+												  .acUrls(List.of("https://localhost/test"))
+												  .build())
+
+						 .build();
 	}
 
 	private static JWTClaimsSet givenClaims(String id, String issuer,

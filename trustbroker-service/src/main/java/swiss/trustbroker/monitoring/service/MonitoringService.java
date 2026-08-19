@@ -58,7 +58,7 @@ public class MonitoringService {
 		var rpRequest = assertionConsumerService.handleRpAuthnRequest(authnRequest, request, stateData);
 		var uiObjects = filterUiObjectsForCp(rpRequest.getUiObjects().getTiles(), cpId);
 		if (uiObjects.size() == 1) {
-			claimsProviderService.sendSamlToCpWithMandatoryIds(request, response, stateData, uiObjects.get(0).getUrn());
+			claimsProviderService.sendSamlToCpWithMandatoryIds(request, response, stateData, uiObjects.getFirst().getUrn());
 		}
 		return uiObjects.size();
 	}

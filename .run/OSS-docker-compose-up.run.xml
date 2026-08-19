@@ -1,0 +1,46 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="OSS-docker-compose-up" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+    <deployment type="docker-compose.yml">
+      <settings>
+        <option name="envFilePath" value="" />
+        <option name="envFilePaths">
+          <list>
+            <option value="" />
+          </list>
+        </option>
+        <option name="envVars">
+          <list>
+            <DockerEnvVarImpl>
+              <option name="name" value="GIT_URL" />
+              <option name="value" value="https://github.com/swiss/gitops.trustbroker.swiss.git #GIT_TOKEN=not-required-on-public-repo  # Variant 1: Access token used to access GitOps repository using http bearer token (must be created on Git server) # Gitea &gt;&gt; User Avater &gt;&gt; Settings &gt;&gt; Applications &gt;&gt; Manage Access Tokens &gt;&gt; Generate Token # Pass by value or by reference ie.e $TRUSTBROKER_HOME/keys/git_token #GIT_URL=http://git@gitea:3000/trustbroker-swiss/gitops.trustbroker.swiss.git #GIT_TOKEN=./keys/git_token  # Variant 2: SSH key used to access GitOps repository using ssh protocol (see setup-ssh.sh on how to get it) # We instead mount the SSH key(s) into /etc/trustbroker/keys. #GIT_URL=ssh://git@gitea:22/trustbroker-swiss/gitops.trustbroker.swiss.git #SSH_KEY=./keys/id_rsa  # data selection from git repo selecting trustbroker-inventories/DEMO CONFIG_BRANCH=main SPRING_PROFILES_ACTIVE=DEMO  # Passphrase to decrypt keystores stored in git (RSA private in openssl PEM or PKCS12 keystores) PKI_PASSPHRASE=changeit  # Access to the mariadb session store. We use the same passphrase for DB owner 'root' and XTB user 'trustbroker'. STATECACHE_PASS=secret " />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="CONFIG_BRANCH" />
+              <option name="value" value="master" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="SPRING_PROFILES_ACTIVE" />
+              <option name="value" value="DEMO" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="PKI_PASSPHRASE" />
+              <option name="value" value="changeit" />
+            </DockerEnvVarImpl>
+            <DockerEnvVarImpl>
+              <option name="name" value="STATECACHE_PASS" />
+              <option name="value" value="secret" />
+            </DockerEnvVarImpl>
+          </list>
+        </option>
+        <option name="services">
+          <list>
+            <option value="postgresql" />
+          </list>
+        </option>
+        <option name="sourceFilePath" value="trustbroker-install/docker/docker-compose.yml" />
+        <option name="upDetach" value="false" />
+      </settings>
+    </deployment>
+    <method v="2" />
+  </configuration>
+</component>

@@ -30,13 +30,13 @@ import org.opensaml.saml.saml2.metadata.SingleLogoutService;
 import org.opensaml.saml.saml2.metadata.SingleSignOnService;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.security.credential.UsageType;
-import org.opensaml.xmlsec.signature.KeyInfo;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.springframework.stereotype.Component;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlFactory;
 import swiss.trustbroker.common.saml.util.SamlUtil;
+import swiss.trustbroker.common.saml.util.SkinnySamlUtil;
 import swiss.trustbroker.samlmock.SamlMockProperties;
 
 @Component
@@ -54,7 +54,7 @@ public class SamlMockMetadataService {
 	private final SamlMockFileService fileService;
 
 	public EntityDescriptor generateMetadata() {
-		EntityDescriptor descriptor = OpenSamlUtil.buildSamlObject(EntityDescriptor.class);
+		var descriptor = OpenSamlUtil.buildSamlObject(EntityDescriptor.class);
 		descriptor.setID(buildSourceId());
 		descriptor.setEntityID(properties.getArtifactResolutionIssuer());
 
@@ -77,12 +77,17 @@ public class SamlMockMetadataService {
 		var signature = SamlFactory.prepareSignableObject(
 				descriptor, credential, SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256, null, null);
 		SamlUtil.signSamlObject(descriptor, signature);
+
+		// remove whitespace in Signature certs -> does not affect signature value
+		SkinnySamlUtil.eliminateCertWhitespace(descriptor.getSignature().getDOM());
+
 		return descriptor;
 	}
 
 	private static KeyDescriptor getKeyDescriptor(Credential credential, UsageType usageType) {
-		KeyDescriptor keyDescriptor = OpenSamlUtil.buildSamlObject(KeyDescriptor.class);
-		KeyInfo keyInfo = SamlFactory.createKeyInfo(credential);
+		var keyDescriptor = OpenSamlUtil.buildSamlObject(KeyDescriptor.class);
+		var keyInfo = SamlFactory.createKeyInfo(credential);
+		SkinnySamlUtil.eliminateCertWhitespace(keyInfo);
 		keyDescriptor.setUse(usageType);
 		keyDescriptor.setKeyInfo(keyInfo);
 		return keyDescriptor;
@@ -98,7 +103,7 @@ public class SamlMockMetadataService {
 	}
 
 	private IDPSSODescriptor buildIdpSsoDescriptor() {
-		IDPSSODescriptor idpDescriptor = OpenSamlUtil.buildSamlObject(IDPSSODescriptor.class);
+		var idpDescriptor = OpenSamlUtil.buildSamlObject(IDPSSODescriptor.class);
 		idpDescriptor.setWantAuthnRequestsSigned(true);
 		idpDescriptor.addSupportedProtocol(SAMLConstants.SAML20P_NS);
 		var artifactResolutionService = buildArtifactResolutionService();
@@ -138,21 +143,21 @@ public class SamlMockMetadataService {
 	}
 
 	private static SingleSignOnService getSingleSignOnService(String location, String binding) {
-		SingleSignOnService sso = OpenSamlUtil.buildSamlObject(SingleSignOnService.class);
+		var sso = OpenSamlUtil.buildSamlObject(SingleSignOnService.class);
 		sso.setLocation(location);
 		sso.setBinding(binding);
 		return sso;
 	}
 
 	private static SingleLogoutService getSingleLogoutService(String location, String binding) {
-		SingleLogoutService sso = OpenSamlUtil.buildSamlObject(SingleLogoutService.class);
+		var sso = OpenSamlUtil.buildSamlObject(SingleLogoutService.class);
 		sso.setLocation(location);
 		sso.setBinding(binding);
 		return sso;
 	}
 
 	private static AssertionConsumerService getAssertionConsumerService(String location, String binding, int index) {
-		AssertionConsumerService assertionConsumerService = OpenSamlUtil.buildSamlObject(AssertionConsumerService.class);
+		var assertionConsumerService = OpenSamlUtil.buildSamlObject(AssertionConsumerService.class);
 		assertionConsumerService.setLocation(location);
 		assertionConsumerService.setBinding(binding);
 		assertionConsumerService.setIndex(index);

@@ -15,10 +15,8 @@
 
 package swiss.trustbroker.homerealmdiscovery.controller;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,35 +32,25 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import swiss.trustbroker.api.announcements.dto.Announcement;
-import swiss.trustbroker.api.announcements.dto.AnnouncementUiElement;
-import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
-import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.WebUtil;
-import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.Flow;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
-import swiss.trustbroker.homerealmdiscovery.dto.ProfileRequest;
+import swiss.trustbroker.homerealmdiscovery.dto.SessionRequest;
 import swiss.trustbroker.homerealmdiscovery.dto.SupportInfo;
-import swiss.trustbroker.homerealmdiscovery.service.RedirectOutputService;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
-import swiss.trustbroker.homerealmdiscovery.util.OperationalUtil;
-import swiss.trustbroker.homerealmdiscovery.util.RelyingPartyUtil;
 import swiss.trustbroker.saml.dto.DeviceInfoReq;
 import swiss.trustbroker.saml.dto.UiObjects;
 import swiss.trustbroker.saml.service.AssertionConsumerService;
 import swiss.trustbroker.saml.service.ClaimsProviderService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
 import swiss.trustbroker.saml.util.SamlStatusCode;
-import swiss.trustbroker.saml.util.SamlValidationUtil;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sessioncache.service.StateCacheService;
 import swiss.trustbroker.sso.service.SsoService;
@@ -71,13 +59,13 @@ import swiss.trustbroker.util.WebSupport;
 
 /**
  * HRD services separated from application namespace.
+ * <br/>
+ * Always enabled as it's required for the HRD UI.
  */
 @Controller
 @AllArgsConstructor
 @Slf4j
 public class HrdController {
-
-	private final TrustBrokerProperties trustBrokerProperties;
 
 	private final AssertionConsumerService assertionConsumerService;
 
@@ -91,20 +79,16 @@ public class HrdController {
 
 	private final StateCacheService stateCacheService;
 
-	private final AnnouncementService announcementService;
-
 	private final ApiSupport apiSupport;
 
 	private final List<OutputService> outputServices;
-
-	private final RedirectOutputService redirectOutputService;
 
 	// Return the list of CP issuers we need to render
 	// once the FE has been adapted, id and stateDataByAuthnReq can be changed to required
 	@GetMapping(path = ApiSupport.HRD_RP_URL + "/{issuer}/tiles")
 	@ResponseBody
-	public UiObjects getHrdTilesForRpIssuer(HttpServletRequest httpRequest, HttpServletResponse httpResponse,
-			@PathVariable("issuer") String issuer, @RequestParam(value = ApiSupport.HRD_SID_PARAM, required = false) String rpAuthnRequestId) {
+	public UiObjects getHrdTilesForRpIssuer(HttpServletRequest httpRequest, @PathVariable("issuer") String issuer,
+			@RequestParam(value = ApiSupport.HRD_SID_PARAM, required = false) String rpAuthnRequestId) {
 		rpAuthnRequestId = ApiSupport.decodeUrlParameter(rpAuthnRequestId);
 
 		var rpIssuer = ApiSupport.decodeUrlParameter(issuer);
@@ -120,15 +104,12 @@ public class HrdController {
 		return rpRequest.getUiObjects();
 	}
 
-	@GetMapping(path = ApiSupport.HRD_RP_URL + "/{sessionId}/continue")
-	public String handleContinueToRp(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable(name = "sessionId") String sessionIdEncoded) {
-		log.debug("User confirmed continuation to RP");
-
-		var sessionId = ApiSupport.decodeUrlParameter(sessionIdEncoded);
-		var stateData = stateCacheService.findMandatoryValidState(sessionId, this.getClass().getSimpleName());
-		// avoid loop due to aborted status (no problem if not persisted):
-		stateData.getCpResponse().resetErrorPageStatus();
+	@PostMapping(path = ApiSupport.HRD_RP_CONTINUE_URL)
+	public String handleContinueToRp(@RequestBody SessionRequest session,
+			HttpServletRequest request, HttpServletResponse response) {
+		var sessionId = ApiSupport.decodeUrlParameter(session.getSid());
+		log.debug("User confirmed continuation to RP for sessionId={}", sessionId);
+		var stateData = findValidStateForErrorPage(sessionId);
 		var rpId = stateData.getRpIssuer();
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(rpId, null);
 		var returnUrl = relyingPartyService.sendResponseToRpFromSessionState(outputServices, relyingParty, stateData, request,
@@ -136,33 +117,20 @@ public class HrdController {
 		return WebSupport.getViewRedirectResponse(returnUrl);
 	}
 
-	@GetMapping(path = ApiSupport.API_CONTEXT + "/hrd/profiles")
-	@ResponseBody
-	public ProfileResponse getUserProfiles(HttpServletRequest request, HttpServletResponse response,
-			@RequestHeader(WebSupport.HTTP_HEADER_XTB_PROFILE_ID) String id) {
-		SamlValidationUtil.validateProfileRequestId(id);
-		log.debug("Rendering response for profileId={}", id);
-		var stateData = stateCacheService.find(id, this.getClass().getSimpleName());
-		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(stateData.getRpIssuer(), null);
-		var profileSelection = relyingParty != null ? relyingParty.getProfileSelection() : null;
-		var hasAccessRequest = relyingParty != null && relyingParty.hasAccessRequest();
-		var profileSelectionData = ProfileSelectionData.builder()
-													   .profileSelectionProperties(profileSelection)
-													   .selectedProfileId(id)
-													   .applicationName(stateData.getRpApplicationName())
-													   .ignoreEmptyProfiles(!hasAccessRequest)
-													   .build();
-		final var profileSelectionService = relyingPartyService.getProfileSelectionService(relyingParty != null ? relyingParty.getIdmLookup() : null);
-		return profileSelectionService.buildProfileResponse(profileSelectionData, stateData.getCpResponse());
-	}
+	private StateData findValidStateForErrorPage(String sessionId) {
+		var stateData = stateCacheService.findMandatoryValidState(sessionId, this.getClass().getSimpleName());
+		var cpResponse = stateData.getCpResponse();
+		if (cpResponse == null) {
+			throw new RequestDeniedException(String.format("Cannot continue to RP in sessionId=%s without CpResponse", sessionId));
+		}
+		if (!cpResponse.showErrorPage() || !cpResponse.getFlowPolicy().doAppContinue()) {
+			throw new RequestDeniedException(String.format("Cannot continue to RP in sessionId=%s aborted=%s flowPolicy=%s",
+					sessionId, cpResponse.isAborted(), cpResponse.getFlowPolicy()));
 
-	@PostMapping(path = ApiSupport.API_CONTEXT + "/hrd/profile")
-	public String selectProfile(HttpServletRequest request, HttpServletResponse response,
-			@RequestBody ProfileRequest profileRequest) {
-		var redirectUrl = relyingPartyService.sendResponseWithSelectedProfile(outputServices,
-				profileRequest, request, response);
-		redirectUrl = redirectOutputService.handleRedirect(request, response, redirectUrl);
-		return WebSupport.getViewRedirectResponse(redirectUrl);
+		}
+		// avoid loop due to aborted status (no problem if not persisted):
+		stateData.getCpResponse().resetErrorPageStatus();
+		return stateData;
 	}
 
 	/**
@@ -182,6 +150,7 @@ public class HrdController {
 
 		// state for current AuthnRequest must exist
 		var stateDataByAuthnReq = stateCacheService.findRequiredBySpId(rpAuthnRequestId, this.getClass().getSimpleName());
+		assertionConsumerService.validateSelectedCp(stateDataByAuthnReq, cpIssuerId);
 
 		// check SSO
 		var rpIssuerId = stateDataByAuthnReq.getRpIssuer();
@@ -316,51 +285,9 @@ public class HrdController {
 		throw new RequestDeniedException(String.format("Unexpected invalid sessionId=%s", stateDataByAuthnReq.getId()));
 	}
 
-	@GetMapping(value = { ApiSupport.API_CONTEXT + "/announcements/{issuer}/{appName}", ApiSupport.API_CONTEXT + "/announcements/{issuer}" })
-	@ResponseBody
-	public List<AnnouncementUiElement> getAnnouncements(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable("issuer") String issuer, @PathVariable(required = false, name = "appName") String appName) {
-
-		String decodedIssuer = ApiSupport.decodeUrlParameter(issuer);
-		String applicationName = null;
-		if (appName != null) {
-			applicationName = ApiSupport.decodeUrlParameter(appName);
-		}
-		log.debug("Requested announcements for issuer={} appName={}", issuer, appName);
-
-		RelyingParty relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(decodedIssuer, null);
-		if (relyingParty == null) {
-			log.error("RP config was not found for issuer={} appName={}, no announcements will be shown", decodedIssuer,
-					applicationName);
-			return Collections.emptyList();
-		}
-
-		Set<String> idpIds = RelyingPartyUtil.getCpIdsWithoutSpecChars(relyingParty);
-
-		List<Announcement> announcementsForApplication =
-				announcementService.getAnnouncementsForApplication(relyingParty, relyingParty.getAnnouncement(), applicationName, idpIds);
-
-		// adminlogin cookie shall let users pass
-		var skipDisabling = OperationalUtil.skipUiFeaturesForAdminAndMonitoringClients(request, trustBrokerProperties);
-
-		// HRD on client to display tiles with or without disabling
-		return announcementsForApplication.stream()
-				.map(announcementEntity -> AnnouncementUiElement.builder()
-																.type(announcementEntity.getType())
-																.applicationAccessible(announcementService.isRpAppAccessible(announcementEntity) || skipDisabling)
-																.message(announcementEntity.getMessage())
-																.title(announcementEntity.getTitle())
-																.url(announcementEntity.getUrl())
-																.phoneNumber(announcementEntity.getPhoneNumber())
-																.emailAddress(announcementEntity.getEmailAddress())
-																.validTo(announcementEntity.getValidTo())
-																.build())
-				.toList();
-	}
-
 	// redirect to HRD for the given session
-	@GetMapping(path = ApiSupport.API_CONTEXT + "/hrd/{session}/continue")
-	public String backToHrd(HttpServletRequest request, HttpServletResponse response, @PathVariable("session") String session) {
+	@GetMapping(path = ApiSupport.HRD_URL + "/{session}/continue")
+	public String backToHrd(@PathVariable("session") String session) {
 		var sessionId = ApiSupport.decodeUrlParameter(session);
 		var stateData = stateCacheService.find(sessionId, HrdController.class.getSimpleName());
 		var rpIssuerId = stateData.getRpIssuer();
@@ -373,8 +300,7 @@ public class HrdController {
 
 	@GetMapping(path = ApiSupport.API_CONTEXT + "/support/{errorCode}/{session}")
 	@ResponseBody
-	public SupportInfo fetchSupportInfo(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable("errorCode") String errorCode, @PathVariable("session") String session) {
+	public SupportInfo fetchSupportInfo(@PathVariable("errorCode") String errorCode, @PathVariable("session") String session) {
 		var sessionId = ApiSupport.decodeUrlParameter(session);
 		var builder = SupportInfo.builder();
 		var flow = getFlowForSessionId(sessionId, errorCode);

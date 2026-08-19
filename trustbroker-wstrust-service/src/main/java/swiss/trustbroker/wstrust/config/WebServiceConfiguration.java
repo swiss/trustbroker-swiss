@@ -29,8 +29,8 @@ import javax.xml.transform.TransformerFactory;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -80,7 +80,7 @@ public class WebServiceConfiguration implements WsConfigurer {
 	}
 
 	@Bean
-	@ConditionalOnProperty(value = "trustbroker.config.wstrust.enabled", havingValue = "true", matchIfMissing = true)
+	@ConditionalOnBooleanProperty(value = "trustbroker.config.wstrust.enabled")
 	public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext applicationContext) {
 		var wsTrustConfig = trustBrokerProperties.getWstrust();
 		var servlet = new MessageDispatcherServlet();

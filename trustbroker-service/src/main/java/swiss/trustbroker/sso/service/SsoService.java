@@ -51,6 +51,7 @@ import org.opensaml.saml.saml2.core.LogoutResponse;
 import org.opensaml.saml.saml2.core.NameID;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 import swiss.trustbroker.api.saml.dto.DestinationType;
 import swiss.trustbroker.audit.dto.OidcAuditData;
 import swiss.trustbroker.audit.service.AuditService;
@@ -65,6 +66,7 @@ import swiss.trustbroker.common.saml.util.SamlIoUtil;
 import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.saml.util.VelocityUtil;
 import swiss.trustbroker.common.tracing.TraceSupport;
+import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.UrlAcceptor;
@@ -396,7 +398,7 @@ public class SsoService {
 			var name = cookie.getName();
 			if (name.equals(cookieName)) {
 				log.debug("Matched cookieName={}", name);
-				matchingCookies.add(0, cookie);
+				matchingCookies.addFirst(cookie);
 			}
 			else if (name.startsWith(groupPrefix)) {
 				if (nameParams.isGroupOnly()) {
@@ -443,7 +445,7 @@ public class SsoService {
 	}
 
 	public boolean isRelyingPartyOkForSso(RelyingParty relyingParty, StateData stateData) {
-		if (!relyingParty.isSsoEnabled()) {
+		if (!relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())) {
 			log.debug("No SSO for rpIssuerId={} sessionId={}", relyingParty.getId(), stateData.getId());
 			return false;
 		}
@@ -460,8 +462,7 @@ public class SsoService {
 			return SsoSessionOperation.IGNORE;
 		}
 		ensureAuthnReqOrImplicitSsoState(stateDataByAuthnReq);
-		var requestedContextClasses = stateDataByAuthnReq.getRpContextClasses();
-		return validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, requestedContextClasses);
+		return validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, false);
 	}
 
 	private boolean validStateForSso(StateData ssoStateData) {
@@ -501,7 +502,7 @@ public class SsoService {
 	}
 
 	private SsoSessionOperation validAuthnRequestForSso(ClaimsParty claimsParty, RelyingParty relyingParty, StateData ssoStateData,
-			StateData stateDataByAuthnReq, List<String> requestedContextClasses) {
+			StateData stateDataByAuthnReq, boolean join) {
 		if (!stateDataByAuthnReq.isAuthnRequestSigned()) {
 			var requireSignedAuthnRequest = relyingParty.requireSignedAuthnRequestForSsoJoin();
 			log.info("AuthnRequest sessionId={} is not signed - denySsoJoin={}",
@@ -522,12 +523,27 @@ public class SsoService {
 					authnRequestId, ssoStateData.getId(), ssoStateData.getCompletedAuthnRequests());
 			return SsoSessionOperation.IGNORE;
 		}
-		return qoaLevelSufficient(claimsParty, relyingParty, requestedContextClasses, ssoStateData);
+		Optional<List<String>> cpAssertedContextClasses = join ?
+				Optional.of(getCpAssertedContextClassesFromState(stateDataByAuthnReq)) : Optional.empty();
+		return qoaLevelSufficient(claimsParty, relyingParty, stateDataByAuthnReq.getRpContextClasses(),
+				cpAssertedContextClasses, ssoStateData);
+	}
+
+	public boolean ssoStateValidForJoin(ClaimsParty claimsParty, RelyingParty relyingParty,
+			StateData ssoStateData, StateData stateDataByAuthnReq, String deviceId, String cpIssuerId) {
+		return ssoStateValidForDeviceInfo(
+				claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, deviceId, cpIssuerId, true);
 	}
 
 	public boolean ssoStateValidForDeviceInfo(ClaimsParty claimsParty, RelyingParty relyingParty, StateData ssoStateData,
 			StateData stateDataByAuthnReq, String deviceId, String cpIssuerId) {
-		if (!relyingParty.isSsoEnabled()) {
+		return ssoStateValidForDeviceInfo(
+				claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, deviceId, cpIssuerId, false);
+	}
+
+	private boolean ssoStateValidForDeviceInfo(ClaimsParty claimsParty, RelyingParty relyingParty, StateData ssoStateData,
+			StateData stateDataByAuthnReq, String deviceId, String cpIssuerId, boolean join) {
+		if (!relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())) {
 			log.error("Relying party rpIssuer={} has no SSO", relyingParty.getId());
 			return false;
 		}
@@ -566,8 +582,7 @@ public class SsoService {
 			return false;
 		}
 		// repeat the checks done before device info (for the single CP/no HRD case and as a defense against attacks)
-		var ssoOp = validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq,
-				ssoStateData.getRpContextClasses());
+		var ssoOp = validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, join);
 		if (ssoOp != SsoSessionOperation.JOIN) {
 			return false;
 		}
@@ -739,7 +754,7 @@ public class SsoService {
 		if (!ssoPossible && knownQoaLevel.getOrder() >= ssoMinQoaLevel) {
 			ssoPossible = true;
 		}
-		if (relyingParty.isSsoEnabled()) {
+		if (relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())) {
 			log.info("Decided ssoPossible={} on ssoSessionQoas={} having cpQoaLevel={} >= ssoMinQoaLevel={}",
 					ssoMinQoaLevel, qoas, knownQoaLevel, ssoMinQoaLevel);
 		}
@@ -781,7 +796,7 @@ public class SsoService {
 	}
 
 	private SsoSessionOperation qoaLevelSufficient(ClaimsParty claimsParty, RelyingParty relyingParty,
-			List<String> requestedContextClasses, StateData stateData) {
+			List<String> requestedContextClasses, Optional<List<String>> cpAssertedContextClasses, StateData stateData) {
 		var qoaConfiguration = qoaMappingService.getQoaConfiguration(stateData.getSpStateData(), relyingParty);
 		var authnQoas = extractValidQoasFromContextClasses(requestedContextClasses, qoaConfiguration);
 
@@ -793,11 +808,17 @@ public class SsoService {
 		var sessionQoa = Optional.ofNullable(stateData.getSsoState() != null ? stateData.getSsoState().getSsoQoa() : null);
 		if (sessionQoa.isEmpty()) {
 			// should not happen as this is checked when the session is established
-			var contextClasses = getCpAssertedContextClassesFromState(stateData);
+			var contextClasses = cpAssertedContextClasses.orElseGet(() -> getCpAssertedContextClassesFromState(stateData));
 			if (contextClasses.isEmpty()) {
 				log.warn("No QOA stored in ssoSessionId={} - STEPUP required for SSO", stateData.getId());
 				return SsoSessionOperation.STEPUP;
 			}
+			sessionQoa = findHighestQoaInState(contextClasses, claimsParty.getQoaConfig());
+		}
+		else if (cpAssertedContextClasses.isPresent()) {
+			log.debug("JOIN - checking sessionQoa={} or cpAssertedContextClasses={}",
+					sessionQoa.get(), cpAssertedContextClasses.get());
+			var contextClasses = CollectionUtil.addToList(cpAssertedContextClasses.get(), sessionQoa.get());
 			sessionQoa = findHighestQoaInState(contextClasses, claimsParty.getQoaConfig());
 		}
 
@@ -854,7 +875,8 @@ public class SsoService {
 		for (var stateDataEntry : validStates.entrySet()) {
 			var stateData = stateDataEntry.getValue();
 			var rp = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(participantId, null, true);
-			var fingerprintCheck = rp != null && rp.isSsoEnabled() ? rp.getSso().getFingerprintCheck() : FingerprintCheck.STRICT;
+			var fingerprintCheck = rp != null && rp.isSsoEnabled(true) ? rp.getSso().getFingerprintCheck() :
+					FingerprintCheck.STRICT;
 			if (!validateFingerprint(deviceId, stateData, fingerprintCheck)) {
 				throw new RequestDeniedException("Device ID does not match stored fingerprint");
 			}
@@ -1143,19 +1165,18 @@ public class SsoService {
 	}
 
 	public boolean isOidcPrincipalAllowedToJoinSsoSession(StateData ssoStateData, String userPrincipal,
-			String oidcSessionId) {
+	                                                      String oidcClientId, String oidcSessionId) {
 		if (!ssoStateData.isSsoEstablished()) {
-			log.debug("Skip non-SSO join of participant oidcSessionId={} userPrincipal=\"{}\" to "
-							+ "ssoSessionId={} subjectNameId={}",
-					oidcSessionId, userPrincipal, ssoStateData.getId(), ssoStateData.getSubjectNameId());
+			log.debug("Skip non-SSO join of participant={} oidcSessionId={} userPrincipal=\"{}\" to ssoSessionId={} subjectNameId={}",
+					oidcClientId, oidcSessionId, userPrincipal, ssoStateData.getId(), ssoStateData.getSubjectNameId());
 			return false;
 		}
 		// throws exception on subject change (would be a bug if this happens on OIDC side)
 		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(ssoStateData.getCpIssuer());
 		var nameIdFromSso = getSsoSubject(ssoStateData, claimsParty.orElse(null));
 		var subjectNameId = checkAndExtractNameId(ssoStateData, nameIdFromSso, claimsParty.orElse(null));
-		log.debug("SSO join of OIDC participant oidcSessionId={} userPrincipal=\"{}\" to ssoSessionId={} subjectNameId={}",
-					oidcSessionId, userPrincipal, ssoStateData.getId(), subjectNameId);
+		log.debug("SSO join of OIDC participant={} oidcSessionId={} userPrincipal=\"{}\" to ssoSessionId={} subjectNameId={}",
+				oidcClientId, oidcSessionId, userPrincipal, ssoStateData.getId(), subjectNameId);
 		return true;
 	}
 
@@ -1215,9 +1236,10 @@ public class SsoService {
 											   .cpIssuerId(cpIssuerId)
 											   .assertionConsumerServiceUrl(acsUrl)
 											   .build();
-		ssoStateData.addSsoParticipant(participant);
-		log.info("Added participant to SSO session={} rpIssuerId={} cpIssuerId={} cpResponseIssuer={}",
-				ssoStateData.getId(), rpIssuerId, cpIssuerId, ssoStateData.getCpResponse().getIssuer());
+		var added = ssoStateData.addSsoParticipant(participant);
+		log.info("Participant {} SSO session={} rpIssuerId={} cpIssuerId={} cpResponseIssuer={} acsUrl=\"{}\"",
+				(added ? "added to" : "already in"),
+				ssoStateData.getId(), rpIssuerId, cpIssuerId, ssoStateData.getCpResponse().getIssuer(), acsUrl);
 	}
 
 	private int getSsoGroupTimeoutSecs(SsoGroup ssoGroup, ToIntFunction<SsoGroup> func) {
@@ -1325,8 +1347,11 @@ public class SsoService {
 
 		// update /verify match
 		var claimsPartyId = ssoStateData.getCpIssuer() != null ? ssoStateData.getCpIssuer() : stateDataByAuthnReq.getCpIssuer();
-		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimsPartyId);
-		updateSubjectNameIdInSession(ssoStateData, claimsParty.orElse(null));
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimsPartyId, null);
+		var relyingPartyId = stateDataByAuthnReq.getRpIssuer();
+		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(relyingPartyId, null);
+		updateSubjectNameIdInSession(ssoStateData, claimsParty);
+		updateQoaInSession(relyingParty, claimsParty, ssoStateData);
 
 		// these fields are set on the base object in AssertionConsumerService.saveState
 		ssoStateData.setForceAuthn(stateDataByAuthnReq.getForceAuthn());
@@ -1371,7 +1396,7 @@ public class SsoService {
 	}
 
 	static boolean logoutNotificationsEnabled(RelyingParty relyingParty) {
-		return relyingParty != null && relyingParty.isSsoEnabled() && relyingParty.getSso().logoutNotificationsEnabled();
+		return relyingParty != null && relyingParty.isSsoEnabled(true) && relyingParty.getSso().logoutNotificationsEnabled();
 	}
 
 	// returns all RPs matching the referrer, followed by the ones matching the issuer (exact match before near matches)
@@ -1400,7 +1425,7 @@ public class SsoService {
 	 */
 	public Optional<StateData> logoutRelyingParty(String logoutIssuer, List<String> sessionIndexes,
 			RelyingParty relyingParty, Cookie[] cookies, SloState logoutState) {
-		if (relyingParty.isSsoEnabled()) {
+		if (relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())) {
 			// identify the cookie(s) that address a state
 			var cookieParams = SsoService.SsoCookieNameParams.of(relyingParty.getSso().getGroupName());
 			var result = findValidStateAndCookiesToExpire(cookieParams, cookies, relyingParty);
@@ -1622,7 +1647,7 @@ public class SsoService {
 		}
 		// normal case: single one is used:
 		if (acUrls.size() == 1) {
-			var acUrl = acUrls.get(0);
+			var acUrl = acUrls.getFirst();
 			log.debug("SSO session contains acsUrl={} for rpIssuerId={} referer={}", acUrl, relyingParty.getId(), referer);
 			return acUrl;
 		}
@@ -1636,10 +1661,10 @@ public class SsoService {
 				acsUrlsForReferer, referer, relyingParty.getId());
 		// no match, use first of the acUrls
 		if (acsUrlsForReferer.isEmpty()) {
-			return acUrls.get(0);
+			return acUrls.getFirst();
 		}
 		// use first matching (there should be only one):
-		return acsUrlsForReferer.get(0);
+		return acsUrlsForReferer.getFirst();
 	}
 
 	void addSloNotifications(RelyingParty relyingParty, String acsUrl, boolean initiatingRp, NameID nameId,
@@ -1809,7 +1834,7 @@ public class SsoService {
 		var notifications = getNotifications(responseMap);
 		// velocity parameters
 		// first wait minWait, then if not yet completed 100ms until all are except notify-try are completed
-		var maxWait = notifications.isEmpty() ? -1 : trustBrokerProperties.getSloNotificationTimoutMillis();
+		var maxWait = notifications.isEmpty() ? -1 : trustBrokerProperties.getSloNotificationTimeoutMillis();
 		var hasNotifyTry = notifications.stream().anyMatch(slo -> slo.getSlo().getMode().isNotifyTry());
 		var notifyFailWait = notifications.isEmpty() ? 0 : 100; // just a short time to allow the browser to submit the requests
 		var minWait = hasNotifyTry ? trustBrokerProperties.getSloNotificationMinWaitMillis() : notifyFailWait;
@@ -1830,9 +1855,15 @@ public class SsoService {
 			}
 		}
 		if (redirectUrl != null) {
+			// getRedirectResponse returns encoded URL - unescape to split (relative or absolute URL must contain /)
+			if (redirectUrl.indexOf('/') == -1) {
+				log.debug("HTMl-unescaping redirectUrl=\"{}\"", redirectUrl);
+				redirectUrl = HtmlUtils.htmlUnescape(redirectUrl);
+			}
 			var split = WebUtil.splitQueryParameters(redirectUrl, true);
 			velocityParams.put(VelocityUtil.VELOCITY_PARAM_XTB_HTTP_METHOD, HttpMethod.GET.name());
-			velocityParams.put(VelocityUtil.VELOCITY_PARAM_ACTION, split.getKey());
+			velocityParams.put(VelocityUtil.VELOCITY_PARAM_ACTION, HTMLEncoder.encodeForHTMLAttribute(split.getKey()));
+			// attribute keys and values are HTML encoded already:
 			velocityParams.put(VelocityUtil.VELOCITY_PARAM_ADDITIONAL_FIELDS, split.getValue());
 		}
 		var useHttpGet = redirectUrl != null;
@@ -1876,7 +1907,7 @@ public class SsoService {
 			List<String> foundSessionIds = sessions.stream().map(StateData::getSsoSessionId).toList();
 			log.error("Multiple valid SSO session with sessionIndexes={} foundSessionIds={}", sessionIndexes, foundSessionIds);
 		}
-		var stateData = sessions.get(0);
+		var stateData = sessions.getFirst();
 		log.info("Found valid stateId={} ssoSessionId={}", stateData.getId(), stateData.getSsoSessionId());
 		return Optional.of(stateData);
 	}

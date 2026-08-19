@@ -25,6 +25,7 @@ import java.util.Objects;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.profileselection.dto.Profile;
 import swiss.trustbroker.api.profileselection.dto.ProfileResponse;
@@ -38,7 +39,6 @@ import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.api.sessioncache.dto.SessionState;
 import swiss.trustbroker.common.config.ExternalStores;
 import swiss.trustbroker.common.exception.TechnicalException;
-import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.ProfileSelectionMode;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
 import swiss.trustbroker.saml.dto.ClaimSource;
@@ -53,13 +53,13 @@ import swiss.trustbroker.util.ApiSupport;
 @Service("ldap")
 @AllArgsConstructor
 @Slf4j
+@ConditionalOnBooleanProperty("trustbroker.config.ldap.enabled")
+@ConditionalOnBooleanProperty("trustbroker.config.profileselection.enabled")
 public class LdapIdentitySelectionService implements ProfileSelectionService {
 
 	public static final String PROFILE_SEPARATOR = ":";
 
 	private ApiSupport apiSupport;
-
-	private TrustBrokerProperties trustBrokerProperties;
 
 	@Override
 	public ProfileSelectionResult doInitialProfileSelection(ProfileSelectionData profileSelectionData,
@@ -314,9 +314,9 @@ public class LdapIdentitySelectionService implements ProfileSelectionService {
 			List<String> values = entry.getValue();
 			if (values != null) {
 				values = values.stream()
-							   .filter(value -> value.contains(profileName))
-							   .map(value -> getAttributeValueWithoutPrefix(profileName, value))
-							   .toList();
+				               .filter(value -> isProfileAttribute(value, profileName))
+				               .map(value -> getAttributeValueWithoutPrefix(profileName, value))
+				               .toList();
 				if (!values.isEmpty()) {
 					translationValues.put(key.getName(), values.getFirst());
 				}
@@ -346,7 +346,7 @@ public class LdapIdentitySelectionService implements ProfileSelectionService {
 												 Map<AttributeName, List<String>> userDetails) {
 		final var values = DefinitionUtil.findValueByName(userDetails, attributeName);
 		return values.stream()
-					 .filter(value -> value.contains(profileName))
+					 .filter(value -> isProfileAttribute(value, profileName))
 					 .map(value -> getAttributeValueWithoutPrefix(profileName, value))
 					 .toList();
 	}
@@ -406,8 +406,32 @@ public class LdapIdentitySelectionService implements ProfileSelectionService {
 		}
 
 		return values.stream()
-					 .filter(profileAttr -> unselectedProfileIds.stream().noneMatch(profileAttr::contains))
-					 .toList();
+		             .filter(profileAttr -> unselectedProfileIds.stream().noneMatch(unselected -> isProfileAttribute(profileAttr, unselected)))
+		             .toList();
+	}
+
+	static boolean isProfileAttribute(String profileAttr, String profilePrefix) {
+		if (profileAttr.equals(profilePrefix)) {
+			return true;
+		}
+		if (!profileAttr.contains(PROFILE_SEPARATOR)) {
+			return false;
+		}
+		String[] profileAttrParts = profileAttr.split(PROFILE_SEPARATOR);
+		String[] profilePrefixParts = new String[]{ profilePrefix };
+		if (profilePrefix.contains(PROFILE_SEPARATOR)) {
+			profilePrefixParts = profilePrefix.split(PROFILE_SEPARATOR);
+		}
+
+		if (profilePrefixParts.length > profileAttrParts.length) {
+			return false;
+		}
+		for (int i = 0; i < profilePrefixParts.length; i++) {
+			if (!profilePrefixParts[i].equals(profileAttrParts[i])) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private static String getLdapSource() {
@@ -438,7 +462,7 @@ public class LdapIdentitySelectionService implements ProfileSelectionService {
 		}
 		else {
 			transformedValues = entry.getValue().stream()
-									 .map(value -> value != null && value.startsWith(prefix)
+									 .map(value -> value != null && isProfileAttribute(value, prefix)
 											 ? value.substring(prefix.length()) : value)
 									 .toList();
 		}

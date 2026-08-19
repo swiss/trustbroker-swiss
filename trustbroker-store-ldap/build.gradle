@@ -7,6 +7,7 @@ dependencies {
 	implementation project("${rootProject.top}:trustbroker-api")
 	implementation project("${rootProject.top}:trustbroker-common")
 	implementation project("${rootProject.top}:trustbroker-service")
+	testImplementation project("${rootProject.top}:trustbroker-test")
 
 	// spring-boot baseline
 	implementation "org.springframework.boot:spring-boot-starter-web"
@@ -16,4 +17,16 @@ dependencies {
 
 	// spring-test baseline
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
 }

@@ -39,10 +39,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,6 +77,7 @@ import swiss.trustbroker.util.SamlValidator;
 		MonitoringService.class
 })
 @AutoConfigureMockMvc
+@TestPropertySource(properties="trustbroker.config.monitoring.enabled=true")
 class MonitoringControllerTest {
 
 	private static final String RP_URN = "urn:rpIssuer1";

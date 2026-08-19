@@ -11,6 +11,7 @@ dependencies {
 	implementation project("${rootProject.top}:trustbroker-common")
 	implementation project("${rootProject.top}:trustbroker-service")
 	implementation project("${rootProject.top}:trustbroker-wstrust-service")
+	runtimeOnly project("${rootProject.top}:trustbroker-store-ldap")
 	runtimeOnly project("${rootProject.top}:trustbroker-frontend")
 
 	// baseline
@@ -122,10 +123,13 @@ publishing {
 		uberJar(MavenPublication) {
 			artifact bootJar
 		}
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
 	}
 }
 
 artifactoryPublish {
-	publications(publishing.publications.uberJar)
+	publications(publishing.publications.uberJar, publishing.publications.docJar)
 }
 

@@ -75,6 +75,8 @@ public class StateData implements Serializable, SessionState {
 
 	private String assertionConsumerServiceUrl;
 
+	private List<String> selectableCpIssuerIds;
+
 	private CpResponse cpResponse;
 
 	private String deviceId;
@@ -220,8 +222,8 @@ public class StateData implements Serializable, SessionState {
 		completedAuthnRequests.add(authReqId);
 	}
 
-	public void addSsoParticipant(SsoSessionParticipant ssoSessionParticipant) {
-		initializedSsoState().getSsoParticipants().add(ssoSessionParticipant);
+	public boolean addSsoParticipant(SsoSessionParticipant ssoSessionParticipant) {
+		return initializedSsoState().getSsoParticipants().add(ssoSessionParticipant);
 	}
 
 	@JsonIgnore

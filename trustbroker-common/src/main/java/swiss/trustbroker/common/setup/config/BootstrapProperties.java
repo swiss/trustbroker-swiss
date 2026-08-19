@@ -31,6 +31,8 @@ public class BootstrapProperties {
 
 	public static final String GIT_REPO_TOKEN = "GIT_TOKEN";
 
+	public static final String GIT_TRANSPORT_TIMEOUT_SEC = "GIT_TRANSPORT_TIMEOUT_SEC";
+
 	// ...authenticating with...
 	public static final String GIT_SSH_KEY_PATH = "CONFIG_KEY"; // path to SSH key file in TRUSTBROKER_HOME/keys/git-ssh.key
 
@@ -85,6 +87,11 @@ public class BootstrapProperties {
 
 	public static String getGitToken(String defaultValue) {
 		return getFromSysPropsOrEnv(GIT_REPO_TOKEN, defaultValue, true);
+	}
+
+	public static int getGitTransportTimeout() {
+		// pod startup trying git connection twice may result in +30sec startup time to get ready with a cached clone in a PVC
+		return Integer.parseInt(getFromSysPropsOrEnv(GIT_TRANSPORT_TIMEOUT_SEC, "15", true));
 	}
 
 	public static String getGitSshKeyPath() {

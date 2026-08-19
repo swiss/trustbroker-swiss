@@ -19,7 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +36,7 @@ import swiss.trustbroker.util.WebSupport;
 @Controller
 @AllArgsConstructor
 @Slf4j
-@ConditionalOnProperty(value = "trustbroker.config.oidc.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnBooleanProperty(value = "trustbroker.config.oidc.enabled", matchIfMissing = true)
 public class OidcClientController {
 
 	private final OidcClientService oidcClientService;

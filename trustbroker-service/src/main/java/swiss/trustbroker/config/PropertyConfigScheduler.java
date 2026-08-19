@@ -64,7 +64,7 @@ public class PropertyConfigScheduler {
 	/**
 	 * Allow a config reload every 1sec (a bit of DOS prevention) given the client knows the admin secret.
 	 * Returns HTTP/404 when the feature is disabled (default) or the action or secret is wrong.
-	 * Copy & paste this one in DEV "local" setup to speed up config changes.<pre>
+	 * Copy and paste this one in DEV "local" setup to speed up config changes.<pre>
 	 * curl -kv http://localhost:8090/api/v1/config \
 	 *   -H 'Content-Type: application/json' \
 	 *   -d '{"action":"reload","adminSecret":"trustbroker.config.adminSecret"}'

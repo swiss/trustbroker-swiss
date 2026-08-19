@@ -15,10 +15,11 @@
 
 package swiss.trustbroker.ldap.model;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.springframework.ldap.core.ContextMapper;
@@ -30,12 +31,18 @@ public class LdapAttributeMapper implements ContextMapper<Map<String, List<Strin
 	public Map<String, List<String>> mapFromContext(Object ctx) throws NamingException {
 		final var context = (DirContextAdapter) ctx;
 		Map<String, List<String>> attributeMap = new HashMap<>();
-		final var ids = context.getAttributes().getIDs();
-		while (ids.hasMore()) {
-			final var attrId = ids.next();
-			attributeMap.put(attrId, Arrays.asList(context.getStringAttributes(attrId)));
+		final var attributes = context.getAttributes().getAll();
+		while (attributes.hasMore()) {
+			var attribute = attributes.next();
+			var id = attribute.getID();
+			List<String> values = new ArrayList<>();
+
+			NamingEnumeration<?> vals = attribute.getAll();
+			while (vals.hasMore()) {
+				values.add(vals.next().toString());
+			}
+			attributeMap.put(id, values);
 		}
 		return attributeMap;
 	}
-
 }

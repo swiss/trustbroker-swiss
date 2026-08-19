@@ -142,11 +142,23 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	@Test
 	void isSignatureValidTrueTest() {
-		Signature signature = dummySignableObject().getSignature();
-		Credential credential = SamlTestBase.dummyCredential();
-		List<Credential> credentials = List.of(credential);
-		boolean signatureValid = SamlUtil.isSignatureValid(signature, credentials);
+		var signature = dummySignableObject().getSignature();
+		var credential = SamlTestBase.dummyCredential();
+		var credentials = List.of(credential);
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+		var signatureValid = SamlUtil.isSignatureValid(signature, credentials, allowedSignatureAlgorithms, true);
 		assertTrue(signatureValid);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = { "true", "false"})
+	void isSignatureValidAlgorithmBlockedTest(boolean enforceAlgorithm) {
+		var signature = dummySignableObject().getSignature();
+		var credential = SamlTestBase.dummyCredential();
+		var credentials = List.of(credential);
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA384);
+		var signatureValid = SamlUtil.isSignatureValid(signature, credentials, allowedSignatureAlgorithms, enforceAlgorithm);
+		assertThat(signatureValid, is(!enforceAlgorithm));
 	}
 
 	@Test
@@ -158,18 +170,20 @@ class ResponseFactoryTest extends SamlTestBase {
 		assertion.getAttributeStatements().add(SamlFactory.createAttributeStatement(List.of(attribute)));
 		// update DOM:
 		XMLObjectSupport.getMarshaller(assertion).marshall(assertion);
-		Credential credential = SamlTestBase.dummyCredential();
-		List<Credential> credentials = List.of(credential);
-		boolean signatureValid = SamlUtil.isSignatureValid(signature, credentials);
+		var credential = SamlTestBase.dummyCredential();
+		var credentials = List.of(credential);
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+		var signatureValid = SamlUtil.isSignatureValid(signature, credentials, allowedSignatureAlgorithms, true);
 		assertFalse(signatureValid);
 	}
 
 	@Test
 	void isSignatureValidUntrustedSignerTest() {
-		Signature signature = dummySignableObject().getSignature();
-		Credential credential = SamlTestBase.dummyInvalidCredential().get(0);
-		List<Credential> credentials = List.of(credential);
-		boolean signatureValid = SamlUtil.isSignatureValid(signature, credentials);
+		var signature = dummySignableObject().getSignature();
+		var credential = SamlTestBase.dummyInvalidCredential().getFirst();
+		var credentials = List.of(credential);
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+		var signatureValid = SamlUtil.isSignatureValid(signature, credentials, allowedSignatureAlgorithms, true);
 		assertFalse(signatureValid);
 	}
 
@@ -177,7 +191,8 @@ class ResponseFactoryTest extends SamlTestBase {
 	void isSignatureOkForSaml20() {
 		var xmlObject = realSignableObject(givenStandardSignature(), null);
 		var credentials = List.of(SamlTestBase.dummyCredential());
-		assertTrue(SamlUtil.isSignatureValid(xmlObject.getSignature(), credentials));
+		var allowedSignatureAlgorithms = List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+		assertTrue(SamlUtil.isSignatureValid(xmlObject.getSignature(), credentials, allowedSignatureAlgorithms, true));
 
 		// The following breaks when the opensaml/xml-security/xerxes stack changes unexpectedly when doing library maintenance.
 		// Might be that all is fine but SAML2 is notorious for bad implementations (like ADFS) so we make sure we know
@@ -185,9 +200,9 @@ class ResponseFactoryTest extends SamlTestBase {
 		var assertionString = SerializeSupport.nodeToString(xmlObject.getDOM());
 
 		// cross-check re-internalized signatures
-		assertDemarshalledAssertionValid(assertionString, credentials);
-		assertDemarshalledAssertionManipulated(assertionString, credentials);
-		assertDemarshalledAssertionDigestCovered(assertionString, credentials);
+		assertUnmarshalledAssertionValid(assertionString, credentials, allowedSignatureAlgorithms);
+		assertUnmarshalledAssertionManipulated(assertionString, credentials, allowedSignatureAlgorithms);
+		assertUnmarshalledAssertionDigestCovered(assertionString, credentials, allowedSignatureAlgorithms);
 
 		// check namespace behavior and data
 		assertThat(assertionString, containsString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"));
@@ -221,17 +236,20 @@ class ResponseFactoryTest extends SamlTestBase {
 	void isSignatureOkForAdfs() {
 		var xmlObject = realSignableObject(givenAdfsCompliantSignature(), SamlFactory.XML_SEC_DIGEST_METHOD_SHA1);
 		var credentials = List.of(SamlTestBase.dummyCredential());
-		assertTrue(SamlUtil.isSignatureValid(xmlObject.getSignature(), credentials));
+		var allowedSignatureAlgorithms = List.of(
+				SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256,
+				SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
+		assertTrue(SamlUtil.isSignatureValid(xmlObject.getSignature(), credentials, allowedSignatureAlgorithms, true));
 
 		// The following breaks when the opensaml/xml-security/xerxes stack changes unexpectedly when doing library maintenance.
 		// Might be that all is fine but SAML2 is notorious for bad implementations (like ADFS) so we make sure we know
 		// something changed.
 		var assertionString = SerializeSupport.nodeToString(xmlObject.getDOM());
 
-		// cross check re-internalized signatures
-		assertDemarshalledAssertionValid(assertionString, credentials);
-		assertDemarshalledAssertionManipulated(assertionString, credentials);
-		assertDemarshalledAssertionDigestCovered(assertionString, credentials);
+		// cross-check re-internalized signatures
+		assertUnmarshalledAssertionValid(assertionString, credentials, allowedSignatureAlgorithms);
+		assertUnmarshalledAssertionManipulated(assertionString, credentials, allowedSignatureAlgorithms);
+		assertUnmarshalledAssertionDigestCovered(assertionString, credentials, allowedSignatureAlgorithms);
 
 		// check namespace behavior and data
 		assertThat(assertionString, containsString(CoreAttributeName.CLAIMS_NAME.getNamespaceUri()));
@@ -269,7 +287,10 @@ class ResponseFactoryTest extends SamlTestBase {
 	void responseWrappingIsAdfsCompliant() {
 		var assertion = realSignableObject(givenAdfsCompliantSignature(), null);
 		var credentials = List.of(SamlTestBase.dummyCredential());
-		assertTrue(SamlUtil.isSignatureValid(assertion.getSignature(), credentials));
+		var allowedSignatureAlgorithms = List.of(
+				SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256,
+				SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
+		assertTrue(SamlUtil.isSignatureValid(assertion.getSignature(), credentials, allowedSignatureAlgorithms, true));
 
 		// wrap ADFS version into response
 		var response = SamlFactory.createResponse(Response.class, assertion.getIssuer().getValue());
@@ -278,6 +299,8 @@ class ResponseFactoryTest extends SamlTestBase {
 		response.getAssertions().add(assertion);
 		SamlUtil.prepareSamlObject(response, SkinnySamlUtil.ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES, null,
 				OpenSamlUtil.SKINNY_ALL);
+		// re-check assertion signature after manipulations
+		assertTrue(SamlUtil.isSignatureValid(assertion.getSignature(), credentials, allowedSignatureAlgorithms, true));
 
 		// patching
 		var responseString = OpenSamlUtil.samlObjectToString(response);
@@ -297,7 +320,7 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	@Test
 	void buildRedirectBindingSignature() {
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		assertDoesNotThrow(() -> {
@@ -307,7 +330,7 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	@Test
 	void validateRedirectSignature() {
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		var credential = SamlTestBase.dummyCredential();
@@ -322,7 +345,7 @@ class ResponseFactoryTest extends SamlTestBase {
 	@ParameterizedTest
 	@CsvSource(value = { "false", "true" })
 	void validateRedirectSignatureInvalidSignature(boolean redirectBindingSinatureWarning) {
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		var credential = SamlTestBase.dummyCredential();
@@ -344,7 +367,7 @@ class ResponseFactoryTest extends SamlTestBase {
 		var credential = SamlTestBase.dummyCredential();
 		// build signature with a valid algorithm
 		var queryBytes = query.getBytes(StandardCharsets.UTF_8);
-		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1,
+		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256,
 				queryBytes);
 		assertThrows(
 				TechnicalException.class,
@@ -354,21 +377,30 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	@Test
 	void isRedirectSignatureValid() {
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		var credential = SamlTestBase.dummyCredential();
 		var signatureBytes = SamlUtil.buildRedirectBindingSignature(credential, sigAlg,
 				query.getBytes(StandardCharsets.UTF_8));
 		assertTrue(
-				SamlUtil.isRedirectSignatureValid(List.of(credential), sigAlg, query, signatureBytes, false)
+				SamlUtil.isRedirectSignatureValid(List.of(credential), List.of(sigAlg),
+						true, sigAlg, query, signatureBytes, false)
+		);
+		assertTrue(
+				SamlUtil.isRedirectSignatureValid(List.of(credential), Collections.emptyList(),
+						true, sigAlg, query, signatureBytes, false)
+		);
+		assertTrue(
+				SamlUtil.isRedirectSignatureValid(List.of(credential), List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256),
+						true, sigAlg, query, signatureBytes,false)
 		);
 	}
 
 	@ParameterizedTest
 	@CsvSource(value = { "false", "true" })
 	void isRedirectSignatureValidInvalidSignature(boolean redirectBindingSignatureWarning) {
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		// the value does not matter
 		var query = SamlIoUtil.buildSamlRedirectQueryString(sigAlg, true, "dummy", "relay", null);
 		var credential = SamlTestBase.dummyCredential();
@@ -376,7 +408,7 @@ class ResponseFactoryTest extends SamlTestBase {
 				query.getBytes(StandardCharsets.UTF_8));
 		signatureBytes[0] ^= 0x01;
 		assertThat(
-				SamlUtil.isRedirectSignatureValid(List.of(credential), sigAlg, query, signatureBytes,
+				SamlUtil.isRedirectSignatureValid(List.of(credential), List.of(sigAlg), true, sigAlg, query, signatureBytes,
 						redirectBindingSignatureWarning),
 				is(redirectBindingSignatureWarning)
 		);
@@ -457,7 +489,7 @@ class ResponseFactoryTest extends SamlTestBase {
 		assertThat(signableXmlObject.getSubject(), is(not(nullValue())));
 		assertThat(signableXmlObject.getSubject().getSubjectConfirmations(), is(not(empty())));
 		var subjectConfirmationData =
-				signableXmlObject.getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData();
+				signableXmlObject.getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData();
 		assertThat(subjectConfirmationData, is(not(nullValue())));
 		checkValidity(before, after, SUBJECT_VALIDITY_SECONDS, subjectConfirmationData.getNotBefore(),
 				subjectConfirmationData.getNotOnOrAfter(), false);
@@ -575,36 +607,42 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	// asserts
 
-	private void assertDemarshalledAssertionValid(String assertionString, List<Credential> credentials) {
+	private void assertUnmarshalledAssertionValid(String assertionString, List<Credential> credentials,
+			List<String> allowedSignatureAlgorithms) {
 		// check signature on internalized data
 		var inputValid = new ByteArrayInputStream(assertionString.getBytes(StandardCharsets.UTF_8));
-		var inputAssertionValid = (Assertion) SamlIoUtil.unmarshallAssertion(inputValid);
-		assertTrue(SamlUtil.isSignatureValid(inputAssertionValid.getSignature(), credentials),
+		var inputAssertionValid = SamlIoUtil.unmarshallAssertion(inputValid);
+		assertTrue(SamlUtil.isSignatureValid(
+				inputAssertionValid.getSignature(), credentials, allowedSignatureAlgorithms, true),
 				"SAML: " + assertionString);
 	}
 
-	private void assertDemarshalledAssertionManipulated(String assertionString, List<Credential> credentials) {
+	private void assertUnmarshalledAssertionManipulated(String assertionString, List<Credential> credentials,
+			List<String> allowedSignatureAlgorithms) {
 		// make sure we fail when input was manipulated
 		var manipulated = assertionString.replace(CoreAttributeName.CLAIMS_NAME.getNamespaceUri(),
 				CoreAttributeName.CLAIMS_NAME.getNamespaceUri() + "X");
 		var inputManipulated = new ByteArrayInputStream(manipulated.getBytes(StandardCharsets.UTF_8));
-		var inputAssertionManipulated = (Assertion) SamlIoUtil.unmarshallAssertion(inputManipulated);
-		assertFalse(SamlUtil.isSignatureValid(inputAssertionManipulated.getSignature(), credentials),
+		var inputAssertionManipulated = SamlIoUtil.unmarshallAssertion(inputManipulated);
+		assertFalse(SamlUtil.isSignatureValid(
+				inputAssertionManipulated.getSignature(), credentials, allowedSignatureAlgorithms,true),
 				"SAML: " + manipulated);
 	}
 
-	private void assertDemarshalledAssertionDigestCovered(String assertionString, List<Credential> credentials) {
+	private void assertUnmarshalledAssertionDigestCovered(String assertionString, List<Credential> credentials,
+			List<String> allowedSignatureAlgorithms) {
 		var digestTag = "</ds:DigestValue>";
 		var digestEndTagIdx = assertionString.indexOf(digestTag);
 		assertThat(digestEndTagIdx, greaterThan(0));
 		var manipulated = assertionString.substring(0, digestEndTagIdx - 5)
-				+ "QED" + assertionString.substring(digestEndTagIdx - 2, assertionString.length());
+				+ "QED" + assertionString.substring(digestEndTagIdx - 2);
 		assertThat(manipulated.length(), equalTo(assertionString.length()));
 		assertThat(manipulated, containsString("QED"));
 		var inputManipulated = new ByteArrayInputStream(manipulated.getBytes(StandardCharsets.UTF_8));
-		var inputAssertionManipulated = (Assertion) SamlIoUtil.unmarshallAssertion(inputManipulated);
+		var inputAssertionManipulated = SamlIoUtil.unmarshallAssertion(inputManipulated);
 		// digest is part of sec check
-		assertFalse(SamlUtil.isSignatureValid(inputAssertionManipulated.getSignature(), credentials),
+		assertFalse(SamlUtil.isSignatureValid(
+				inputAssertionManipulated.getSignature(), credentials, allowedSignatureAlgorithms, true),
 				"SAML: " + manipulated);
 	}
 
@@ -775,7 +813,7 @@ class ResponseFactoryTest extends SamlTestBase {
 		assertThat(assertion.getVersion(), is(SAMLVersion.VERSION_20));
 		validateSubject(assertion.getSubject(), nameId, nameIdFormat, spStateData.getId(), expetedRecipient);
 		validateConditions(assertion.getConditions(), expectedAudience);
-		validateAuthnStatements(assertion.getAuthnStatements(), sessionIndex, contextClass);
+		validateAuthnStatements(assertion.getAuthnStatements(), contextClass);
 		List<Map.Entry<Definition, List<String>>> expectedAttributes = new ArrayList<>();
 		cpAttributes.remove(userExtId); // userExtId from cpAttributes is expected to be removed by filter
 		cpAttributes.entrySet()
@@ -851,7 +889,7 @@ class ResponseFactoryTest extends SamlTestBase {
 		assertThat(subject.getNameID().getValue(), is(nameId));
 		assertThat(subject.getNameID().getFormat(), is(nameIdFormat));
 		assertThat(subject.getSubjectConfirmations(), hasSize(1));
-		var subjectConfirmation = subject.getSubjectConfirmations().get(0).getSubjectConfirmationData();
+		var subjectConfirmation = subject.getSubjectConfirmations().getFirst().getSubjectConfirmationData();
 		assertThat(subjectConfirmation.getInResponseTo(), is(inResponseTo));
 		assertThat(subjectConfirmation.getRecipient(), is(recipient));
 		assertThat(subjectConfirmation.getNotOnOrAfter(), is(not(nullValue())));
@@ -862,14 +900,14 @@ class ResponseFactoryTest extends SamlTestBase {
 		assertThat(conditions.getNotOnOrAfter(), is(not(nullValue())));
 		assertThat(conditions.getNotBefore(), is(not(nullValue())));
 		assertThat(conditions.getAudienceRestrictions(), hasSize(1));
-		var audienceRestriction = conditions.getAudienceRestrictions().get(0);
+		var audienceRestriction = conditions.getAudienceRestrictions().getFirst();
 		assertThat(audienceRestriction.getAudiences(), hasSize(1));
-		assertThat(audienceRestriction.getAudiences().get(0).getURI(), is(audience));
+		assertThat(audienceRestriction.getAudiences().getFirst().getURI(), is(audience));
 	}
 
-	private static void validateAuthnStatements(List<AuthnStatement> authnStatements, String sessionIndex, String contextClass) {
+	private static void validateAuthnStatements(List<AuthnStatement> authnStatements, String contextClass) {
 		assertThat(authnStatements, hasSize(1));
-		var authnStatement = authnStatements.get(0);
+		var authnStatement = authnStatements.getFirst();
 		assertThat(authnStatement.getAuthnInstant(), is(not(nullValue())));
 		assertThat(authnStatement.getSessionIndex(), is(not(nullValue())));
 		assertThat(authnStatement.getAuthnContext(), is(not(nullValue())));
@@ -882,7 +920,7 @@ class ResponseFactoryTest extends SamlTestBase {
 			String originalIssuer, String homeNameOriginalIssuer, String clientName,
 			List<Map.Entry<Definition, List<String>>> attributeList) {
 		assertThat(attributeStatements, hasSize(1));
-		var attributeStatement = attributeStatements.get(0);
+		var attributeStatement = attributeStatements.getFirst();
 		var attributes = attributeStatement.getAttributes();
 		for (var attribute : attributes) {
 			var expected = attributeList.stream()

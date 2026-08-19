@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
@@ -57,6 +58,8 @@ import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
 import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethod;
 import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethods;
+import swiss.trustbroker.federation.xmlconfig.CounterParty;
+import swiss.trustbroker.federation.xmlconfig.Oidc;
 import swiss.trustbroker.federation.xmlconfig.OidcClaimsSource;
 import swiss.trustbroker.federation.xmlconfig.OidcClaimsSources;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -88,10 +91,10 @@ class OidcMetadataCacheServiceTest {
 	private HttpClient httpClient;
 
 	@MockitoBean
-	private HttpResponse httpResponseMetadata;
+	private HttpResponse<String> httpResponseMetadata;
 
 	@MockitoBean
-	private HttpResponse httpResponseJwk;
+	private HttpResponse<InputStream> httpResponseJwk;
 
 	@MockitoBean
 	private ExecutorService executor;
@@ -190,10 +193,10 @@ class OidcMetadataCacheServiceTest {
 		client.setIssuerId(clientIssuerId);
 		client.setClaimsSources(OidcClaimsSources.builder().claimsSourceList(claimsSources).build());
 		if (exceptionExpected) {
-			assertThrows(TechnicalException.class, () -> service.validateMetadata(client, metadata));
+			assertThrows(TechnicalException.class, () -> OidcMetadataCacheService.validateMetadata(client, metadata));
 		}
 		else {
-			assertDoesNotThrow(() -> service.validateMetadata(client, metadata));
+			assertDoesNotThrow(() -> OidcMetadataCacheService.validateMetadata(client, metadata));
 		}
 	}
 
@@ -233,7 +236,42 @@ class OidcMetadataCacheServiceTest {
 		};
 	}
 
-	private void mockMetadata(ClaimsParty cp, OidcClient oidcClient, String metadataJson) throws Exception {
+	@Test
+	void testCacheCollisions() throws Exception {
+		// different client secret for each so we can tell the results apart
+
+		// CP 1
+		var cp1OidcClient = OidcMockTestData.givenClient();
+		var cp1ClientSecret = cp1OidcClient.getClientSecret();
+		var cp1 = OidcMockTestData.givenCpWithOidcClient(cp1OidcClient);
+		mockMetadata(cp1, cp1OidcClient, OidcMockTestData.METADATA_JSON);
+
+		// CP 2 with different ID, OIDC client with same ID
+		var cp2OidcClient = OidcMockTestData.givenClient();
+		var cp2ClientSecret = cp1OidcClient.getClientSecret() + ".2";
+		cp2OidcClient.setClientSecret(cp2ClientSecret);
+		var cp2 = OidcMockTestData.givenCpWithOidcClient(cp2OidcClient);
+		cp2.setId(cp2.getId() + ".2");
+		mockMetadata(cp2, cp2OidcClient, OidcMockTestData.METADATA_JSON);
+
+		// RP with same ID as CP, OIDC client with same ID
+		var rpOidcClient = OidcMockTestData.givenClient();
+		var rpClientSecret = rpOidcClient.getClientSecret() + ".rp";
+		rpOidcClient.setClientSecret(rpClientSecret);
+		var rp = RelyingParty.builder()
+							 .id(cp1.getId())
+							 .oidc(Oidc.builder()
+									   .clients(List.of(rpOidcClient))
+									   .build())
+							 .build();
+		mockMetadata(rp, rpOidcClient, OidcMockTestData.METADATA_JSON);
+
+		assertThat(service.getOidcConfiguration(cp1).getClientSecret(), is(removePlainPrefix(cp1ClientSecret)));
+		assertThat(service.getOidcConfiguration(cp2).getClientSecret(), is(removePlainPrefix(cp2ClientSecret)));
+		assertThat(service.getOidcConfiguration(rp, rpOidcClient).getClientSecret(), is(removePlainPrefix(rpClientSecret)));
+	}
+
+	private void mockMetadata(CounterParty cp, OidcClient oidcClient, String metadataJson) throws Exception {
 		doReturn(httpClient).when(httpClientProvider)
 							.createHttpClient(oidcClient, cp.getCertificates(), URI.create(OidcMockTestData.METADATA_URL));
 		// mock metadata
@@ -248,9 +286,14 @@ class OidcMetadataCacheServiceTest {
 		), any());
 		doReturn(HttpStatus.OK.value()).when(httpResponseJwk).statusCode();
 		// re-create stream for each invocation
-		doAnswer(invocation -> new ByteArrayInputStream(OidcMockTestData.JWKS_JSON.getBytes(StandardCharsets.UTF_8))).when(httpResponseJwk).body();
+		doAnswer(invocation -> new ByteArrayInputStream(OidcMockTestData.JWKS_JSON.getBytes(StandardCharsets.UTF_8)))
+				.when(httpResponseJwk).body();
 		// mock client secret
-		doReturn(OidcMockTestData.CLIENT_SECRET).when(clientSecretProvider).resolveClientSecret(oidcClient);
+		doReturn(removePlainPrefix(oidcClient.getClientSecret())).when(clientSecretProvider).resolveClientSecret(oidcClient);
+	}
+
+	private static String removePlainPrefix(String clientSecret) {
+		return clientSecret.replace(OidcMockTestData.CLIENT_SECRET_PLAIN, "");
 	}
 
 	private static void validateStaticMetadata(OpenIdProviderConfiguration metadata) {

@@ -53,6 +53,13 @@ public class OidcClient implements Serializable {
 
 	/**
 	 * Client ID.
+	 * <br/>
+	 * Notes:
+	 * <ul>
+	 *   <li>OIDC client IDs must be unique for all RPs within the configuration of each environment
+	 *       (<code>trustbroker-inventories/environment</code>).</li>
+	 *   <li>OIDC client IDs used for CPs may overlap both across CPs and with those of RPs.</li>
+	 * </ul>
 	 */
 	@XmlAttribute(name = "id")
 	private String id;

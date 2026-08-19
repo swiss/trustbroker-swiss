@@ -15,8 +15,7 @@
 
 package swiss.trustbroker.api.idm.service;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import swiss.trustbroker.api.idm.dto.IdmRequest;
@@ -34,6 +33,8 @@ import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
  * Breaking changes:
  * <ul>
  *     <li>With 1.8.0 getAttributesFromIdm renamed to getAttributes.</li>
+ *     <li>With 1.15.0 getAttributes and getAttributesAudited were changed to a single <code>IdmRequest</code> as input
+ *     and state was added for implementations that need state across requests.</li>
  * </ul>
  */
 public interface IdmQueryService {
@@ -41,13 +42,18 @@ public interface IdmQueryService {
 	/**
 	 * @param relyingPartyConfig   Data from the request (not null)
 	 * @param cpResponse           Data from the CP response (not null)
-	 * @param idmRequests          Defines the requests to be performed by this call to query the IDM.
+	 * @param idmRequest           Defines the request to be performed by this call to query the IDM.
+	 *                             <br/>
+	 *                             The request is for this service.
 	 * @param statusPolicyCallback callback for status policy enforcement
-	 * @return Optional.empty if this service does not apply for these queries. A non-null result otherwise
+	 * @param state                State that can be used by this service across a set of related requests.
+	 * @param result               Update with this query's result. Changing exising results is allowed.
+	 * @return					   true if the query was processed, false otherwise
 	 * @since 1.8.0
 	 */
-	Optional<IdmResult> getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
-			IdmRequests idmRequests, IdmStatusPolicyCallback statusPolicyCallback);
+	boolean getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+									  IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback,
+									  Map<String, Object> state, IdmResult result);
 
 	/**
 	 * Implements getAttributes as well but signals, that the IDM data is fetched based on a federated login
@@ -55,26 +61,18 @@ public interface IdmQueryService {
 	 *
 	 * @since 1.8.0
 	 */
-	default Optional<IdmResult> getAttributesAudited(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
-			IdmRequests idmRequests, IdmStatusPolicyCallback statusPolicyCallback) {
-		return getAttributes(relyingPartyConfig, cpResponse, idmRequests, statusPolicyCallback);
+	default boolean getAttributesAudited(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+			IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback,
+			Map<String, Object> state, IdmResult result) {
+		return getAttributes(relyingPartyConfig, cpResponse, idmRequest, statusPolicyCallback, state, result);
 	}
 
 	/**
 	 * @param idmRequests Defines the requests to be performed by the call to query the IDM.
-	 * @return ClientExtId if defined in idmRequests and relevant for this service.
+	 * @return Client external ID if defined in <code>IdmRequests</code> and relevant for this service.
 	 */
 	default Optional<String> getClientExtId(IdmRequests idmRequests) {
 		return Optional.empty();
-	}
-
-	/**
-	 * @param idmRequests Defines the requests to be performed by this call to query the IDM.
-	 * @return IdmRequest sorted in a suitable way, e.g. by name, if applicable for this service, otherwise unmodified list from
-	 * idmRequests or empty Optional
-	 */
-	default List<IdmRequest> sortIdmRequests(IdmRequests idmRequests) {
-		return idmRequests != null ? idmRequests.getQueryList() : Collections.emptyList();
 	}
 
 	/**
@@ -99,5 +97,28 @@ public interface IdmQueryService {
 	default boolean isQueryOfStore(String requestedStore, IdmRequest idmQuery, String defaultStore) {
 		return requestedStore.equals(idmQuery.getStore())
 				|| idmQuery.getStore() == null && requestedStore.equals(defaultStore);
+	}
+
+	/**
+	 * @return the default order used by the service to determine the <code>IdmRequest</code>> order when no explicit order is set
+	 * @since 1.15.0
+	 */
+	Integer getServiceDefaultOrder();
+
+	/**
+	 * @return the <code>IdmStore</code> name use to assign the correct <code>IdmService</code> to the <code>IdmRequest</code>
+	 * @since 1.15.0
+	 */
+	String getStoreName();
+
+	/**
+	 * @return true if the  <code>IdmRequest</code> should be sorted by name when no explicit order is provided.
+	 * <br/>
+	 * Default: false
+	 *
+	 * @since 1.15.0
+	 */
+	default boolean sortQueriesByName() {
+		return false;
 	}
 }

@@ -20,6 +20,8 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -73,11 +75,11 @@ class StateDataTest {
 	@Test
 	void addSsoParticipant() {
 		var stateData = StateData.builder().id("id").build();
-		stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer1", "acs1", null, null));
-		stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer2", "acs1", null, null));
+		assertTrue(stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer1", "acs1", null, null)));
+		assertTrue(stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer2", "acs1", null, null)));
 		// duplicate:
-		stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer2", "acs1", null, null));
-		stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer2", "cpIssuer2", "acs2", null, null));
+		assertFalse(stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer1", "cpIssuer2", "acs1", null, null)));
+		assertTrue(stateData.addSsoParticipant(new SsoSessionParticipant("rpIssuer2", "cpIssuer2", "acs2", null, null)));
 		assertThat(stateData.hasSsoState(), is(true));
 		assertThat(stateData.getSsoState(), is(not(nullValue())));
 		var result = stateData.getSsoState().getSsoParticipants();

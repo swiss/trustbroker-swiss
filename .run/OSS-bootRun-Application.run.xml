@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="OSS-bootRun-Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="CONFIG_BRANCH" value="main" />
+      <env name="GIT_URL" value="https://github.com/swiss/gitops.trustbroker.swiss.git" />
+      <env name="PKI_PASSPHRASE" value="changeit" />
+      <env name="SPRING_PROFILES_ACTIVE" value="DEMO" />
+      <env name="STATECACHE_PASS" value="secret" />
+      <env name="TRUSTBROKER_HOME" value="./home" />
+    </envs>
+    <module name="trustbroker-swiss.trustbroker-application.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="swiss.trustbroker.Application" />
+    <option name="VM_PARAMETERS" value="-Dtrustbroker.config.versionInfo=Intellij -Dtrustbroker.config.frontendBaseUrl=http://localhost:4200 -Dtrustbroker.config.ldap.enabled=true -Dtrustbroker.config.rest.enabled=true" />
+    <option name="WORKING_DIRECTORY" value="file://$PROJECT_DIR$/trustbroker-application" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -464,22 +464,22 @@ class QoaMappingUtilTest {
 		acClasses.add(AcClass.builder().contextClass(SamlTestBase.Qoa.MOBILE_ONE_FACTOR_UNREGISTERED.getName()).build());
 		List<String> minQQoa1 = QoaMappingUtil.getMinQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, minQQoa1.size());
-		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQQoa1.get(0));
+		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQQoa1.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass(SamlTestBase.Qoa.KERBEROS.getName()).build());
 		List<String> minQoa2 = QoaMappingUtil.getMinQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, minQoa2.size());
-		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQoa2.get(0));
+		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQoa2.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass("any").build());
 		List<String> minQoa3 = QoaMappingUtil.getMinQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, minQoa3.size());
-		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQoa3.get(0));
+		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQoa3.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass("ur:qoa:negative").build());
 		List<String> minQQoa4 = QoaMappingUtil.getMinQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, minQQoa4.size());
-		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQQoa4.get(0));
+		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, minQQoa4.getFirst());
 	}
 
 
@@ -491,22 +491,22 @@ class QoaMappingUtilTest {
 		acClasses.add(AcClass.builder().contextClass(SamlTestBase.Qoa.MOBILE_ONE_FACTOR_UNREGISTERED.getName()).build());
 		List<String> maxQoa1 = QoaMappingUtil.getMaxQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, maxQoa1.size());
-		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, maxQoa1.get(0));
+		assertEquals(SamlContextClass.MOBILE_ONE_FACTOR_UNREGISTERED, maxQoa1.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass(SamlTestBase.Qoa.KERBEROS.getName()).build());
 		List<String> maxQoa2 = QoaMappingUtil.getMaxQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, maxQoa2.size());
-		assertEquals(SamlContextClass.KERBEROS, maxQoa2.get(0));
+		assertEquals(SamlContextClass.KERBEROS, maxQoa2.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass("any").build());
 		List<String> maxQoa3 = QoaMappingUtil.getMaxQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, maxQoa3.size());
-		assertEquals(SamlContextClass.KERBEROS, maxQoa3.get(0));
+		assertEquals(SamlContextClass.KERBEROS, maxQoa3.getFirst());
 
 		acClasses.add(AcClass.builder().contextClass("ur:qoa:negative").build());
 		List<String> maxQoa4 = QoaMappingUtil.getMaxQoa(acClasses, Collections.emptyList(), ISSUER, globalMapping);
 		assertEquals(1, maxQoa4.size());
-		assertEquals(SamlContextClass.KERBEROS, maxQoa4.get(0));
+		assertEquals(SamlContextClass.KERBEROS, maxQoa4.getFirst());
 	}
 
 	@ParameterizedTest
@@ -608,7 +608,7 @@ class QoaMappingUtilTest {
 		// no outbound config but levels are defined in the global mapping
 		var outBoundQoaConf = new QoaConfig(null, "any");
 		assertEquals(SamlTestBase.Qoa.QOA_40.getName(),
-				QoaMappingUtil.getDowngradedClasses(outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).get(0));
+				QoaMappingUtil.getDowngradedClasses(outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).getFirst());
 	}
 
 	@Test
@@ -623,7 +623,7 @@ class QoaMappingUtilTest {
 
 		// downgrade from 50 to 40
 		assertEquals(SamlTestBase.Qoa.QOA_40.getName(), QoaMappingUtil.getDowngradedClasses(
-				outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).get(0));
+				outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).getFirst());
 	}
 
 	@Test
@@ -638,7 +638,7 @@ class QoaMappingUtilTest {
 
 		// downgrade from 50 to 30 (60 must be ignored)
 		assertEquals(SamlTestBase.Qoa.QOA_30.getName(), QoaMappingUtil.getDowngradedClasses(
-				outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).get(0));
+				outBoundQoaConf, requestedQoa, inboundQoaAccClasses, ctxClass, qoaOrders, globalMapping).getFirst());
 	}
 
 	@ParameterizedTest

@@ -14,7 +14,7 @@
  */
 
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { EMPTY, Observable, catchError, switchMap, tap, throwError } from 'rxjs';
 
 import { environment } from '../../environments/environment';
@@ -23,6 +23,8 @@ import { SsoParticipants } from '../model/SsoParticipants';
 import { SupportInfo } from '../model/SupportInfo';
 import { Theme } from '../model/Theme';
 import { EncodeUtil } from '../shared/encode-util';
+import { Router } from '@angular/router';
+import { Session } from '../model/Session';
 
 @Injectable({
 	providedIn: 'root'
@@ -30,6 +32,8 @@ import { EncodeUtil } from '../shared/encode-util';
 export class ApiService {
 	private readonly apiBaseUrl = environment.apiUrl;
 	private configuration: Configuration | undefined;
+
+	private readonly router = inject(Router);
 
 	constructor(private readonly http: HttpClient) {}
 
@@ -52,9 +56,14 @@ export class ApiService {
 		});
 	}
 
-	continueResponseToRp(sessionId: string) {
-		// top level navigation, the response is the SAML response form
-		window.location.href = `${this.apiBaseUrl}hrd/relyingparties/${sessionId}/continue`;
+	continueResponseToRp(sessionId: string): Observable<HttpResponse<string>> {
+		// the response is the SAML response form
+		const session: Session = { sid: sessionId };
+		return this.http.post<string>(`${this.apiBaseUrl}hrd/relyingparties/continue`, session, {
+			headers: new HttpHeaders().set('Accept', 'text/html'),
+			observe: 'response',
+			responseType: 'text' as 'json'
+		});
 	}
 
 	relogin(sessionId: string) {
@@ -112,5 +121,28 @@ export class ApiService {
 	base64UrlEncode(value: string): string {
 		// btoa support just from IE10
 		return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+	}
+
+	handleFormResponse(response: HttpResponse<string>) {
+		const location = response.headers.get('location');
+		if (location) {
+			// writing the body of the redirect result to the document does not work
+			window.location.href = location;
+			return;
+		}
+		// document.write for error page does not work here
+		const url = response.url!.replace(/^.*(\/failure\/.*$)/, '$1');
+		if (url !== response.url) {
+			void this.router.navigate([url]);
+			return;
+		}
+		window.document.write(response.body!);
+		if (document.forms.length > 0) {
+			document.forms[0].submit();
+		} else {
+			// not a SAML form, e.g. AccessRequest
+			// NOSONAR
+			// console.info('[HrdCardsComponent] Do not have a form to submit');
+		}
 	}
 }

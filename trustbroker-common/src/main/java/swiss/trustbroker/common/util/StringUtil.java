@@ -15,11 +15,20 @@
 
 package swiss.trustbroker.common.util;
 
+import java.util.Set;
+import java.util.regex.Pattern;
+
 import org.apache.commons.lang3.StringUtils;
 
 public class StringUtil {
 
 	private static final String WHITE_SPACES = "[\n\r\t]";
+
+	private static final Pattern UNSAFE_CHARS = Pattern.compile("[\\r\\n\\t\\p{Cntrl}<>\"'\\\\;]");
+
+	private static final Set<String> SENSITIVE_TERMS = Set.of("secret", "token", "assertion", "password", "code");
+
+	private static final int MASK_PREFIX_LENGTH = 5;
 
 	static final String NULL = "<null>";
 
@@ -52,6 +61,19 @@ public class StringUtil {
 	}
 
 	/**
+	 * @param dataToBeCleans
+	 * @return input with all unsafe characters replaced with a question mark
+	 */
+	public static String cleanForNameValue(String dataToBeCleans) {
+		if (dataToBeCleans == null) {
+			return "";
+		}
+
+		// Remove CRLF, tabs, control chars, HTML tags, JS, etc.
+		return UNSAFE_CHARS.matcher(dataToBeCleans).replaceAll("?");
+	}
+
+	/**
 	 * @param secret
 	 * @return secret masked if not null
 	 */
@@ -76,4 +98,20 @@ public class StringUtil {
 		return value;
 	}
 
+	/**
+	 * @param key
+	 * @param value
+	 * @return value masked if key is sensitive
+	 */
+
+	public static String maskSecret(String key, String value) {
+		var lower = key.toLowerCase();
+		boolean isSensitiveKey = SENSITIVE_TERMS.stream().anyMatch(lower::contains);
+		if (value == null) return "";
+		if (isSensitiveKey) {
+			int visible = Math.min(MASK_PREFIX_LENGTH, value.length());
+			return value.substring(0, visible) + "***";
+		}
+		return value;
+	}
 }

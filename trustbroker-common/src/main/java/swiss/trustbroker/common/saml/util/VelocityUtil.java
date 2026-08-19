@@ -44,6 +44,8 @@ public class VelocityUtil {
 
 	public static final String VELOCITY_WS_FED_TEMPLATE_ID = "/templates/WS-FED-POST.vm";
 
+	public static final String VELOCITY_TEMPLATE_SKINNY_HRD = "/templates/Skinny-HRD.vm";
+
 	public static final String VELOCITY_PARAM_XTB_SIG_ALG = "XTBSigAlg";
 
 	public static final String VELOCITY_PARAM_XTB_SIGNATURE = "XTBSignature";
@@ -59,6 +61,10 @@ public class VelocityUtil {
 	public static final String VELOCITY_PARAM_ACTION = "action"; // from OpenSaml
 
 	public static final String VELOCITY_PARAM_ADDITIONAL_FIELDS = "XTBAdditionalFields";
+
+	public static final String VELOCITY_PARAM_VERSION = "XTBVersion";
+
+	public static final String VELOCITY_PARAM_TILES = "XTBTiles";
 
 	private VelocityUtil() {}
 

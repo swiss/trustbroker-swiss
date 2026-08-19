@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ import org.opensaml.saml.saml2.metadata.NameIDFormat;
 import swiss.trustbroker.common.config.KeystoreProperties;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
+import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.ArtifactResolution;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
@@ -53,6 +55,7 @@ import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 import swiss.trustbroker.util.ApiSupport;
+import swiss.trustbroker.util.CertificateUtil;
 
 class FederationMetadataServiceTest {
 
@@ -66,6 +69,8 @@ class FederationMetadataServiceTest {
 
 	private FederationMetadataService federationMetadataService;
 
+	private TrustBrokerProperties trustBrokerProperties;
+
 	@BeforeAll
 	static void init() {
 		SamlInitializer.initSamlSubSystem();
@@ -73,7 +78,7 @@ class FederationMetadataServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		var trustBrokerProperties = givenProperties();
+		trustBrokerProperties = givenProperties();
 		var relyingPartySetupService = givenRpSetupService(trustBrokerProperties);
 		federationMetadataService = new FederationMetadataService(trustBrokerProperties, relyingPartySetupService);
 		federationMetadataService.onApplicationEvent(); // final application context
@@ -141,6 +146,8 @@ class FederationMetadataServiceTest {
 		assertThat(samlObj, is(instanceOf(EntityDescriptor.class)));
 		var entityDescriptor = (EntityDescriptor) samlObj;
 		assertThat(entityDescriptor.isSigned(), is(true));
+		assertTrue(SamlUtil.isSignatureValid(entityDescriptor.getSignature(),
+				CertificateUtil.getXtbSignerCredentials(trustBrokerProperties), null, false));
 		validateIdp(entityDescriptor);
 		validateSp(entityDescriptor);
 		// AuthnAuthority

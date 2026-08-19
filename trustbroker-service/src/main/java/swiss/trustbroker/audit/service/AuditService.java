@@ -48,6 +48,7 @@ public class AuditService {
 			EventType.LOGOUT_RESPONSE, MAPPED_RESPONSE_TYPE,
 			EventType.RST_REQUEST, "rst",
 			EventType.RST_RESPONSE, MAPPED_RESPONSE_TYPE,
+			EventType.OIDC_TOKEN_REQUEST, "token_request",
 			EventType.OIDC_TOKEN, "token", // OIDC access_token response
 			EventType.OIDC_IDTOKEN, "id_token",
 			EventType.OIDC_LOGOUT, MAPPED_LOGOUT_TYPE
@@ -100,5 +101,4 @@ public class AuditService {
 
 		return logBuilder;
 	}
-
 }

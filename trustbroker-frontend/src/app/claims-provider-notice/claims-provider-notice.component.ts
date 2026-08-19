@@ -64,7 +64,7 @@ export default class ClaimsProviderNoticeComponent implements OnInit {
 	private readonly hostElement = inject(ElementRef);
 
 	ngOnInit(): void {
-		this.idpObject = this.router.lastSuccessfulNavigation?.extras?.state?.['idpObject'] as IdpObjectWithNoticeClaimProviders;
+		this.idpObject = this.router.lastSuccessfulNavigation()?.extras?.state?.['idpObject'] as IdpObjectWithNoticeClaimProviders;
 		this.titleKey = `${this.i18nPrefix}.${this.idpObject.name}.title`.toLowerCase();
 		this.metaService.setTitle(this.titleKey);
 

@@ -27,11 +27,13 @@ package swiss.trustbroker.oidc;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClaimAccessor;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -42,9 +44,16 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationGrantAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
 import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
+import org.springframework.security.oauth2.server.authorization.token.DefaultOAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
 import swiss.trustbroker.common.util.OidcUtil;
 
@@ -163,13 +172,30 @@ public class CustomOAuth2AuthenticationProviderUtils {
 		return null;
 	}
 
-	static <T extends OAuth2Token> OAuth2RefreshToken refreshToken(OAuth2Authorization.Builder builder, T token) {
-		if (token == null) {
-			log.error("Invalid null token for idToken");
-			throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_TOKEN);
-		}
-		var refreshToken = new OAuth2RefreshToken(UUID.randomUUID().toString(), token.getIssuedAt(), token.getExpiresAt());
+	static <T extends OAuth2Token> OAuth2RefreshToken refreshToken(OAuth2Authorization.Builder builder,
+	                                                               OAuth2TokenExchangeAuthenticationToken tokenExchangeAuthentication,
+	                                                               RegisteredClient registeredClient, Authentication principal,
+	                                                               Set<String> authorizedScopes,  OAuth2TokenGenerator<T> tokenGenerator) {
+		var tokenContext = generateTokenContextForTokenExchange(OAuth2TokenType.REFRESH_TOKEN, tokenExchangeAuthentication, registeredClient, principal, authorizedScopes, null);
+		var refreshToken =  (OAuth2RefreshToken) tokenGenerator.generate(tokenContext);
 		builder.token(refreshToken, metadata -> metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, Collections.emptyMap()));
 		return refreshToken;
+	}
+
+	public static @NonNull DefaultOAuth2TokenContext generateTokenContextForTokenExchange(
+			OAuth2TokenType tokenType, OAuth2AuthorizationGrantAuthenticationToken tokenExchangeAuthentication, RegisteredClient registeredClient,
+			Authentication principal, Set<String> authorizedScopes, Jwt dPoPProof) {
+		var tokenContextBuilder = DefaultOAuth2TokenContext.builder()
+		                                                   .registeredClient(registeredClient)
+		                                                   .principal(principal)
+		                                                   .authorizationServerContext(AuthorizationServerContextHolder.getContext())
+		                                                   .authorizedScopes(authorizedScopes)
+		                                                   .tokenType(tokenType)
+		                                                   .authorizationGrantType(AuthorizationGrantType.TOKEN_EXCHANGE)
+		                                                   .authorizationGrant(tokenExchangeAuthentication);
+		if (dPoPProof != null) {
+			tokenContextBuilder.put(OAuth2TokenContext.DPOP_PROOF_KEY, dPoPProof);
+		}
+		return tokenContextBuilder.build();
 	}
 }

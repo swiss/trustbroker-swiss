@@ -23,14 +23,20 @@ import static org.mockito.Mockito.doReturn;
 
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
+import java.util.Collections;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.federation.xmlconfig.Certificates;
+import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethod;
+import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethods;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.oidc.OidcHttpClientProvider;
 import swiss.trustbroker.oidc.OidcMockTestData;
@@ -46,7 +52,7 @@ class OidcTokenServiceTest {
 	private HttpClient httpClient;
 
 	@MockitoBean
-	private HttpResponse httpResponseToken;
+	private HttpResponse<String> httpResponseToken;
 
 	@Autowired
 	private OidcTokenService oidcTokenService;
@@ -63,6 +69,49 @@ class OidcTokenServiceTest {
 
 		assertThat(result.size(), is(6));
 		assertThat(result.get(OidcUtil.TOKEN_RESPONSE_TOKEN_TYPE), is(OidcUtil.OIDC_BEARER));
+	}
+
+	@ParameterizedTest
+	@MethodSource
+	void selectAuthenticationMethod(List<ClientAuthenticationMethod> allowed, List<ClientAuthenticationMethod> supported,
+			ClientAuthenticationMethod expected) {
+		var client = OidcClient.builder()
+							   .id("client1")
+							   .clientAuthenticationMethods(
+									   ClientAuthenticationMethods.builder().methods(allowed).build()
+							   )
+							   .build();
+		var config = OpenIdProviderConfiguration.builder()
+												.authenticationMethods(
+														ClientAuthenticationMethods.builder().methods(supported).build()
+												)
+												.build();
+		assertThat(OidcTokenService.selectAuthenticationMethod(client, config), is(expected));
+	}
+
+	static Object[][] selectAuthenticationMethod() {
+		return new Object[][] {
+				// default:
+				{ Collections.emptyList(), Collections.emptyList(), ClientAuthenticationMethod.CLIENT_SECRET_BASIC },
+				{ List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST), List.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+						ClientAuthenticationMethod.CLIENT_SECRET_BASIC },
+				// select matching:
+				{ List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST),
+						List.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC, ClientAuthenticationMethod.CLIENT_SECRET_POST),
+						ClientAuthenticationMethod.CLIENT_SECRET_POST },
+				{ List.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+						List.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC, ClientAuthenticationMethod.CLIENT_SECRET_POST),
+						ClientAuthenticationMethod.CLIENT_SECRET_BASIC },
+				// basic preferred:
+				{ List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST, ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+						List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST, ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+						ClientAuthenticationMethod.CLIENT_SECRET_BASIC },
+				// including others:
+				{ List.of(ClientAuthenticationMethod.CLIENT_SECRET_POST),
+						List.of(ClientAuthenticationMethod.CLIENT_SECRET_JWT, ClientAuthenticationMethod.CLIENT_SECRET_POST,
+								ClientAuthenticationMethod.CLIENT_SECRET_BASIC),
+						ClientAuthenticationMethod.CLIENT_SECRET_POST }
+		};
 	}
 
 	private void mockTokenResponse(OidcClient oidcClient, Certificates certificates, OpenIdProviderConfiguration configuration)

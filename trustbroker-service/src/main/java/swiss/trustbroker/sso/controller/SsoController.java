@@ -21,6 +21,7 @@ import java.util.List;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +42,7 @@ import swiss.trustbroker.util.WebSupport;
  */
 @Controller
 @Slf4j
+@ConditionalOnBooleanProperty("trustbroker.config.sso.enabled")
 public class SsoController extends AbstractSamlController {
 
 	private final SsoService ssoService;
@@ -60,7 +62,7 @@ public class SsoController extends AbstractSamlController {
 	// Return the list of participants in a particular SSO group
 	@GetMapping(path = ApiSupport.SSO_PARTICIPANTS_URL + "/{ssoGroupName}")
 	@ResponseBody
-	public List<SsoParticipants> getSsoParticipantsForGroup(HttpServletRequest request, HttpServletResponse response,
+	public List<SsoParticipants> getSsoParticipantsForGroup(HttpServletRequest request,
 			@PathVariable(name = "ssoGroupName") String ssoGroupName) {
 		var cookieNameParams = SsoService.SsoCookieNameParams.of(ssoGroupName);
 		var deviceId = WebSupport.getDeviceId(request);
@@ -71,11 +73,7 @@ public class SsoController extends AbstractSamlController {
 	// Return the list of participants in all SSO groups
 	@GetMapping(path = ApiSupport.SSO_PARTICIPANTS_URL)
 	@ResponseBody
-	public List<SsoParticipants> getSsoParticipants(HttpServletRequest request, HttpServletResponse response) {
-		return getSsoParticipants(request);
-	}
-
-	private List<SsoParticipants> getSsoParticipants(HttpServletRequest request) {
+	public List<SsoParticipants> getSsoParticipants(HttpServletRequest request) {
 		var deviceId = WebSupport.getDeviceId(request);
 		return ssoService.getAllSsoParticipants(request.getCookies(), deviceId);
 	}
@@ -89,7 +87,7 @@ public class SsoController extends AbstractSamlController {
 		var relyingPartyId = ApiSupport.decodeUrlParameter(rpId);
 		var result = getSsoParticipants(request);
 		if (result.size() == 1) {
-			var ssoGroupName = result.get(0).getSsoGroupName();
+			var ssoGroupName = result.getFirst().getSsoGroupName();
 			if (logoutSsoParticipantAndClearCookies(request, response, ssoGroupName, relyingPartyId, null, null)) {
 				return Collections.emptyList();
 			}

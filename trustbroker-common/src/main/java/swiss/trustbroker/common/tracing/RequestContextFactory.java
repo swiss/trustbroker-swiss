@@ -18,10 +18,6 @@ package swiss.trustbroker.common.tracing;
 /**
  * Factory for getting hold of the currently valid request context. I.e. the context
  * associated with the current user's current request.
- *
- * @author  kkj
- * @since 26-09-2004 17:29:20
- * @version $Revision$
  */
 public interface RequestContextFactory {
 

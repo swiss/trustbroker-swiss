@@ -21,8 +21,11 @@ import org.opensaml.core.xml.XMLObject;
 import org.opensaml.saml.common.xml.SAMLConstants;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Response;
+import org.opensaml.xmlsec.signature.KeyInfo;
 import org.opensaml.xmlsec.signature.SignableXMLObject;
 import org.opensaml.xmlsec.signature.Signature;
+import org.opensaml.xmlsec.signature.X509Certificate;
+import org.opensaml.xmlsec.signature.X509Data;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -32,21 +35,21 @@ import swiss.trustbroker.common.exception.TechnicalException;
  * Skinny SAML messages handling requires rewriting the opensaml output DOM.
  * It's recommended to use the cleaner opensaml representation but large SAML messages might be blocked on peers.
  * <ul>
- * <li>The fun of SAML XML-Sec C14:
- *     https://groups.google.com/g/opensaml-users/c/fJOZqT08UXs
+ * <li>The fun of SAML XML-Sec C14N:
+ *     <a href="https://groups.google.com/g/opensaml-users/c/fJOZqT08UXs">AttributeValue of type XSString or XSInteger causing signature validation to fail</a>
  * </li>
  * <li>AD connect requirements:
- *     https://docs.microsoft.com/en-us/azure/active-directory/hybrid/how-to-connect-fed-saml-idp
- *     https://login.microsoftonline.com/federationmetadata/saml20/federationmetadata.xml
+ *     <a href="https://docs.microsoft.com/en-us/azure/active-directory/hybrid/how-to-connect-fed-saml-idp">Use a SAML IdP for SSO</a>
+ *     <a href="https://login.microsoftonline.com/federationmetadata/saml20/federationmetadata.xml">Federation Metadata</a>
  * </li>
  * <li>ADFS interop:
- *     https://www-public.imtbs-tsp.eu/~procacci/dok/lib/exe/fetch.php?media=docpublic:systemes:shibboleth:azuread-sso-shibboleth-idp-20180607-2.docx
+ *     <a href="https://www-public.imtbs-tsp.eu/~procacci/dok/lib/exe/fetch.php?media=docpublic:systemes:shibboleth:azuread-sso-shibboleth-idp-20180607-2.docx">Shibboleth IDP</a>
  * </li>
  * <li>This manipulation is configured in XB using CanonicalizationMethod:
- *    http://www.w3.org/2001/10/xml-exc-c14n#WithSkinnyPatches
+ *    <code>http://www.w3.org/2001/10/xml-exc-c14n#WithSkinnyPatches</code>
  * </li>
  * <li>Standards this is based on:
- *     https://www.w3.org/TR/2002/REC-xml-exc-c14n-20020718/
+ *     <a href="https://www.w3.org/TR/2002/REC-xml-exc-c14n-20020718/">XML Canonicalization</a>
  * </li>
  * </ul>
  * Limitations:
@@ -65,14 +68,14 @@ public class SkinnySamlUtil {
 	}
 
 	public static void prepareSAMLSignature(Signature signature, String c14nAlgo) {
-		if (SkinnySamlUtil.ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES.equals(c14nAlgo) && signature != null) {
+		if (ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES.equals(c14nAlgo) && signature != null) {
 			signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
 		}
 	}
 
 	public static void prepareSAMLObject(SignableXMLObject object, String c14nAlgo) {
-		if (SkinnySamlUtil.ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES.equals(c14nAlgo)) {
-			SkinnySamlUtil.patchDomForSkinnyMessages(object);
+		if (ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES.equals(c14nAlgo)) {
+			patchDomForSkinnyMessages(object);
 		}
 		// Drop the xsi:type="xs:string" required by opensaml as well ending up in AttributeValue being of type any instead
 		if (object instanceof Assertion assertion && c14nAlgo != null && c14nAlgo.contains(OpenSamlUtil.SKINNY_NO_TYPE)) {
@@ -135,18 +138,49 @@ public class SkinnySamlUtil {
 		}
 	}
 
-	private static void eliminateCertNewlines(Assertion assertion) {
-		var keyInfo = extractNodeWithChild(assertion.getSignature().getDOM(), "KeyInfo");
-		if (keyInfo != null) {
-			var x509data = extractNodeWithChild(keyInfo, "X509Data");
-			if (x509data != null) {
-				var x509Cert = extractNodeWithChild(x509data, "X509Certificate");
-				if (x509Cert != null) {
-					var cert = x509Cert.getFirstChild();
-					cert.setNodeValue(cert.getNodeValue().replace("\n", ""));
-				}
+	public static void eliminateCertWhitespace(Element element) {
+		var certList = element.getElementsByTagName("ds:X509Certificate");
+		var nodeListLength = certList.getLength();
+		for (var i = 0; i < nodeListLength; i++) {
+			if (certList.item(i).getNodeType() == Node.ELEMENT_NODE) {
+				eliminateCertWhitespace(certList.item(i));
 			}
 		}
+	}
+
+	private static void eliminateCertWhitespace(Node x509Cert) {
+		if (x509Cert != null) {
+			var cert = x509Cert.getFirstChild();
+			var cleaned = eliminateCertWhitespace(cert.getNodeValue());
+			cert.setNodeValue(cleaned);
+		}
+	}
+
+	public static void eliminateCertWhitespace(KeyInfo keyInfo) {
+		for (var x509Data : keyInfo.getX509Datas()) {
+			eliminateCertWhitespace(x509Data);
+		}
+	}
+
+	private static void eliminateCertWhitespace(X509Data x509Data) {
+		for (var x509Cert : x509Data.getX509Certificates()) {
+			eliminateCertWhitespace(x509Cert);
+		}
+	}
+
+	private static void eliminateCertWhitespace(X509Certificate x509Cert) {
+		if (x509Cert != null) {
+			var cert = x509Cert.getValue();
+			var cleaned = eliminateCertWhitespace(cert);
+			x509Cert.setValue(cleaned);
+		}
+	}
+
+	private static String eliminateCertWhitespace(String data) {
+		if (data == null) {
+			return null;
+		}
+		return data.replaceAll("\\s", "");
 	}
 
 	private static void eliminateInclusiveNamespace(Assertion assertion) {
@@ -198,23 +232,24 @@ public class SkinnySamlUtil {
 	}
 
 	static void patchDomForSkinnyMessages(SignableXMLObject object) {
-		if (object instanceof Assertion assertion) {
-			log.debug("Applying skinny assertion patches triggered by {}" , ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES);
-			discardTypeInfoOnAttributeValues(assertion);
-			eliminateCertNewlines(assertion);
-			eliminateInclusiveNamespace(assertion);
-			// prefixReplace="saml" transforms saml2 to saml, null eliminated the prefix
-			replaceSaml2Namespace(object.getDOM(), SAMLConstants.SAML20_NS, SAMLConstants.SAML20_PREFIX, null, true);
-			// KeyInfo also has some funny NS issue
-			eliminateKeyInfoPrefix(assertion);
-		}
-		else if (object instanceof Response response) {
-			replaceSaml2Namespace(response.getIssuer().getDOM(), SAMLConstants.SAML20_NS,
-					SAMLConstants.SAML20_PREFIX, null, false);
-			replaceSaml2Namespace(object.getDOM(), SAMLConstants.SAML20P_NS, SAMLConstants.SAML20P_PREFIX, SAML20P_PREFIX_SKINNY_STYLE, true);
-		}
-		else {
-			log.info("Skipping skinny Assertion patches on class={} triggered by {}",
+		switch (object) {
+			case Assertion assertion -> {
+				log.debug("Applying skinny assertion patches triggered by {}", ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES);
+				discardTypeInfoOnAttributeValues(assertion);
+				eliminateCertWhitespace(assertion.getSignature().getDOM());
+				eliminateInclusiveNamespace(assertion);
+				// prefixReplace="saml" transforms saml2 to saml, null eliminated the prefix
+				replaceSaml2Namespace(object.getDOM(), SAMLConstants.SAML20_NS, SAMLConstants.SAML20_PREFIX, null, true);
+				// KeyInfo also has some funny NS issue
+				eliminateKeyInfoPrefix(assertion);
+			}
+			case Response response -> {
+				replaceSaml2Namespace(response.getIssuer().getDOM(), SAMLConstants.SAML20_NS,
+						SAMLConstants.SAML20_PREFIX, null, false);
+				replaceSaml2Namespace(object.getDOM(), SAMLConstants.SAML20P_NS, SAMLConstants.SAML20P_PREFIX,
+						SAML20P_PREFIX_SKINNY_STYLE, true);
+			}
+			default -> log.info("Skipping skinny Assertion patches on class={} triggered by {}",
 					object.getClass().getName(), ALGO_ID_C14N_EXCL_WITH_SKINNY_PATCHES);
 		}
 	}

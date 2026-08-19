@@ -16,6 +16,9 @@
 package swiss.trustbroker.waf;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -27,10 +30,12 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.event.Level;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import swiss.trustbroker.common.config.RegexNameValue;
+import org.springframework.util.CollectionUtils;
+import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.util.ApiSupport;
@@ -46,11 +51,19 @@ public class AccessFilter implements Filter {
 
 	private final String allAllowedPathsRegex;
 
-	private final String internalAllowedPathsRegex;
-
 	private final Pattern allAllowedPaths;
 
+	private final String internalAllowedPathsRegex;
+
 	private final Pattern internalAllowedPaths;
+
+	private final String frontendApiPathsRegex;
+
+	private final Pattern frontendApiPaths;
+
+	private final String externalApiPathsRegex;
+
+	private final Pattern externalApiPaths;
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
@@ -60,6 +73,10 @@ public class AccessFilter implements Filter {
 		allAllowedPaths = Pattern.compile(allAllowedPathsRegex);
 		internalAllowedPathsRegex = getInternalAllowedPathsRegex();
 		internalAllowedPaths = Pattern.compile(internalAllowedPathsRegex);
+		frontendApiPathsRegex = getFrontendApiPathsRegex();
+		frontendApiPaths = Pattern.compile(frontendApiPathsRegex);
+		externalApiPathsRegex = getExternalApiPathsRegex();
+		externalApiPaths = Pattern.compile(externalApiPathsRegex);
 	}
 
 	// all request paths that are allowed by this filter
@@ -69,11 +86,6 @@ public class AccessFilter implements Filter {
 				.stream()
 				.map(Pattern::quote) // escape regex characters
 				.collect(Collectors.joining("|"));
-		var htmlPathRegex = trustBrokerProperties.getSkinnyHrdTriggers() == null ? "" :
-				trustBrokerProperties.getSkinnyHrdTriggers()
-						.stream()
-						.map(RegexNameValue::getValue)
-						.collect(Collectors.joining("|"));
 		return "^("
 				// SPA - see app-routing-module and AppController code
 				+ "/app|/app/.*"
@@ -86,7 +98,6 @@ public class AccessFilter implements Filter {
 				// assets referenced by UI (some of which are unfortunately in the context root)
 				+ "|/assets/.*|/js/.*|/[^/]*.(js|css|woff2?|ttf|eot|svg)"
 				+ "|/index.html"
-				+ "|" + htmlPathRegex
 				+ "|/favicon.ico"
 				+ "|/robots.txt"
 				// OIDC services (spring-authorization-server and Keycloak compatibility)
@@ -104,6 +115,26 @@ public class AccessFilter implements Filter {
 				+ ")$";
 	}
 
+	// APIs used by the frontend
+	private static String getFrontendApiPathsRegex() {
+		return "^("
+				+ "|" + ApiSupport.WEB_RESOURCE_PATH + "/.*"
+				+ "|" + ApiSupport.CONFIG_FRONTEND_API
+				+ "|" + ApiSupport.ACCESS_REQUEST_URL + "/.*"
+				+ "|" + ApiSupport.ANNOUNCEMENTS_URL + "/.*"
+				+ "|" + ApiSupport.HRD_URL + "/.*"
+				+ "|" + ApiSupport.SSO_URL + "/.*"
+				+ ")$";
+	}
+
+	// externally accessible APIs within the frontend API paths
+	private static String getExternalApiPathsRegex() {
+		return "^("
+				+ "|" + ApiSupport.ACCESS_REQUEST_TRIGGER_URL
+				+ "|" + ApiSupport.ACCESS_REQUEST_COMPLETE_URL + "/.*"
+				+ ")$";
+	}
+
 	@Override
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
@@ -113,30 +144,88 @@ public class AccessFilter implements Filter {
 
 		// firewall
 		if (internalAllowedPaths.matcher(path).matches()) {
-			if (WebSupport.isClientOnInternet(httpRequest, trustBrokerProperties.getNetwork())) {
-				blockAndLogRequest(httpRequest, httpResponse);
+			if (WebSupport.isClientOnIntranet(httpRequest, trustBrokerProperties.getNetwork())) {
+				processRequest(path, httpRequest, httpResponse, chain);
 			}
 			else {
-				chain.doFilter(request, response);
+				blockAndLogRequest(httpRequest, httpResponse, Level.DEBUG, "Internal path called from Internet");
 			}
 		}
 		else if (allAllowedPaths.matcher(path).matches()) {
-			chain.doFilter(request, response);
+			processRequest(path, httpRequest, httpResponse, chain);
 		}
 		else {
-			blockAndLogRequest(httpRequest, httpResponse);
+			blockAndLogRequest(httpRequest, httpResponse, Level.DEBUG, "Blocked path called");
 		}
 	}
 
-	private void blockAndLogRequest(HttpServletRequest httpRequest, HttpServletResponse httpResponse) throws IOException {
+	private void processRequest(String path, HttpServletRequest httpRequest, HttpServletResponse httpResponse, FilterChain chain)
+			throws IOException, ServletException {
+		if (frontendApiPaths.matcher(path).matches()
+				&& !externalApiPaths.matcher(path).matches()
+				&& !isRequestFromFrontend(httpRequest)) {
+			blockAndLogRequest(httpRequest, httpResponse, Level.WARN, "Internal frontend API called without frontend referer");
+		}
+		else {
+			if (validateAndBlockRequest(httpRequest, httpResponse,
+					trustBrokerProperties.getBlockedHeaderNames(), httpRequest::getHeader, "Header")) {
+				return;
+			}
+			if (validateAndBlockRequest(httpRequest, httpResponse,
+					trustBrokerProperties.getBlockedRequestParameterNames(), httpRequest::getParameter, "Parameter")) {
+				return;
+			}
+			chain.doFilter(httpRequest, httpResponse);
+		}
+	}
+
+	private boolean isRequestFromFrontend(HttpServletRequest httpRequest) {
+		var referer = WebUtil.getReferer(httpRequest);
+		return WebSupport.isOwnOrigin(trustBrokerProperties, WebUtil.getValidatedUri(referer));
+	}
+
+	private void blockAndLogRequest(HttpServletRequest httpRequest, HttpServletResponse httpResponse,
+			Level level, String reason) throws IOException {
 		// favicon.ico by browser to be handled silently, shall come from assets (see test)
-		var path = httpRequest.getRequestURI();
-		if (log.isDebugEnabled()) {
-			log.debug("Sending HTTP/404 NOT FOUND for path='{}' clientNetwork={} allowedAll='{}' allowedInternal='{}'",
-					path, WebSupport.getClientNetwork(httpRequest, trustBrokerProperties.getNetwork()),
-					allAllowedPathsRegex, internalAllowedPathsRegex);
+		if (log.isEnabledForLevel(level)) {
+			var path = httpRequest.getRequestURI();
+			log.atLevel(level).log("{} - sending HTTP/404 NOT FOUND for path='{}' clientNetwork={} referer={} userAgent='{}'"
+							+ " allowedAll='{}' allowedInternal='{}' frontendApis='{}' externalApis='{}'",
+					reason, path, WebSupport.getClientNetwork(httpRequest, trustBrokerProperties.getNetwork()),
+					StringUtil.clean(WebUtil.getReferer(httpRequest)), StringUtil.clean(WebSupport.getUserAgent(httpRequest)),
+					allAllowedPathsRegex, internalAllowedPathsRegex, frontendApiPathsRegex, externalApiPathsRegex);
 		}
 		httpResponse.sendError(HttpServletResponse.SC_NOT_FOUND);
 	}
 
+	// validate headers or parameters against a blocked list and send 404 if any are found
+	private boolean validateAndBlockRequest(HttpServletRequest httpRequest, HttpServletResponse httpResponse,
+			List<String> blockedNames, Function<String, String> getter, String type) throws IOException {
+		if (CollectionUtils.isEmpty(blockedNames)) {
+			return false;
+		}
+		var blockedValues = blockedNames.stream().map(name -> checkBlocked(name, getter)).filter(Objects::nonNull).toList();
+		if (blockedValues.isEmpty()) {
+			return false;
+		}
+		// block and log
+		if (log.isWarnEnabled()) {
+			var path = httpRequest.getRequestURI();
+			log.warn("Sending HTTP/404 NOT FOUND for path='{}' clientNetwork={} referer={} userAgent='{}' found blocked{}Values={}",
+					path, WebSupport.getClientNetwork(httpRequest, trustBrokerProperties.getNetwork()),
+					StringUtil.clean(WebUtil.getReferer(httpRequest)), StringUtil.clean(WebSupport.getUserAgent(httpRequest)),
+					type, blockedValues);
+		}
+		httpResponse.sendError(HttpServletResponse.SC_NOT_FOUND);
+		return true;
+	}
+
+	// returns a non-null string for logging if blocked
+	private static String checkBlocked(String name, Function<String, String> getter) {
+		var value = getter.apply(name);
+		if (value != null) {
+			return StringUtil.clean(name) + '=' + StringUtil.clean(value);
+		}
+		return null;
+	}
 }

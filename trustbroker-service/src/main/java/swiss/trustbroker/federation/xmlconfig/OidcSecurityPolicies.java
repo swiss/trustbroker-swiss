@@ -17,8 +17,6 @@ package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
 
-import com.nimbusds.jose.EncryptionMethod;
-import com.nimbusds.jose.JWEAlgorithm;
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
@@ -27,7 +25,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import swiss.trustbroker.common.util.WebUtil;
 
 /**
  * Security policy overrides for OIDC.
@@ -46,8 +43,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * Default: true
 	 */
 	@XmlAttribute(name = "requireProofKey")
-	@Builder.Default
-	private Boolean requireProofKey = Boolean.TRUE;
+	@Default(value = "true")
+	private Boolean requireProofKey;
 
 	/**
 	 * Require authorization consent (currently unsupported).
@@ -55,18 +52,19 @@ public class OidcSecurityPolicies implements Serializable {
 	 * Default: false
 	 */
 	@XmlAttribute(name = "requireAuthorizationConsent")
-	@Builder.Default
-	private Boolean requireAuthorizationConsent = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean requireAuthorizationConsent;
 
 	/**
 	 * Allow to enable Opaque AccessToken for Rp.
 	 * <br/>
 	 * Default: false
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "requireOpaqueAccessToken")
-	@Builder.Default
-	private Boolean requireOpaqueAccessToken = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean requireOpaqueAccessToken;
 
 	/**
 	 * Allow access_token in form body
@@ -76,62 +74,67 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "allowFormBearerToken")
-	@Builder.Default
-	private Boolean allowFormBearerToken = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean allowFormBearerToken;
 
 	/**
 	 * Allow to enable Encrypted IdToken JWT Singing for Rp.
 	 * <br/>
 	 * Default: false
+	 *
 	 * @since 1.11.0
 	 */
-
 	@XmlAttribute(name = "requireIdTokenEncryption")
-	@Builder.Default
-	private Boolean requireIdTokenEncryption = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean requireIdTokenEncryption;
 
 	/**
 	 * Allow to enable Opaque RefreshToken for Rp.
 	 * <br/>
 	 * Default: false
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "requireOpaqueRefreshToken")
-	@Builder.Default
-	private Boolean requireOpaqueRefreshToken = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean requireOpaqueRefreshToken;
 
 	/**
 	 * Allow to enable Encrypted UserInfo response
 	 * <br/>
 	 * Default: false
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "requireUserInfoResponseEncryption")
-	@Builder.Default
-	private Boolean requireUserInfoResponseEncryption = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean requireUserInfoResponseEncryption;
 
 	/**
 	 * Encryption algorithm
 	 * <br/>
-	 * Default: RSA_OAEP_256
+	 * Default: RSA-OAEP-256
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "encryptionAlgorithm")
-	@Builder.Default
-	private String encryptionAlgorithm = JWEAlgorithm.RSA_OAEP_256.getName();
+	@Default(value = "RSA-OAEP-256") // JWEAlgorithm.RSA_OAEP_256
+	private String encryptionAlgorithm;
 
 	/**
 	 * Encryption method
 	 * <br/>
 	 * Default: A256GCM
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "encryptionMethod")
-	@Builder.Default
-	private String encryptionMethod = EncryptionMethod.A256GCM.getName();
+	@Default(value = "A256GCM") // EncryptionMethod.A256GCM
+	private String encryptionMethod;
 
 	/**
 	 * Encryption keyID
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "encryptionKid")
@@ -173,17 +176,18 @@ public class OidcSecurityPolicies implements Serializable {
 	 * Default: 1
 	 */
 	@XmlAttribute(name = "sessionTimeToLiveMin")
-	@Builder.Default
-	private Integer sessionTimeToLiveMin = 1;
+	@Default(value = "1")
+	private Integer sessionTimeToLiveMin;
 
 	/**
 	 * Reuse refresh tokens.
 	 * <br/>
 	 * Default: false
+	 *
 	 */
 	@XmlAttribute(name = "reuseRefreshTokens")
-	@Builder.Default
-	private Boolean reuseRefreshTokens = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean reuseRefreshTokens;
 
 	/**
 	 * ID token signature algorithm (many adapters only support RS256)
@@ -199,8 +203,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * Default: Dynamic
 	 */
 	@XmlAttribute(name = "sessionCookieSameSite")
-	@Builder.Default
-	private String sessionCookieSameSite = WebUtil.COOKIE_SAME_SITE_DYNAMIC;
+	@Default(value = "Dynamic") // WebUtil.COOKIE_SAME_SITE_DYNAMIC
+	private String sessionCookieSameSite;
 
 	public Integer getAccessTokenTimeToLiveMin() {
 		if (accessTokenTimeToLiveMin != null) {
@@ -224,8 +228,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "allowPublicClientTokenExchange")
-	@Builder.Default
-	private Boolean allowPublicClientTokenExchange = Boolean.FALSE;
+	@Default(value = "false")
+	private Boolean allowPublicClientTokenExchange;
 
 	/**
 	 * Restrict Token Exchange subject_token age
@@ -235,8 +239,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "subjectTokenMaxAgeSec")
-	@Builder.Default
-	private Integer subjectTokenMaxAgeSec = 60;
+	@Default(value = "60")
+	private Integer subjectTokenMaxAgeSec;
 
 	/**
 	 * Maximum number a subject_token can be used
@@ -246,8 +250,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "subjectTokenMaxUseCount")
-	@Builder.Default
-	private Integer subjectTokenMaxUseCount = 1;
+	@Default(value = "1")
+	private Integer subjectTokenMaxUseCount;
 
 	/**
 	 * subject_token timestamp clock/transfer tolerance.
@@ -273,8 +277,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "clientAssertionMaxAgeSec")
-	@Builder.Default
-	private Integer clientAssertionMaxAgeSec = 60;
+	@Default(value = "60")
+	private Integer clientAssertionMaxAgeSec;
 
 	/**
 	 * Restrict client_assertion expiration maxLifeTime
@@ -284,8 +288,8 @@ public class OidcSecurityPolicies implements Serializable {
 	 * @since 1.14.0
 	 */
 	@XmlAttribute(name = "clientAssertionExpirationLifeTimeSec")
-	@Builder.Default
-	private Integer clientAssertionExpirationLifeTimeSec = 3600;
+	@Default(value = "3600")
+	private Integer clientAssertionExpirationLifeTimeSec;
 
 	/**
 	 * client_assertion timestamp clock/transfer tolerance.
@@ -302,5 +306,4 @@ public class OidcSecurityPolicies implements Serializable {
 	 */
 	@XmlAttribute(name = "clientAssertionNotBeforeToleranceSec")
 	private Integer clientAssertionNotBeforeToleranceSec;
-
 }

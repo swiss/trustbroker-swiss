@@ -196,10 +196,15 @@ public class ArtifactResolutionService {
 		return Optional.empty();
 	}
 
-	private static SignatureValidationParameters buildSignatureValidationParameters(
+	private SignatureValidationParameters buildSignatureValidationParameters(
 			boolean requireSignedArtifactResponse, ClaimsParty cp) {
 		return SignatureValidationParameters.of(
-				cp.requireSignedArtifactResponse(requireSignedArtifactResponse), cp.getCpTrustCredential());
+				cp.requireSignedArtifactResponse(requireSignedArtifactResponse), cp.getCpTrustCredential(),
+				getAllowedSignatureAlgorithms(cp), trustBrokerProperties.getSecurity().isEnforceArtifactSignatureAlgorithms());
+	}
+
+	private List<String> getAllowedSignatureAlgorithms(CounterParty cp) {
+		return cp.getAllowedSignatureAlgorithms(trustBrokerProperties.getSecurity().getAllowedSignatureAlgorithms());
 	}
 
 	private static Optional<SignatureParameters> buildSignatureParameters(
@@ -211,10 +216,11 @@ public class ArtifactResolutionService {
 		return Optional.empty();
 	}
 
-	private static SignatureValidationParameters buildSignatureValidationParameters(
+	private SignatureValidationParameters buildSignatureValidationParameters(
 			boolean requireSignedArtifactResponse, RelyingParty rp) {
 			return SignatureValidationParameters.of(
-					rp.requireSignedArtifactResponse(requireSignedArtifactResponse), rp.getRpTrustCredentials());
+					rp.requireSignedArtifactResponse(requireSignedArtifactResponse), rp.getRpTrustCredentials(),
+					getAllowedSignatureAlgorithms(rp), trustBrokerProperties.getSecurity().isEnforceArtifactSignatureAlgorithms());
 	}
 
 	public void resolveArtifact(HttpServletRequest request, HttpServletResponse response) {
@@ -269,15 +275,19 @@ public class ArtifactResolutionService {
 
 	private void validateArtifactResolve(ArtifactResolve artifactResolve, RelyingParty relyingParty, ClaimsParty claimsParty) {
 		List<Credential> trustCredentials = Collections.emptyList();
+		List<String> allowedSignatureAlgorithms = Collections.emptyList();
 		if (relyingParty != null) {
 			log.debug("ArtifactResolve issued by rpIssuerId={}", relyingParty.getId());
 			trustCredentials = relyingParty.getRpTrustCredentials();
+			allowedSignatureAlgorithms = getAllowedSignatureAlgorithms(relyingParty);
 		}
 		else if (claimsParty != null) {
 			log.debug("ArtifactResolve issued by cpIssuerId={}", claimsParty.getId());
 			trustCredentials = claimsParty.getCpTrustCredential();
+			allowedSignatureAlgorithms = getAllowedSignatureAlgorithms(claimsParty);
 		}
-		AssertionValidator.validateArtifactResolve(artifactResolve, trustBrokerProperties, trustCredentials);
+		AssertionValidator.validateArtifactResolve(artifactResolve, trustBrokerProperties,
+				trustCredentials, allowedSignatureAlgorithms);
 	}
 
 	private void signSamlObjects(String issuerId, RelyingParty relyingPartyByIssuerId, ClaimsParty claimsProviderByIssuerId,

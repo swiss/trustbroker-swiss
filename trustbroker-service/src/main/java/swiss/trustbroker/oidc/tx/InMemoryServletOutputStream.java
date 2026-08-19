@@ -23,7 +23,7 @@ import jakarta.servlet.WriteListener;
 
 public class InMemoryServletOutputStream extends ServletOutputStream {
 
-	private ByteArrayOutputStream output;
+	private final ByteArrayOutputStream output;
 
 	public InMemoryServletOutputStream() {
 		this.output = new ByteArrayOutputStream();

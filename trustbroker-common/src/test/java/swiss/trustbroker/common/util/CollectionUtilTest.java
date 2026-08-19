@@ -195,4 +195,19 @@ class CollectionUtilTest {
 		};
 	}
 
+	@ParameterizedTest
+	@MethodSource
+	void addToList(List<String> list, String valueToAdd, List<String> expected) {
+		assertThat(CollectionUtil.addToList(list, valueToAdd), is(expected));
+	}
+
+	static Object[][] addToList() {
+		return new Object[][] {
+				{ null, null, Collections.emptyList() },
+				{ List.of("one"), null, List.of("one") },
+				{ null, "one", List.of("one") },
+				{ List.of("one", "two"), "three", List.of("one", "two", "three") }
+		};
+	}
+
 }

@@ -36,14 +36,12 @@ import swiss.trustbroker.common.saml.dto.SignatureContext;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
-import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.homerealmdiscovery.util.OperationalUtil;
 import swiss.trustbroker.saml.dto.ResponseData;
 import swiss.trustbroker.saml.dto.RpRequest;
 import swiss.trustbroker.saml.util.SamlValidationUtil;
-import swiss.trustbroker.saml.util.SkinnyHrd;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sso.service.SsoService;
 import swiss.trustbroker.util.ApiSupport;
@@ -71,7 +69,7 @@ public class AuthenticationService {
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
-	private final RelyingPartyDefinitions relyingPartyDefinitions;
+	private final SkinnyHrdService skinnyHrdService;
 
 	@Transactional
 	public String handleSamlResponse(List<OutputService> outputServices, ResponseData<Response> responseData,
@@ -190,7 +188,7 @@ public class AuthenticationService {
 
 		// get HRD CP dispatching data to display HRD screen or forward to CP
 		if (rpRequest.hasSingleClaimsProvider()) {
-			var cpIssuerId = rpRequest.getClaimsProviders().get(0).getId();
+			var cpIssuerId = rpRequest.getClaimsProviders().getFirst().getId();
 			if (doSso) {
 				return handleSingleClaimsProviderSsoRedirect(authnRequest, httpRequest, referer, rpIssuer,
 						relyingParty, stateDataByAuthnReq, cpIssuerId);
@@ -199,26 +197,28 @@ public class AuthenticationService {
 					stateDataByAuthnReq, cpIssuerId);
 		}
 
-		if (useSkinnyUi != null) {
-			return redirectToSkinnyHRD(rpRequest, useSkinnyUi);
+		if (useSkinnyUi) {
+			renderSkinnyHrd(rpRequest, httpResponse);
+			return null;
 		}
 		// see angular routing on home/HRD handling
 		return apiSupport.getHrdUrl(rpIssuer, authnRequest.getID());
 	}
 
 	private boolean showAnnouncements(RelyingParty relyingParty, String providerName,
-									  String useSkinnyUi, boolean skipForMonitoring, Set<String> conditions) {
+									  boolean useSkinnyUi, boolean skipForMonitoring, Set<String> conditions) {
 		return announcementService.showAnnouncements(relyingParty.getAnnouncement(), providerName, conditions)
-				&& useSkinnyUi == null && !skipForMonitoring;
+				&& !useSkinnyUi && !skipForMonitoring;
 	}
 
 	private boolean doSso(HttpServletRequest request, String cpSelectionHint, RelyingParty relyingParty) {
-		if (relyingParty.isSsoEnabled() && cpSelectionHint != null && !HrdSupport.isHrdHintTest(request, trustBrokerProperties)) {
+		if (relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())
+				&& cpSelectionHint != null && !HrdSupport.isHrdHintTest(request, trustBrokerProperties)) {
 			log.debug("SSO requires HRD round-trip to get {} for rpIssuer={} cpIssuer={}",
 					WebSupport.HTTP_HEADER_DEVICE_ID, relyingParty.getId(), cpSelectionHint);
 			return true;
 		}
-		return cpSelectionHint == null && relyingParty.isSsoEnabled();
+		return cpSelectionHint == null && relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled());
 	}
 
 	private String skipHrdWithSsoSession(AuthnRequest authnRequest, HttpServletRequest httpRequest, String referer,
@@ -260,7 +260,7 @@ public class AuthenticationService {
 			RelyingParty relyingParty, String cpSelectionHint,
 			StateData stateDataByAuthnReq, String cpIssuerId) {
 		log.debug("Direct cpIssuerId='{}' selection for relyingParty='{}' with ssoEnabled={} hint='{}'",
-				cpIssuerId, relyingParty.getId(), relyingParty.isSsoEnabled(), cpSelectionHint);
+				cpIssuerId, relyingParty.getId(), relyingParty.isSsoEnabled(true), cpSelectionHint);
 		claimsProviderService.sendSamlToCpWithMandatoryIds(httpRequest, httpResponse, stateDataByAuthnReq,
 				cpIssuerId);
 		return null;
@@ -291,10 +291,9 @@ public class AuthenticationService {
 		return null;
 	}
 
-	private String redirectToSkinnyHRD(RpRequest rpRequest, String skinnyHtml) {
+	private void renderSkinnyHrd(RpRequest rpRequest, HttpServletResponse httpResponse) {
 		var uiObjects = rpRequest.getUiObjects();
-		var pageContent = SkinnyHrd.buildSkinnyHrdPage(uiObjects.getTiles(), skinnyHtml);
-		return apiSupport.getSkinnyHrd(pageContent, rpRequest.getRequestId(), skinnyHtml);
+		skinnyHrdService.renderSkinnyHrdPage(uiObjects.getTiles(), rpRequest.getRequestId(), httpResponse);
 	}
 
 }

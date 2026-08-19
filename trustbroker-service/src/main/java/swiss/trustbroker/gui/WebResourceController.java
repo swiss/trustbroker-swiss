@@ -25,7 +25,9 @@ import swiss.trustbroker.homerealmdiscovery.service.WebResourceProvider;
 import swiss.trustbroker.util.ApiSupport;
 
 /**
- * Controller for web resources consumed bz the GUI.
+ * Controller for web resources consumed by the GUI.
+ * <br/>
+ * Always enabled as it's required for the UIs.
  */
 @Controller
 @AllArgsConstructor

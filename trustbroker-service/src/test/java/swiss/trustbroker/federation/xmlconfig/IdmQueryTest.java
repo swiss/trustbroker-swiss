@@ -106,7 +106,7 @@ class IdmQueryTest {
 
 		var attributeSelectionImmutable = query.getAttributeSelection();
 		assertThat(attributeSelectionImmutable, hasSize(1));
-		assertThat(attributeSelectionImmutable.get(0).getName(), is(ATTRIBUTE_NAME));
+		assertThat(attributeSelectionImmutable.getFirst().getName(), is(ATTRIBUTE_NAME));
 		assertThrows(UnsupportedOperationException.class, () -> attributeSelectionImmutable.add(definition));
 	}
 }

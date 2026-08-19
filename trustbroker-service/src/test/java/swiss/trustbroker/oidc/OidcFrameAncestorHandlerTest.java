@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -51,14 +52,20 @@ class OidcFrameAncestorHandlerTest {
 
 	private OidcFrameAncestorHandler oidcFrameAncestorHandler;
 
+	private AutoCloseable mocks;
+
 	@BeforeEach
 	void setUp() {
-		MockitoAnnotations.openMocks(this);
+		mocks = MockitoAnnotations.openMocks(this);
 		properties = new TrustBrokerProperties();
 		request = new MockHttpServletRequest();
 		oidcFrameAncestorHandler = new OidcFrameAncestorHandler(request, definitions, properties);
 	}
 
+	@AfterEach
+	void tearDown() throws Exception {
+		mocks.close();
+	}
 
 	@Test
 	void supportedFrameAncestorsNoClient() {

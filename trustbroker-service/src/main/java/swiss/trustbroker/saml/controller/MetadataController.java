@@ -18,18 +18,19 @@ package swiss.trustbroker.saml.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 import swiss.trustbroker.federation.service.FederationMetadataService;
 import swiss.trustbroker.util.ApiSupport;
 
 /**
  * This is the controller for metadata related interaction.
  */
-@Controller
+@RestController
 @AllArgsConstructor
+@ConditionalOnExpression("${trustbroker.config.saml.enabled} or ${trustbroker.config.wstrust.enabled}")
 public class MetadataController {
 
 	private final FederationMetadataService federationMetadataService;
@@ -41,21 +42,18 @@ public class MetadataController {
 			ApiSupport.XTB_LOWER_CASE_ALTERNATE_METADATA_ENDPOINT,
 			ApiSupport.XTB_ALTERNATE_METADATA_ENDPOINT // camel-case deprecated but documented in old MS docs
 	}, produces = MediaType.APPLICATION_XML_VALUE)
-	@ResponseBody
 	public String handleFederationMetadata(HttpServletRequest request, HttpServletResponse response) {
 		return federationMetadataService.getFederationMetadata(true, true);
 	}
 
 	// RP side only
 	@GetMapping(path = { ApiSupport.SAML_METADATA_URL + "/sp" }, produces = MediaType.APPLICATION_XML_VALUE)
-	@ResponseBody
 	public String handleSpFederationMetadata(HttpServletRequest request, HttpServletResponse response) {
 		return federationMetadataService.getFederationMetadata(false, true);
 	}
 
 	// CP side only
 	@GetMapping(path = { ApiSupport.SAML_METADATA_URL + "/idp" }, produces = MediaType.APPLICATION_XML_VALUE)
-	@ResponseBody
 	public String handleIdpFederationMetadata(HttpServletRequest request, HttpServletResponse response) {
 		return federationMetadataService.getFederationMetadata(true, false);
 	}

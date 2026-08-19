@@ -58,10 +58,24 @@ public class ClaimsParty extends CounterParty {
 	/**
 	 * Issuer ID of the claims provider that need to match ClaimsProvider entries in ClaimsProviderDefinitions for HRD display
 	 * and have to be returned by CPs in SAML responses.
+	 * <br/>
+	 * Notes:
+	 * <ul>
+	 *   <li>CP IDs must be unique within the configuration of each environment
+	 *       (<code>trustbroker-inventories/environment</code>)</li>
+	 *   <li>CP IDs may overlap with RP IDs.</li>
+	 *   <li>For SAML this ID is also used by the actual CP.</li>
+	 *   <li>For OIDC this just an internal ID.</li>
+	 * </ul>
 	 */
 	@XmlAttribute(name = "id")
 	private String id;
 
+	/**
+	 * Flag to enable/disable this CP.
+	 * <br/>
+	 * Default is true.
+	 */
 	@XmlAttribute(name = "enabled")
 	@Builder.Default
 	private FeatureEnum enabled = FeatureEnum.TRUE;
@@ -123,7 +137,7 @@ public class ClaimsParty extends CounterParty {
 	private HomeName homeName;
 
 	/**
-	 * The Account Source consumed by the <code>IdmProvisioningService<code>
+	 * The Account Source consumed by the <code>IdmProvisioningService</code>
 	 * @since 1.12.0
 	 */
 	@XmlElement(name = "AccountSource")
@@ -317,6 +331,6 @@ public class ClaimsParty extends CounterParty {
 			throw new TechnicalException(String.format("Invalid ClaimsParty id=%s expected single OidcClient, but count=%s",
 					id, oidcClientCount));
 		}
-		return oidc.getClients().get(0);
+		return oidc.getClients().getFirst();
 	}
 }

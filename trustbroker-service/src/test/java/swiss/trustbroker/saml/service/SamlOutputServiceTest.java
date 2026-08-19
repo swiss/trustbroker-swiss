@@ -47,13 +47,17 @@ import swiss.trustbroker.test.saml.util.SamlTestBase;
 @SpringBootTest(classes = { SamlServiceTestConfiguration.class, SamlOutputService.class })
 class SamlOutputServiceTest extends ServiceSamlTestUtil {
 
-	private static final String RELAY_STATE = "state123";
+	private static final String RELAY_STATE = "urn:application:state?id=123&date=ok";
+
+	private static final String RELAY_STATE_URL_ENCODED = "urn%3Aapplication%3Astate%3Fid%3D123%26date%3Dok";
+
+	private static final String RELAY_STATE_HTML_ENCODED = "urn&#x3a;application&#x3a;state&#x3f;id&#x3d;123&amp;date&#x3d;ok";
 
 	private static final String ISSUER_ID = "selfId";
 
 	private static final String ENDPOINT = "https://localhost/service";
 
-	private static final String ENDPOINT_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;service";
+	private static final String ENDPOINT_HTML_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;service";
 
 	private static final DestinationType DESTINATION_ALIAS = DestinationType.RP;
 
@@ -185,7 +189,7 @@ class SamlOutputServiceTest extends ServiceSamlTestUtil {
 		assertThat(httpResponse.getStatus(), is(HttpStatus.FOUND.value()));
 		var location = httpResponse.getHeader(HttpHeaders.LOCATION);
 		assertThat(location, startsWith(ENDPOINT + '?' + messageType + '='));
-		assertThat(location, containsString('&' + SamlIoUtil.SAML_RELAY_STATE + '=' + RELAY_STATE));
+		assertThat(location, containsString('&' + SamlIoUtil.SAML_RELAY_STATE + '=' + RELAY_STATE_URL_ENCODED));
 		assertThat(location, containsString('&' + SamlIoUtil.SAML_REDIRECT_SIGNATURE + '='));
 		assertThat(location, containsString('&' + SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM + '='));
 	}
@@ -194,9 +198,10 @@ class SamlOutputServiceTest extends ServiceSamlTestUtil {
 	private static void validateResponse(MockHttpServletResponse httpResponse) throws Exception {
 		assertThat(httpResponse.getStatus(), is(HttpStatus.OK.value()));
 		var content = httpResponse.getContentAsString();
-		assertThat(content, containsString(" action=\"" + ENDPOINT_ENCODED + '"'));
+		assertThat(content, containsString(" action=\"" + ENDPOINT_HTML_ENCODED + '"'));
+		assertThat(content, containsString(" value=\"" + RELAY_STATE_HTML_ENCODED + '"'));
 		var encodedRelayState = SamlHttpTestBase.extractHtmlFormValue( content, SamlIoUtil.SAML_RELAY_STATE);
-		assertThat(encodedRelayState, is(RELAY_STATE));
+		assertThat(encodedRelayState, is(RELAY_STATE_HTML_ENCODED));
 	}
 
 }

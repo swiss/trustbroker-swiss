@@ -45,11 +45,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
@@ -58,6 +58,7 @@ import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.federation.xmlconfig.OidcSecurityPolicies;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.sessioncache.dto.Lifecycle;
 import swiss.trustbroker.sessioncache.dto.LifecycleState;
@@ -71,10 +72,10 @@ class OidcSessionSupportTest {
 
 	private static final String OIDC_CLIENT_ID = "client1";
 
-	@Mock
+	@MockitoBean
 	private RelyingPartyDefinitions relyingPartyDefinitions;
 
-	@Mock
+	@MockitoBean
 	private SsoService ssoService;
 
 	private NetworkConfig network;
@@ -240,7 +241,7 @@ class OidcSessionSupportTest {
 	@MethodSource
 	void testGetCookieSameSite(boolean withClient, String policySameSite, String redirectUri,
 			String logoutRedirectUri, String perimeterUrl, String propertySameSite, String secFetchMode, String expected) {
-		var client = withClient ? OidcClient.builder().id("id").build() : null;
+		var client = withClient ? OidcClient.builder().id("id").oidcSecurityPolicies(new OidcSecurityPolicies()).build() : null;
 		if (client != null) {
 			client.getOidcSecurityPolicies().setSessionCookieSameSite(policySameSite);
 		}
@@ -291,7 +292,7 @@ class OidcSessionSupportTest {
 		oidc.setSessionCookie(false);
 		properties.setOidc(oidc);
 		var clientId = "client-1";
-		var client = OidcClient.builder().id(clientId).build();
+		var client = OidcClient.builder().id(clientId).oidcSecurityPolicies(new OidcSecurityPolicies()).build();
 		var ttlMinutes = 10;
 		int ttlSecs = ttlMinutes * 60;
 		var httpOnly = true;
@@ -353,12 +354,12 @@ class OidcSessionSupportTest {
 		var session = new TomcatSession(null);
 		session.setStateData(StateData.builder().id("1").build());
 		request.setSession(session);
-		assertThat(OidcSessionSupport.isAcrValuesStepUpRequired(request, session, "TestClient"), is(false));
+		assertThat(OidcSessionSupport.isAcrValuesChangeRequired(request, session, "TestClient"), is(false));
 		request.setParameter("acr_values", "acr1 acr2");
 		OidcSessionSupport.rememberAcrValues(request);
-		assertThat(OidcSessionSupport.isAcrValuesStepUpRequired(request, session, "TestClient"), is(false));
+		assertThat(OidcSessionSupport.isAcrValuesChangeRequired(request, session, "TestClient"), is(false));
 		request.setParameter("acr_values", "acr3");
-		assertThat(OidcSessionSupport.isAcrValuesStepUpRequired(request, session, "TestClient"), is(true));
+		assertThat(OidcSessionSupport.isAcrValuesChangeRequired(request, session, "TestClient"), is(true));
 	}
 
 	@ParameterizedTest

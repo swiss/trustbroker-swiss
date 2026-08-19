@@ -57,7 +57,7 @@ import org.springframework.security.saml2.provider.service.web.RelyingPartyRegis
 import org.springframework.security.saml2.provider.service.web.RelyingPartyRegistrationPlaceholderResolvers.UriResolver;
 import org.springframework.security.saml2.provider.service.web.Saml2AuthenticationRequestRepository;
 import org.springframework.security.web.authentication.AuthenticationConverter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
@@ -85,13 +85,13 @@ public final class OpenSaml5AuthenticationTokenConverter implements Authenticati
 	// This matches the behaviour of the commons-codec decoder.
 	private static final Base64.Decoder BASE64 = Base64.getMimeDecoder();
 
-	private static final Base64Checker BASE_64_CHECKER = new Base64Checker();
+	private static final Base64Checker BASE64_CHECKER = new Base64Checker();
 
 	private final RelyingPartyRegistrationRepository registrations;
 
 	private RequestMatcher requestMatcher = new OrRequestMatcher(
-			new AntPathRequestMatcher("/login/saml2/sso/{registrationId}"),
-			new AntPathRequestMatcher("/login/saml2/sso"));
+			PathPatternRequestMatcher.pathPattern("/login/saml2/sso/{registrationId}"),
+			PathPatternRequestMatcher.pathPattern("/login/saml2/sso"));
 
 	private final ParserPool parserPool; // opensaml5: different package
 
@@ -238,7 +238,7 @@ public final class OpenSaml5AuthenticationTokenConverter implements Authenticati
 
 	private byte[] samlDecode(String base64EncodedPayload) {
 		try {
-			BASE_64_CHECKER.checkAcceptable(base64EncodedPayload);
+			BASE64_CHECKER.checkAcceptable(base64EncodedPayload);
 			return BASE64.decode(base64EncodedPayload);
 		}
 		catch (Exception ex) {

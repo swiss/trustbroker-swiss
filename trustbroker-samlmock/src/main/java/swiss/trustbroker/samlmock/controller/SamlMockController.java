@@ -182,8 +182,7 @@ public class SamlMockController {
 		try {
 			var entityDescriptor = metadataService.generateMetadata();
 			var domDescriptor = SamlUtil.marshallMessage(entityDescriptor);
-			SamlUtil.removeNewLinesFromCertificates(domDescriptor);
-			return SerializeSupport.prettyPrintXML(domDescriptor);
+			return SerializeSupport.nodeToString(domDescriptor);
 		}
 		catch (MessageEncodingException e) {
 			log.error("Could not generate metadata: {}", e.getMessage(), e);

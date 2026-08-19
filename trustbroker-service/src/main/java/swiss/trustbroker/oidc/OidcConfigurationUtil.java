@@ -175,9 +175,7 @@ public class OidcConfigurationUtil {
 
 	static ClientSettings getClientSettings(OidcSecurityPolicies oidcSecurityPolicies) {
 		var builder = ClientSettings.builder();
-		if (Boolean.TRUE.equals(oidcSecurityPolicies.getRequireProofKey())) {
-			builder.requireProofKey(true);
-		}
+		builder.requireProofKey(Boolean.TRUE.equals(oidcSecurityPolicies.getRequireProofKey()));
 		// unused
 		if (Boolean.TRUE.equals(oidcSecurityPolicies.getRequireAuthorizationConsent())) {
 			builder.requireAuthorizationConsent(true);
@@ -394,7 +392,7 @@ public class OidcConfigurationUtil {
 			// Single value: We discard the array and make it a value directly (OIDC supports that)
 			switch (multiValued) {
 				case ORIGINAL:
-					claimMap.put(oidcName, allValues.size() != 1 ? allValues : allValues.get(0));
+					claimMap.put(oidcName, allValues.size() != 1 ? allValues : allValues.getFirst());
 					break;
 				case LIST:
 					claimMap.put(oidcName, allValues);
@@ -419,7 +417,7 @@ public class OidcConfigurationUtil {
 
 	static Object getStringValueOfOidcClaim(List<Object> allValues) {
 		if (allValues.size() == 1) {
-			return allValues.get(0);
+			return allValues.getFirst();
 		}
 		if (allValues.size() > 1) {
 			return StringUtils.join(allValues, " ");
@@ -473,7 +471,7 @@ public class OidcConfigurationUtil {
 			if (values.size() > 1) {
 				log.warn("Cannot convert Claim={} with multiple values to String claim", name);
 			}
-			context.getClaims().claim(name, values.get(0));
+			context.getClaims().claim(name, values.getFirst());
 		}
 	}
 
@@ -526,10 +524,14 @@ public class OidcConfigurationUtil {
 	}
 
 	public static void addOptionalClaimToProviderConfiguration(OidcProviderConfiguration.Builder providerConfiguration,
-			String claimName, Object claimValue) {
-		if (claimValue != null) {
-			addClaimToProviderConfiguration(providerConfiguration, claimName, claimValue);
+	                                                           String claimName, Object claimValue) {
+		if (claimValue == null) {
+			return;
 		}
+		if (claimValue instanceof List<?> list && list.isEmpty()) {
+			return;
+		}
+		addClaimToProviderConfiguration(providerConfiguration, claimName, claimValue);
 	}
 
 	public static void addClaimToProviderConfiguration(OidcProviderConfiguration.Builder providerConfiguration,
@@ -587,18 +589,13 @@ public class OidcConfigurationUtil {
 		return false;
 	}
 
-	public static boolean canIssueIdToken(OidcClient oidcClient) {
+	public static boolean canIssueIdToken(OidcClient oidcClient, Set<String> authorizedScopes) {
 		var authorizationGrantTypes = oidcClient.getAuthorizationGrantTypes();
 		var scopes = oidcClient.getScopes();
-		if (authorizationGrantTypes == null || scopes == null) {
+		if (authorizationGrantTypes == null || scopes == null || authorizedScopes == null || authorizedScopes.isEmpty()) {
+			log.debug("Missing authorizationGrantTypes, scopes in configuration, or authorizedScopes={} for clientId={}", authorizedScopes, oidcClient.getId());
 			return false;
 		}
-		var types = authorizationGrantTypes.getGrantTypes();
-		for (var type : types) {
-			if (org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE.equals(type.getType()) && scopes.getScopeList().contains(OidcScopes.OPENID)) {
-				return true;
-			}
-		}
-		return false;
+		return scopes.getScopeList().contains(OidcScopes.OPENID) && authorizedScopes.contains(OidcScopes.OPENID);
 	}
 }

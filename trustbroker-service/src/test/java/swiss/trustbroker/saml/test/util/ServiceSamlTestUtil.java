@@ -25,7 +25,6 @@ import static swiss.trustbroker.config.TestConstants.TEST_SETUP_RP;
 import static swiss.trustbroker.config.TestConstants.TEST_SSO_GROUP_SETUP;
 
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +46,12 @@ import org.opensaml.xmlsec.signature.KeyInfo;
 import org.opensaml.xmlsec.signature.Signature;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.springframework.mock.web.MockHttpServletRequest;
+import swiss.trustbroker.api.idm.dto.IdmRequest;
+import swiss.trustbroker.api.idm.dto.IdmResult;
+import swiss.trustbroker.api.idm.service.IdmQueryService;
+import swiss.trustbroker.api.idm.service.IdmStatusPolicyCallback;
+import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
+import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
@@ -67,6 +72,26 @@ import swiss.trustbroker.test.saml.util.SamlHttpTestBase;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 
 public class ServiceSamlTestUtil implements SamlHttpTestBase {
+
+	public static class MockStore implements IdmQueryService {
+
+		@Override
+		public boolean getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+				IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback, Map<String, Object> state,
+				IdmResult result) {
+			return false;
+		}
+
+		@Override
+		public Integer getServiceDefaultOrder() {
+			return 0;
+		}
+
+		@Override
+		public String getStoreName() {
+			return "MockStore";
+		}
+	}
 
 	private static final String TEST_AUTHN_REQUEST = LATEST_DEFINITION_PATH + "RPToTBAuthnRequest.xml";
 
@@ -119,8 +144,9 @@ public class ServiceSamlTestUtil implements SamlHttpTestBase {
 		var definitionPath = getBaseRuleFilePath();
 		var properties = new TrustBrokerProperties();
 		properties.setGlobalProfilesPath(GLOBAL_PROFILES_PATH);
+		List<IdmQueryService> idmQueryServices = List.of(new MockStore());
 		RelyingPartySetupUtil.loadRelyingParty(relyingParties, definitionPath,
-				CACHE_DEFINITION_PATH, properties, Collections.emptyList(), null, claimsProviderSetup,
+				CACHE_DEFINITION_PATH, properties, idmQueryServices, null, claimsProviderSetup,
 				null, null);
 		var credential = SamlTestBase.dummyCredential(
 				SamlTestBase.TEST_TB_KEYSTORE_JKS,
@@ -165,7 +191,7 @@ public class ServiceSamlTestUtil implements SamlHttpTestBase {
 
 		Signature signature = OpenSamlUtil.buildSamlObject(Signature.class);
 		signature.setSigningCredential(SamlTestBase.dummyCredential(certFileName, password, alias));
-		signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
+		signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
 		signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
 		signature.setSchemaLocation("http://www.w3.org/2000/09/xmldsig#");
 		signature.setKeyInfo(createMockKeyInfo(SamlTestBase.dummyCredential(certFileName, password, alias)));

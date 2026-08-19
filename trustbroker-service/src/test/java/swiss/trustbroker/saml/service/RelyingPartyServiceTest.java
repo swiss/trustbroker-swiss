@@ -17,7 +17,6 @@ package swiss.trustbroker.saml.service;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -31,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalMatchers.or;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -43,7 +43,6 @@ import static org.mockito.Mockito.when;
 import java.io.UnsupportedEncodingException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -87,7 +86,7 @@ import swiss.trustbroker.api.accessrequest.service.AccessRequestService;
 import swiss.trustbroker.api.idm.dto.IdmProvisioningRequest;
 import swiss.trustbroker.api.idm.dto.IdmProvisioningResult;
 import swiss.trustbroker.api.idm.dto.IdmProvisioningStatus;
-import swiss.trustbroker.api.idm.dto.IdmRequests;
+import swiss.trustbroker.api.idm.dto.IdmRequest;
 import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.idm.service.IdmProvisioningService;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
@@ -99,6 +98,7 @@ import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.audit.service.AuditService;
+import swiss.trustbroker.common.config.ExternalStores;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
@@ -117,6 +117,7 @@ import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
+import swiss.trustbroker.config.dto.SsoConfig;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
 import swiss.trustbroker.federation.xmlconfig.AccessRequest;
 import swiss.trustbroker.federation.xmlconfig.ArtifactBinding;
@@ -129,6 +130,7 @@ import swiss.trustbroker.federation.xmlconfig.Encryption;
 import swiss.trustbroker.federation.xmlconfig.Flow;
 import swiss.trustbroker.federation.xmlconfig.HomeName;
 import swiss.trustbroker.federation.xmlconfig.IdmLookup;
+import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.ProvisioningMode;
 import swiss.trustbroker.federation.xmlconfig.Qoa;
@@ -199,7 +201,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 
 	private static final String PERIMETER_URL = "http://test.trustbroker.swiss";
 
-	private static final String IDENTITY_QUERY = "IDENTITY";
+	private static final String LDAP_QUERY = "LDAP";
 
 	private static final String HINT_PARAMETER = "select_cp";
 
@@ -280,6 +282,9 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 	void setupMocks() {
 		doReturn(CustomQoa.UNDEFINED_QOA).when(qoaService).getUnspecifiedAuthLevel();
 		doReturn(new SamlProperties()).when(trustBrokerProperties).getSaml();
+		var sso = new SsoConfig();
+		sso.setEnabled(true);
+		doReturn(sso).when(trustBrokerProperties).getSso();
 	}
 
 	@ParameterizedTest
@@ -349,11 +354,11 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var attributeAuthLevel = cpResponse.getProperty(CoreAttributeName.AUTH_LEVEL.getNamespaceUri());
 		var attributeSsoSessionId = cpResponse.getProperty(CoreAttributeName.SSO_SESSION_ID.getNamespaceUri());
 
-		assertEquals(attributeHomeName, homeName);
-		assertEquals(attributeHomeRealm, issuer);
-		assertEquals(attributeClientExtId, clientExtId);
-		assertEquals(attributeAuthLevel, authnValue);
-		assertEquals(attributeSsoSessionId, ssoSessionIdValue);
+		assertThat(attributeHomeName, is(homeName));
+		assertThat(attributeHomeRealm, is(issuer));
+		assertThat(attributeClientExtId, is(clientExtId));
+		assertThat(attributeAuthLevel, is(authnValue));
+		assertThat(attributeSsoSessionId, is(ssoSessionIdValue));
 	}
 
 	@Test
@@ -396,6 +401,9 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var relyingParty = RelyingParty
 				.builder()
 				.id(rpIssuer)
+				.idmLookup(IdmLookup.builder().queries(List.of(
+						IdmQuery.builder().name(ExternalStores.LDAP.name()).store(ExternalStores.LDAP.name()).build()))
+									.build())
 				.accessRequest(AccessRequest.builder().authorizedApplications(AuthorizedApplications.builder().build()).build())
 				.build();
 		var idmLookup = IdmLookup.builder().build();
@@ -406,6 +414,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var httpData = AccessRequestHttpData.of(request);
 		doReturn(relyingParty).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(rpIssuer, null);
 		mockClaimsParty();
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
 
 		var idmRefreshCallback = ArgumentCaptor.forClass(Runnable.class);
 		doReturn(AccessRequestResult.of(false,  url))
@@ -421,13 +430,13 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		// initial refresh and refresh after AR
 		var relyingPartyConfig = ArgumentCaptor.forClass(RelyingPartyConfig.class);
 		var cpResponseData = ArgumentCaptor.forClass(CpResponseData.class);
-		var queryData = ArgumentCaptor.forClass(IdmRequests.class);
+		var queryData = ArgumentCaptor.forClass(IdmRequest.class);
 		var callback = ArgumentCaptor.forClass(IdmStatusPolicyCallback.class);
 		verify(idmQueryService, times(1)).getAttributesAudited(relyingPartyConfig.capture(),
-				cpResponseData.capture(), queryData.capture(), callback.capture());
+				cpResponseData.capture(), queryData.capture(), callback.capture(), anyMap(), any());
 		assertThat(relyingPartyConfig.getValue().getId(), is(rpIssuer));
 		assertThat(cpResponseData.getValue().getIssuerId(), is(cpResponse.getIssuer()));
-		assertThat(queryData.getValue().getQueryList(), hasSize(idmLookup.getQueries().size()));
+		assertThat(queryData.getValue(), is(relyingParty.getIdmLookup().getQueries().getFirst()));
 		assertThat(callback.getValue(), instanceOf(DefaultIdmStatusPolicyCallback.class));
 		if (fallback) {
 			verify(stateCacheService).save(stateData, RelyingPartyService.class.getSimpleName());
@@ -480,7 +489,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var claimsParty = ClaimsParty.builder().id(CP_ISSUER_ID).build();
 		when(trustBrokerProperties.getHrdHintTestParameter()).thenReturn(HINT_PARAMETER);
 		request.addHeader(HINT_PARAMETER, "anycp");
-		var network = new NetworkConfig();
+		var network = givenNetworkConfig();
 		when(trustBrokerProperties.getNetwork()).thenReturn(network);
 		request.addHeader(network.getNetworkHeader(),
 				intranet ? network.getIntranetNetworkName() : network.getInternetNetworkName());
@@ -541,7 +550,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 
 		relyingPartyService.addAssertionToResponse(authnResponse, assertion, relyingParty);
 		assertNotNull(authnResponse.getAssertions());
-		assertNotNull(authnResponse.getAssertions().get(0));
+		assertNotNull(authnResponse.getAssertions().getFirst());
 		assertEquals(1, authnResponse.getAssertions().size());
 	}
 
@@ -633,15 +642,14 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		stateData.setCpResponse(cpResponse);
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
-		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		mockSecurityChecks();
 		mockClaimsParty();
 		var arResult = AccessRequestResult.of(false, null);
 		var httpData = AccessRequestHttpData.of(mockHttpRequest);
 		doReturn(arResult)
 				.when(accessRequestService).performAccessRequestIfRequired(eq(httpData), eq(relyingParty), eq(stateData), any());
-
-		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
+		var mockProfileSelectionService = mockProfileSelectionService();
 		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doInitialProfileSelection(
 				ProfileSelectionData.builder().exchangeId(RELAY_STATE).oidcClientId(CLIENT_ID).ignoreEmptyProfiles(true).build(),
 				relyingParty, cpResponse, stateData);
@@ -725,7 +733,6 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		relyingParty.setSso(Sso.builder().enabled(ssoEnabled).forceIdmRefresh(forceIdmFetch).build());
 		givenMockedOidcProperties(PERIMETER_URL);
 		mockSecurityChecks();
-		var mockProfileSelectionService = mock(ProfileSelectionService.class);
 		var stateData = givenState(RP_ISSUER_ID);
 		stateData.getSpStateData().setRelayState(RELAY_STATE);
 		stateData.getSpStateData().setOidcClientId(CLIENT_ID);
@@ -742,12 +749,13 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 				.oidcClientId(CLIENT_ID)
 				.exchangeId(RELAY_STATE)
 				.build();
-		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
+		var mockProfileSelectionService = mockProfileSelectionService();
 		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doSsoProfileSelection(
 				profileSelectionData, relyingParty, cpResponse, stateData);
 		var mockHttpRequest = new MockHttpServletRequest();
 		var mockHttpResponse = new MockHttpServletResponse();
 		mockClaimsParty();
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
 		var result = relyingPartyService.sendAuthnResponseToRpFromState(outputServices, mockHttpRequest, mockHttpResponse,
 				ssoStateData, stateData);
 		assertThat(result, is(nullValue()));
@@ -756,14 +764,14 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		if (expectIdmRefresh) {
 			var relyingPartyConfig = ArgumentCaptor.forClass(RelyingPartyConfig.class);
 			var cpResponseData = ArgumentCaptor.forClass(CpResponseData.class);
-			var queryData = ArgumentCaptor.forClass(IdmRequests.class);
+			var queryData = ArgumentCaptor.forClass(IdmRequest.class);
 			var callback = ArgumentCaptor.forClass(IdmStatusPolicyCallback.class);
+			// 3 queries from CP are overwritten by 1 LDAP from RP
 			verify(idmQueryService, times(1)).getAttributes(relyingPartyConfig.capture(),
-					cpResponseData.capture(), queryData.capture(), callback.capture());
+					cpResponseData.capture(), queryData.capture(), callback.capture(), anyMap(), any());
 			assertThat(relyingPartyConfig.getValue().getId(), is(RP_ISSUER_ID));
 			assertThat(cpResponseData.getValue().getIssuerId(), is(CP_ISSUER_ID));
-			assertThat(queryData.getValue().getQueryList(), hasSize(3));
-			assertThat(queryData.getValue().getQueryList().get(0).getName(), is(IDENTITY_QUERY));
+			assertThat(queryData.getValue().getName(), is(LDAP_QUERY));
 			assertThat(callback.getValue(), instanceOf(DefaultIdmStatusPolicyCallback.class));
 		}
 		else {
@@ -779,7 +787,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var relyingParty = givenMockedRelyingParty(useArtifactBinding);
 		givenMockedOidcProperties(PERIMETER_URL);
 		mockSecurityChecks();
-		var mockProfileSelectionService = mock(ProfileSelectionService.class);
+		var mockProfileSelectionService = mockProfileSelectionService();
 		var stateData = givenState(RP_ISSUER_ID);
 		stateData.getSpStateData().setOidcClientId(CLIENT_ID);
 		doReturn(stateData).when(stateCacheService).find(RELAY_STATE, RelyingPartyService.class.getSimpleName());
@@ -790,12 +798,18 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var mockHttpResponse = new MockHttpServletResponse();
 		var arResult = AccessRequestResult.of(false, null);
 		var httpData = AccessRequestHttpData.of(mockHttpRequest);
-		when(profileSelectionServiceFactory.getService(any())).thenReturn(mockProfileSelectionService);
 		doReturn(arResult)
 				.when(accessRequestService).performAccessRequestIfRequired(eq(httpData), eq(relyingParty), eq(stateData), any());
 		doReturn(ProfileSelectionResult.empty()).when(mockProfileSelectionService).doInitialProfileSelection(
 				ProfileSelectionData.builder().exchangeId(RELAY_STATE).oidcClientId(CLIENT_ID).ignoreEmptyProfiles(true).build(),
 				relyingParty, cpResponse, stateData);
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
+		var idmResult = IdmResult.builder()
+								 .additionalData(cpResponse.getAdditionalIdmData())
+								 .queriedStores(cpResponse.getQueriedStores())
+								 .build();
+		doAnswer(invocation -> updateIdmResult(invocation.getArgument(5), idmResult))
+				.when(idmQueryService).getAttributesAudited(any(), any(), any(), any(), any(), any());
 
 		var result = relyingPartyService.sendResponseWithSamlResponseFromCp(outputServices, responseData, cpResponse,
 				mockHttpRequest, mockHttpResponse);
@@ -804,8 +818,15 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		validateResponse(useArtifactBinding, StatusCode.SUCCESS, mockHttpResponse);
 	}
 
+	private ProfileSelectionService mockProfileSelectionService() {
+		var mockProfileSelectionService = mock(ProfileSelectionService.class);
+		when(profileSelectionServiceFactory.getProfileSelectionService(any(IdmLookup.class)))
+				.thenReturn(mockProfileSelectionService);
+		return mockProfileSelectionService;
+	}
+
 	private void mockProvisioning(ClaimsParty claimsParty, CpResponse cpResponse) {
-		var name = claimsParty.getAttributesSelection().getDefinitions().get(0);
+		var name = claimsParty.getAttributesSelection().getDefinitions().getFirst();
 		assertTrue(name.isProvisioningAttribute());
 		var email = claimsParty.getAttributesSelection().getDefinitions().get(1);
 		assertTrue(email.isProvisioningAttribute());
@@ -818,6 +839,8 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		cpResponse.setOriginalAttributes(originalAttributes);
 		Map<Object, Object> additionalAttributes = Map.of("Key1", 100);
 		cpResponse.setAdditionalIdmData(additionalAttributes);
+		var queriedStores = Set.of(ExternalStores.LDAP.name());
+		cpResponse.setQueriedStores(queriedStores);
 		var provRequest = IdmProvisioningRequest.builder()
 												.identifyingClaim(provisionedAttributes.get(1)) // from CP AttributeSelection
 												.homeName(HOME_NAME)
@@ -828,7 +851,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 												.cpAuthenticationQoa(qoa)
 												.modes(Collections.emptyList())
 												.additionalData(additionalAttributes)
-												.queriedStores(Collections.emptySet())
+												.queriedStores(queriedStores)
 												.build();
 		var provResult = IdmProvisioningResult.builder().status(IdmProvisioningStatus.CREATED).build();
 		doReturn(qoa).when(qoaService).getMaxQoaOrder(cpResponse.getContextClasses(), claimsParty.getQoaConfig());
@@ -843,7 +866,9 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var idmResult = IdmResult.builder().userDetails(
 				Map.of(Definition.ofName(CoreAttributeName.FIRST_NAME),
 				List.of(value))).build();
-		doReturn(Optional.of(idmResult)).when(idmQueryService).getAttributesAudited(any(), any(), any(), any());
+		doAnswer(invocation -> updateIdmResult(invocation.getArgument(5), idmResult))
+				.when(idmQueryService).getAttributesAudited(any(), any(), any(), any(), any(), any());
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
 		mockClaimsParty();
 		relyingPartyService.reloadIdmData(relyingParty, stateData);
 
@@ -1024,7 +1049,12 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(CP_ISSUER_ID, "");
 		doReturn(relyingParty).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_ISSUER_ID, null);
 		doReturn(new OidcProperties()).when(trustBrokerProperties).getOidc();
-		doReturn(givenIdmResult()).when(idmQueryService).getAttributesAudited(any(), any(), any(), any());
+		var result = givenIdmResult();
+		doAnswer(invocation -> updateIdmResult(invocation.getArgument(5), result))
+				.when(idmQueryService).getAttributesAudited(any(), any(), any(), any(), any(), any());
+		doAnswer(invocation -> updateIdmResult(invocation.getArgument(5), result))
+				.when(idmQueryService).getAttributesAudited(any(), any(), any(), any(), any(), any());
+		doReturn(ExternalStores.LDAP.name()).when(idmQueryService).getStoreName();
 		doReturn(List.of("mappedOidcAttribute")).when(claimsMapperService).applyMappers(any(), any(), any());
 		doReturn(Optional.of(claimsParty)).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any());
 		var tokenClaims = givenOidcClaims();
@@ -1038,11 +1068,22 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		assertEquals("mappedOidcAttribute", resultUserData.get("locality"));
 	}
 
-	private Optional<IdmResult> givenIdmResult() {
+	private boolean updateIdmResult(IdmResult input, IdmResult result) {
+		assertThat(input, is(not(nullValue())));
+		input.addOriginalPropertiesCount(result.getOriginalPropertiesCount());
+		input.addOriginalUserDetailsCount(result.getOriginalUserDetailsCount());
+		input.getAdditionalData().putAll(result.getAdditionalData());
+		input.getProperties().putAll(result.getProperties());
+		input.getUserDetails().putAll(result.getUserDetails());
+		input.getQueriedStores().addAll(result.getQueriedStores());
+		return true;
+	}
+
+	private IdmResult givenIdmResult() {
 		var result = IdmResult.builder()
 							  .build();
 		result.getUserDetails().putAll(givenUserDetails());
-		return Optional.of(result);
+		return result;
 	}
 
 	private static Map<Definition, List<String>> givenUserDetails() {
@@ -1057,8 +1098,8 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 								 .namespaceUri(CoreAttributeName.LOCALITY.getNamespaceUri())
 								 .source("IDM:IDENTITY")
 								 .build();
-		userDetails.put(email, new ArrayList<>(Arrays.asList("user@trustbroker.swiss")));
-		userDetails.put(locality, new ArrayList<>(Arrays.asList("locality")));
+		userDetails.put(email, new ArrayList<>(List.of("user@trustbroker.swiss")));
+		userDetails.put(locality, new ArrayList<>(List.of("locality")));
 
 		return userDetails;
 	}
@@ -1128,12 +1169,12 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		assertEquals(0, authnResponse.getAssertions().size());
 		List<EncryptedAssertion> encryptedAssertions = authnResponse.getEncryptedAssertions();
 		assertNotNull(encryptedAssertions);
-		assertNotNull(encryptedAssertions.get(0));
+		assertNotNull(encryptedAssertions.getFirst());
 		assertEquals(1, encryptedAssertions.size());
-		assertNotNull(encryptedAssertions.get(0).getEncryptedData().getEncryptionMethod());
-		assertEquals(dataEncryAlg, encryptedAssertions.get(0).getEncryptedData().getEncryptionMethod().getAlgorithm());
-		assertNotNull(encryptedAssertions.get(0).getEncryptedKeys().get(0).getEncryptionMethod());
-		assertEquals(keyEncryAlg, encryptedAssertions.get(0).getEncryptedKeys().get(0).getEncryptionMethod().getAlgorithm());
+		assertNotNull(encryptedAssertions.getFirst().getEncryptedData().getEncryptionMethod());
+		assertEquals(dataEncryAlg, encryptedAssertions.getFirst().getEncryptedData().getEncryptionMethod().getAlgorithm());
+		assertNotNull(encryptedAssertions.getFirst().getEncryptedKeys().getFirst().getEncryptionMethod());
+		assertEquals(keyEncryAlg, encryptedAssertions.getFirst().getEncryptedKeys().getFirst().getEncryptionMethod().getAlgorithm());
 	}
 
 	private RelyingParty givenRelyingPartyWithEncryption(String dataEncryAlg, String keyEncryAlg) {
@@ -1161,8 +1202,16 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 																			   .definitions(List.of(Definition.ofName(CoreAttributeName.FIRST_NAME)))
 																			   .build())
 									   .claimsSelection(AttributesSelection.builder()
-																			   .definitions(List.of(localityDef))
-																			   .build())
+																		   .definitions(List.of(localityDef))
+																		   .build())
+									   .idmLookup(IdmLookup.builder().queries(
+																   List.of(IdmQuery.builder()
+																				   .store(ExternalStores.LDAP.name())
+																				   .name(ExternalStores.LDAP.name())
+																				   .sortByName(false)
+																				   .build()))
+														   .store("test")
+														   .build())
 									   .build();
 		if (useArtifactBinding) {
 			relyingParty.setSaml(Saml.builder()
@@ -1361,4 +1410,10 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 				.build();
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

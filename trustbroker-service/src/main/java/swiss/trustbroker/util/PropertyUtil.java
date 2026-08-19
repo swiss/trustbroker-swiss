@@ -26,6 +26,9 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.StringUtils;
 import swiss.trustbroker.common.exception.TechnicalException;
@@ -33,10 +36,9 @@ import swiss.trustbroker.common.exception.TechnicalException;
 /**
  * Java bean property utilities.
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class PropertyUtil {
-
-	private PropertyUtil() {
-	}
 
 	/**
 	 * Copy all attributes from base to target if set in base, but not in target.
@@ -113,6 +115,8 @@ public class PropertyUtil {
 		if (!copyCondition.test(targetValue)) {
 			return false;
 		}
+		log.trace("Overwriting targetValue={} with baseValue={} on class={}",
+				targetValue, baseValue, target.getClass().getName());
 		setter.accept(target, baseValue);
 		return true;
 	}
@@ -143,8 +147,8 @@ public class PropertyUtil {
 	}
 
 	@SuppressWarnings("java:S4276") // cannot use Predicate for nullable Boolean
-	public static <C, T> T evaluatePropery(C instance,
-			Function<C, T> policy, Supplier<T> defaultValue) {
+	public static <C, T> T evaluateProperty(C instance,
+											Function<C, T> policy, Supplier<T> defaultValue) {
 		// default is required (hence a Boolean, to make sure a false value is not from initialization
 		if (instance == null) {
 			return defaultValue.get();
@@ -158,7 +162,7 @@ public class PropertyUtil {
 
 	public static <C, T extends Number> T evaluatePositiveNumberProperty(C instance,
 			Function<C, T> policy, Supplier<T>  defaultValue) {
-		var result = evaluatePropery(instance, policy, defaultValue);
+		var result = evaluateProperty(instance, policy, defaultValue);
 		if (result != null && result.longValue() > 0l) {
 			return result;
 		}

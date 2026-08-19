@@ -46,6 +46,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 import swiss.trustbroker.common.dto.CookieParameters;
+import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.Base64Util;
 import swiss.trustbroker.common.tracing.OpTraceUtil;
 
@@ -66,6 +67,8 @@ public class WebUtil {
 	public static final String HTTP_REMOTE_USER = "X-Remote-User";
 
 	public static final String MEDIA_TYPE_SOAP_12 = "application/soap+xml";
+
+	public static final String HTTP_BASIC = "Basic";
 
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Mode
 	public static final String HTTP_HEADER_SEC_FETCH_MODE = "Sec-Fetch-Mode";
@@ -340,12 +343,20 @@ public class WebUtil {
 			return Pair.of(url, Collections.emptyList());
 		}
 		var builder = UriComponentsBuilder.fromUri(uri);
-		var params = builder.build().getQueryParams();
+		var built = builder.build();
+		var params = built.getQueryParams();
 		List<Pair<String, String>> queryParams = htmlEncodeQueryParameters(htmlEncodeParameters, params);
-		builder.query(null);
-		var baseUrl = builder.build().toUriString();
+		var baseUrl = removeQueryParameters(url);
 		log.debug("Extracted queryParameters={} from url={} baseUrl={}", queryParams, url, baseUrl);
 		return Pair.of(baseUrl, queryParams);
+	}
+
+	public static String removeQueryParameters(String url) {
+		if (url == null) {
+			return null;
+		}
+		var query = url.indexOf('?');
+		return query < 0 ? url : url.substring(0, query);
 	}
 
 	private static List<Pair<String, String>> htmlEncodeQueryParameters(boolean htmlEncodeParameters,
@@ -608,10 +619,10 @@ public class WebUtil {
 	/**
 	 * "etag" must contain leading and trailing quotes
 	 *
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag">ETag</a>
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control">Cache-Control</a>
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Expires">Expires</a>
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Pragma">Pragma</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag">ETag</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control">Cache-Control</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Expires">Expires</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Pragma">Pragma</a>
 	 */
 	public static void addCacheHeaders(HttpServletResponse response, int maxAgeSecs, String etag, Instant lastModified,
 			Instant now) {
@@ -637,8 +648,8 @@ public class WebUtil {
 	 * Returns true if the resource has not been modified based on the browser headers If-None-Match/If-Modified-Since.
 	 * "etag" must contain leading and trailing quotes
 	 *
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match">If-None-Match</a>
-	 * @see <a hef="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Modified-Since">If-Modified-Since</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match">If-None-Match</a>
+	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Modified-Since">If-Modified-Since</a>
 	 */
 	public static boolean isCached(String etag, String ifNoneMatch, Instant cacheTime, String ifModifiedSince) {
 		if (etag != null && ifNoneMatch != null && ifNoneMatch.contains(etag)) {
@@ -688,12 +699,17 @@ public class WebUtil {
 		return isOriginOrRefererInSets(allowedUrlSets, referer, validReferer);
 	}
 
-	// related OIDC specs:
-	// https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication
-	// https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1
+	// related spec:
+	// https://www.rfc-editor.org/info/rfc2617/
 	public static String getBasicAuthorizationHeader(String clientId, String clientSecret) {
-		return OidcUtil.HTTP_BASIC + ' ' + Base64Util.encode(
-				urlEncodeValue(clientId) + ':' + urlEncodeValue(clientSecret),
+		if (clientId == null || clientId.indexOf(':') >= 0) {
+			throw new TechnicalException(String.format("Invalid clientId='%s' for BasicAuth", clientId));
+		}
+		if (clientSecret == null) {
+			throw new TechnicalException("Missing clientSecret=null for BasicAuth");
+		}
+		return HTTP_BASIC + ' ' + Base64Util.encode(
+				clientId + ':' + clientSecret,
 				Base64Util.Base64Encoding.UNCHUNKED);
 	}
 

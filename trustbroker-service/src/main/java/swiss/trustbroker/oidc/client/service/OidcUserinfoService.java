@@ -25,6 +25,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import io.micrometer.core.annotation.Timed;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.core5.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -69,11 +70,12 @@ class OidcUserinfoService {
 			}
 			var httpResponse = response.get();
 			var contentType = httpResponse.headers().firstValue(HttpHeaders.CONTENT_TYPE);
-			log.info("HTTP GET to userinfoEndpoint={} returned contentType={}",
-					userinfoEndpoint, contentType.orElse(null));
-			if (contentType.isEmpty()) {
-				throw new TechnicalException(String.format("oidcClientId=%s GET to userinfoEndpoint=%s returned no %s header",
-						client.getId(), userinfoEndpoint, HttpHeaders.CONTENT_TYPE));
+			log.info("HTTP GET to userinfoEndpoint={} returned statusCode={} contentType={}",
+					userinfoEndpoint, httpResponse.statusCode(), contentType.orElse(null));
+			if (httpResponse.statusCode() != HttpStatus.SC_OK || contentType.isEmpty()) {
+				throw new TechnicalException(
+						String.format("oidcClientId=%s GET to userinfoEndpoint=%s returned statusCode=%d or no %s header",
+						client.getId(), userinfoEndpoint,  httpResponse.statusCode(), HttpHeaders.CONTENT_TYPE));
 			}
 			var mimeType = MimeType.valueOf(contentType.get());
 			if (mimeType.equalsTypeAndSubtype(MediaType.APPLICATION_JSON)) {

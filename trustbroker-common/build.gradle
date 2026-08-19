@@ -16,6 +16,7 @@ dependencies {
 	// OIDC (compile-time constant references only so far)
 	compileOnly 'org.springframework.security:spring-security-oauth2-core'
 	implementation 'org.springframework.security:spring-security-oauth2-jose'
+	implementation 'tools.jackson.core:jackson-databind'
 
 	// optional optrace component
 	compileOnly 'org.aspectj:aspectjweaver'
@@ -50,4 +51,16 @@ dependencies {
 
 	// monitoring
 	implementation 'io.micrometer:micrometer-registry-prometheus'
+}
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
 }

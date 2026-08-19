@@ -23,14 +23,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.saml2.provider.service.authentication.DefaultSaml2AuthenticatedPrincipal;
 
 class ObjectMapperFactoryTest {
 
 	@Test
-	void testSimpleSaveLoad() throws JsonProcessingException {
+	void testSimpleSaveLoad() {
 		var mapper = ObjectMapperFactory.springSecObjectMapper();
 		var expected = "TEST";
 		var encoded = mapper.writeValueAsString(expected);
@@ -39,7 +38,7 @@ class ObjectMapperFactoryTest {
 	}
 
 	@Test
-	void testAcceptableDataSaveLoad() throws JsonProcessingException {
+	void testAcceptableDataSaveLoad() {
 		var mapper = ObjectMapperFactory.springSecObjectMapper();
 		var claims = new HashMap<String, List<Object>>();
 		claims.put("emptyArrayList", new ArrayList<>());
@@ -52,7 +51,7 @@ class ObjectMapperFactoryTest {
 	}
 
 	@Test
-	void testSaml2Principal() throws JsonProcessingException {
+	void testSaml2Principal() {
 		var mapper = ObjectMapperFactory.springSecObjectMapper();
 		var attrs = new HashMap<String, List<Object>>();
 		var vals = new ArrayList<>();

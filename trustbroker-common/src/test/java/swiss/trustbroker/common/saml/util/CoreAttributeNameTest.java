@@ -77,7 +77,7 @@ class CoreAttributeNameTest {
 				is(CoreAttributeName.NAME));
 		assertThat(AttributeRegistry.forName(CoreAttributeName.CLAIMS_NAME.getName()),
 				is(CoreAttributeName.CLAIMS_NAME));
-		assertThat(AttributeRegistry.forName(CoreAttributeName.EMAIL.getOidcNameList().get(0)),
+		assertThat(AttributeRegistry.forName(CoreAttributeName.EMAIL.getOidcNameList().getFirst()),
 				is(CoreAttributeName.EMAIL));
 	}
 

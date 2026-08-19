@@ -264,22 +264,18 @@ public class CredentialReader {
 		try (var inputStream = readFromFileOrClasspath(keyPath, "PEMKeyPair");
 				var streamReader = new InputStreamReader(inputStream);
 				var parser = new PEMParser(streamReader)) {
-			var pwDebug = (password == null ? password : password.substring(0, 1) + "*****");
+			var pwDebug = (StringUtils.isEmpty(password) ? password : password.charAt(0) + "*****");
 			Object o;
 			PEMKeyPair pair = null;
 			while ((o = parser.readObject()) != null) {
-				if (o instanceof PEMKeyPair keyPair) {
-					pair = keyPair;
-				}
-				else if (o instanceof PEMEncryptedKeyPair keyPair) {
-					pair = decryptPEMKeyPair(keyPath, password, pwDebug, keyPair);
-				}
-				else if (o instanceof PKCS8EncryptedPrivateKeyInfo pkInfo) {
-					PrivateKeyInfo keyInfo = decryptPEMKey(keyPath, password, pwDebug, pkInfo);
-					pair = new PEMKeyPair(null, keyInfo);
-				}
-				else {
-					log.debug("Ignoring object of type {} in {}", o.getClass().getName(), keyPath);
+				switch (o) {
+					case PEMKeyPair keyPair -> pair = keyPair;
+					case PEMEncryptedKeyPair keyPair -> pair = decryptPEMKeyPair(keyPath, password, pwDebug, keyPair);
+					case PKCS8EncryptedPrivateKeyInfo pkInfo -> {
+						var keyInfo = decryptPEMKey(keyPath, password, pwDebug, pkInfo);
+						pair = new PEMKeyPair(null, keyInfo);
+					}
+					default -> log.debug("Ignoring object of type {} in {}", o.getClass().getName(), keyPath);
 				}
 			}
 
@@ -545,6 +541,6 @@ public class CredentialReader {
 	}
 
 	public static Optional<JWK> getJwk(List<JWK> cpJwks) {
-		return Optional.of(cpJwks.get(0));
+		return Optional.of(cpJwks.getFirst());
 	}
 }

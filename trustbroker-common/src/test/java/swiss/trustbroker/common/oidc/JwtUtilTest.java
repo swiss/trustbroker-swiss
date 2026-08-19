@@ -80,7 +80,7 @@ class JwtUtilTest {
 		var filePathFromClassPath = SamlTestBase.filePathFromClassPath(fileName);
 		var credentials = CredentialReader.readTrustCertCredentialFromPem(filePathFromClassPath);
 
-		return credentials.get(0);
+		return credentials.getFirst();
 	}
 
 	private static void testJWEGenerator(JwtEncoderParameters parameters, JWKSource<SecurityContext> jwkSource,

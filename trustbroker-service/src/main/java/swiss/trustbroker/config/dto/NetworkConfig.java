@@ -36,24 +36,25 @@ public class NetworkConfig {
 	private String mobileGatewayIpRegex;
 
 	/**
-	 * Name for the Intranet network used in configurations.
+	 * Name for the Intranet network used in configurations (e.g. INTRANET).
 	 * <br/>
-	 * Default: INTRANET
+	 * Set only if your network infrastructure always sets the <code>networkHeader</code>. This ensures that a request from
+	 * the Internet cannot control the network.
+	 * <br/>
+	 * Default: null
 	 */
-	@Builder.Default
-	private String intranetNetworkName = "INTRANET";
+	private String intranetNetworkName;
 
 	/**
-	 * Name for the Internet network used in configurations.
+	 * Name for the Internet network used in configurations (e.g. INTERNET).
 	 * <br/>
-	 * Default: INTERNET
+	 * Default: null
 	 */
-	@Builder.Default
-	private String internetNetworkName = "INTERNET";
+	private String internetNetworkName;
 
 	/**
 	 * HTTP header delivering the client network.
-	 * Usually sent by load balancer
+	 * Usually sent by load balancer.
 	 * <br/>
 	 * Default: Client_Network (should be X-Client-Network)
 	 */
@@ -62,7 +63,9 @@ public class NetworkConfig {
 
 	/**
 	 * HTTP header for simulating the client network.
-	 * Sent by test agents to test HRD rules.
+	 * <br/>
+	 * Sent by test agents to test HRD rules. This is only evaluated for requests from the Intranet according to
+	 * <code>networkHeader</code>.
 	 * <br/>
 	 * Default: "X-Simulated-Client-Network
 	 */
@@ -91,7 +94,7 @@ public class NetworkConfig {
 	 * @since 1.7.0
 	 */
 	@Builder.Default
-	private Boolean tracingEnabled = Boolean.TRUE;
+	private boolean tracingEnabled = true;
 
 	/**
 	 * Default proxy URL.

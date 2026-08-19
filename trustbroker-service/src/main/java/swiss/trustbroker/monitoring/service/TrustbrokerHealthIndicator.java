@@ -19,9 +19,8 @@ import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.HealthIndicator;
 import swiss.trustbroker.common.exception.TrustBrokerException;
 
 // Health check is executed on readiness probes at startup and after that only every minute with 60 acceptable failures.
@@ -36,10 +35,8 @@ public abstract class TrustbrokerHealthIndicator implements HealthIndicator {
 
 	private static final long HEALTHCHECK_DOWN_RETRIES = 60;
 
-	@Value("0")
 	private long lastHealthCheck = 0;
 
-	@Value("0")
 	private long failCount = 0;
 
 	public abstract boolean pingBackend();

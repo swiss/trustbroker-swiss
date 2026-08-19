@@ -92,7 +92,6 @@ import org.springframework.security.saml2.core.Saml2ErrorCodes;
 import org.springframework.security.saml2.core.Saml2ResponseValidatorResult;
 import org.springframework.security.saml2.provider.service.authentication.AbstractSaml2AuthenticationRequest;
 import org.springframework.security.saml2.provider.service.authentication.DefaultSaml2AuthenticatedPrincipal;
-import org.springframework.security.saml2.provider.service.authentication.OpenSaml4AuthenticationProvider;
 import org.springframework.security.saml2.provider.service.authentication.Saml2Authentication;
 import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationException;
 import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationToken;
@@ -105,6 +104,7 @@ import org.springframework.util.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
+import swiss.trustbroker.common.tracing.TraceSupport;
 
 /**
  * Implementation of {@link AuthenticationProvider} for SAML authentications when
@@ -112,7 +112,7 @@ import swiss.trustbroker.common.saml.util.SamlInitializer;
  * implementation uses the {@code OpenSAML 4} library.
  *
  * <p>
- * The {@link OpenSaml4AuthenticationProvider} supports {@link Saml2AuthenticationToken}
+ * The {@link OpenSaml5AuthenticationProvider} supports {@link Saml2AuthenticationToken}
  * objects that contain a SAML response in its decoded XML format
  * {@link Saml2AuthenticationToken#getSaml2Response()} along with the information about
  * the asserting party, the identity provider (IDP), as well as the relying party, the
@@ -182,7 +182,7 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 	private Converter<ResponseToken, ? extends AbstractAuthenticationToken> responseAuthenticationConverter = createDefaultResponseAuthenticationConverter();
 
 	/**
-	 * Creates an {@link OpenSaml4AuthenticationProvider}
+	 * Creates an {@link OpenSaml5AuthenticationProvider}
 	 */
 	public OpenSaml5AuthenticationProvider() {
 		XMLObjectProviderRegistry registry = ConfigurationService.get(XMLObjectProviderRegistry.class);
@@ -206,7 +206,7 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 	 *	    // ... set parameters as needed
 	 *	    Decrypter decrypter = new Decrypter(parameters);
 	 *		Response response = responseToken.getResponse();
-	 *  	EncryptedAssertion encrypted = response.getEncryptedAssertions().get(0);
+	 *  	EncryptedAssertion encrypted = response.getEncryptedAssertions().getFirst();
 	 *  	try {
 	 *  		Assertion assertion = decrypter.decrypt(encrypted);
 	 *  		response.getAssertions().add(assertion);
@@ -422,19 +422,27 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 		if (!StringUtils.hasText(inResponseTo)) {
 			return Saml2ResponseValidatorResult.success();
 		}
-		if (storedRequest == null) {
-			String message = "The response contained an InResponseTo attribute [" + inResponseTo + "]"
+		if (storedRequest == null || storedRequest.getId() == null) {
+			var message = "The response contained an InResponseTo attribute [" + inResponseTo + "]"
 					+ " but no saved authentication request was found";
 			return Saml2ResponseValidatorResult
 				.failure(new Saml2Error(Saml2ErrorCodes.INVALID_IN_RESPONSE_TO, message));
 		}
-		if (!inResponseTo.equals(storedRequest.getId())) {
-			String message = "The InResponseTo attribute [" + inResponseTo + "] does not match the ID of the "
-					+ "authentication request [" + storedRequest.getId() + "]";
-			return Saml2ResponseValidatorResult
-				.failure(new Saml2Error(Saml2ErrorCodes.INVALID_IN_RESPONSE_TO, message));
+		// exact match
+		if (inResponseTo.equals(storedRequest.getId())) {
+			return Saml2ResponseValidatorResult.success();
 		}
-		return Saml2ResponseValidatorResult.success();
+		// conversation match
+		if (TraceSupport.matchOwnTraceParentForSaml(inResponseTo, storedRequest.getId())) {
+			log.info("Accepting conversational inResponseTo='{}' on initial storedRequest='{}' (multiple user-agent retries)",
+					inResponseTo, storedRequest.getId());
+			return Saml2ResponseValidatorResult.success();
+		}
+		// no match
+		var message = "The InResponseTo attribute [" + inResponseTo + "] does not match the ID of the "
+				+ "authentication request [" + storedRequest.getId() + "]";
+		return Saml2ResponseValidatorResult
+				.failure(new Saml2Error(Saml2ErrorCodes.INVALID_IN_RESPONSE_TO, message));
 	}
 
 	/**
@@ -508,6 +516,7 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 	 * @throws AuthenticationException if a validation exception occurs
 	 */
 	@Override
+	@SuppressWarnings("java:S2589") // false positive on authenticationResponse != null
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		try {
 			Saml2AuthenticationToken token = (Saml2AuthenticationToken) authentication;
@@ -760,7 +769,14 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 		Map<String, Object> params = new HashMap<>();
 		Assertion assertion = assertionToken.getAssertion();
 		if (assertionContainsInResponseTo(assertion)) {
-			String requestId = getAuthnRequestId(token.getAuthenticationRequest());
+			var requestId = getAuthnRequestId(token.getAuthenticationRequest());
+			// re-post tolerance accepting conversational federation (infra retries) on self-created assertions
+			var responseId = subjectConfirmationInResponseTo(assertionToken);
+			if (!requestId.equals(responseId) && TraceSupport.matchOwnTraceParentForSaml(requestId, responseId)) {
+				log.debug("Received SAML-response from firstRequest={} on state of secondRequest={}", requestId, responseId);
+				requestId = responseId;
+			}
+			// continue on first messageId
 			params.put(SAML2AssertionValidationParameters.SC_VALID_IN_RESPONSE_TO, requestId);
 		}
 		params.put(SAML2AssertionValidationParameters.COND_VALID_AUDIENCES, Collections.singleton(audience));
@@ -768,6 +784,15 @@ public final class OpenSaml5AuthenticationProvider implements AuthenticationProv
 		params.put(SAML2AssertionValidationParameters.VALID_ISSUERS, Collections.singleton(assertingPartyEntityId));
 		paramsConsumer.accept(params);
 		return new ValidationContext(params);
+	}
+
+	private static String subjectConfirmationInResponseTo(AssertionToken assertionToken) {
+		var subject = assertionToken.getAssertion().getSubject();
+		if (subject == null || subject.getSubjectConfirmations().isEmpty()) {
+			return null;
+		}
+		var subjectConfirmation = subject.getSubjectConfirmations().getFirst().getSubjectConfirmationData();
+		return subjectConfirmation != null ? subjectConfirmation.getInResponseTo() : null;
 	}
 
 	private static boolean assertionContainsInResponseTo(Assertion assertion) {

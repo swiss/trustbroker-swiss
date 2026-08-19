@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -43,6 +42,7 @@ import swiss.trustbroker.common.oidc.JwtUtil;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import tools.jackson.databind.ObjectMapper;
 
 @AllArgsConstructor
 @Slf4j
@@ -144,7 +144,7 @@ public class CustomUserInfoResponseHandler implements AuthenticationSuccessHandl
 		if (aud instanceof Collection<?> audiences) {
 			var audClaims = Arrays.stream(audiences.toArray()).toList();
 			if (audClaims.size() == 1) {
-				return audClaims.get(0).toString();
+				return audClaims.getFirst().toString();
 			}
 		}
 		return null;

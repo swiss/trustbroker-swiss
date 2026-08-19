@@ -233,12 +233,12 @@ class AttributeFilterUtilTest {
 		entry = givenEntryToFilterAttributes(CoreAttributeName.EMAIL);
 		AttributeFilterUtil.mergeValues(userDetails, entry);
 		assertEquals(3, entry.getValue().size());
-		assertTrue(entry.getValue().contains(entry.getValue().get(0)));
+		assertTrue(entry.getValue().contains(entry.getValue().getFirst()));
 
 		// add only deduplicated value
 		AttributeFilterUtil.mergeValues(userDetails, entry);
 		assertEquals(3, entry.getValue().size());
-		assertTrue(entry.getValue().contains(entry.getValue().get(0)));
+		assertTrue(entry.getValue().contains(entry.getValue().getFirst()));
 	}
 
 	static Map.Entry<Definition, List<String>> givenEntryToFilterAttributes(CoreAttributeName attribute) {

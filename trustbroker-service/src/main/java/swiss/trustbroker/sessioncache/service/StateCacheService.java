@@ -26,8 +26,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.OptimisticLockException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.ConcurrencyFailureException;
@@ -49,6 +47,10 @@ import swiss.trustbroker.sessioncache.dto.LifecycleState;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sessioncache.dto.StateEntity;
 import swiss.trustbroker.sessioncache.repo.StateCacheRepository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @Slf4j
@@ -75,7 +77,9 @@ public class StateCacheService {
 		this.globalExceptionHandler = globalExceptionHandler;
 		this.clock = clock;
 		this.metricsService = metricsService;
-		this.objectMapper = new ObjectMapper(); // trusted anything
+		this.objectMapper = JsonMapper.builder()
+		                              .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+		                              .build(); // trusted anything
 	}
 
 	// @Transactional on repository boundary below + on Service/Controller boundary above
@@ -185,7 +189,7 @@ public class StateCacheService {
 			TraceSupport.switchToConversation(ret.getLastConversationId());
 			return ret;
 		}
-		catch (JsonProcessingException ex) {
+		catch (JacksonException ex) {
 			// possible cause: serialization compatibility issues (removed fields etc.)
 			log.error("State stateId={} could not be extracted, invalidating: actor={} cause={}",
 					stateEntity.getId(), actor, ex.getMessage());
@@ -230,7 +234,7 @@ public class StateCacheService {
 			// persist
 			saveResilient(stateEntity, true, actor, event);
 		}
-		catch (JsonProcessingException ex) {
+		catch (JacksonException ex) {
 			throw new TechnicalException(String.format(
 					"Unable to convert stateData to JSON in call from actor=%s - Details: stateId=%s exceptionMsg=%s",
 					actor, stateData.getId(), ex.getMessage()), ex);
@@ -414,7 +418,7 @@ public class StateCacheService {
 							+ "Details: stateId=%s repostCount=%d",
 					keyName, actor, StringUtil.clean(id), stateDataList.size()));
 		}
-		return Optional.of(stateDataList.get(0));
+		return Optional.of(stateDataList.getFirst());
 	}
 
 	public Optional<StateData> findValidState(String id, String actor) {

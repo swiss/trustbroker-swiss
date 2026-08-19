@@ -113,6 +113,10 @@ class AssertionValidatorTest {
 
 	private static final Optional<List<Credential>> NO_CREDENTIALS = Optional.empty();
 
+	private static final List<String> ALLOWED_SIGNATURE_ALGORITHMS = Collections.emptyList();
+
+	private static final List<Credential> TRUST_CREDENTIALS = Collections.emptyList();
+
 	TrustBrokerProperties properties;
 
 	private MemoryAppender memoryAppender;
@@ -173,10 +177,10 @@ class AssertionValidatorTest {
 				.builder()
 				.expectedIssuer("idpIssuer")
 				.build();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseAssertions(assertions, response, null, properties, null, null,
-					expectedValues);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseAssertions(assertions, response, null, null, properties, null, null,
+					expectedValues)
+		);
 	}
 
 	@Test
@@ -189,10 +193,10 @@ class AssertionValidatorTest {
 				.builder()
 				.expectedIssuer("idpIssuer")
 				.build();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseAssertions(assertions, response, null, properties, null, null,
-					expectedValues);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseAssertions(assertions, response, null, null, properties, null, null,
+					expectedValues)
+		);
 	}
 
 	@Test
@@ -204,63 +208,63 @@ class AssertionValidatorTest {
 				.builder()
 				.expectedIssuer("idpIssuer")
 				.build();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseAssertions(assertions, response, null, properties, null, null,
-					expectedValues);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseAssertions(assertions, response, null, null, properties, null, null,
+					expectedValues)
+		);
 	}
 
 	@Test
 	void validateAssertionNoNameIdTest() {
 		var response = givenSamlResponse();
 		response.getAssertions().add(givenAssertion());
-		response.getAssertions().get(0).setSubject(givenSubject());
+		response.getAssertions().getFirst().setSubject(givenSubject());
 		var assertions = List.of(givenAssertion());
 		var expectedValues = AssertionValidator.ExpectedAssertionValues
 				.builder()
 				.expectedIssuer("idpIssuer")
 				.build();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseAssertions(assertions, response, null, properties, null, null,
-					expectedValues);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseAssertions(assertions, response, null, null, properties, null, null,
+					expectedValues)
+		);
 	}
 
 	@Test
 	void validateSignatureNoSignedTest() {
 		var response = givenResponseWithAssertion();
-		var assertion = response.getAssertions().get(0);
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateAssertionSignature(assertion, null, properties);
-		});
+		var assertion = response.getAssertions().getFirst();
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAssertionSignature(assertion, null, null, properties)
+		);
 	}
 
 	@Test
 	void validateRelayStateOldNullTest() {
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRelayState(null, "newRelayState", properties, null);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRelayState(null, "newRelayState", properties, null)
+		);
 	}
 
 	@Test
 	void validateRelayStateNewNullTest() {
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRelayState("oldRelayState", null, properties, null);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRelayState("oldRelayState", null, properties, null)
+		);
 	}
 
 	//@Test
 	void validateRelayStateDifferentTest() {
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRelayState("oldRelayState", "newRelayState", properties, null);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRelayState("oldRelayState", "newRelayState", properties, null)
+		);
 	}
 
 	@Test
 	void validateRelayStateSameTest() {
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateRelayState("oldRelayState", "oldRelayState", properties, null);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateRelayState("oldRelayState", "oldRelayState", properties, null)
+		);
 	}
 
 	@Test
@@ -269,9 +273,9 @@ class AssertionValidatorTest {
 		var incoming = now.plusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 120);
 		var response = givenSamlResponse();
 		response.setIssueInstant(incoming); // 2 minutes past
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseIssueInstant(response, now, properties);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseIssueInstant(response, now, properties)
+		);
 	}
 
 	@Test
@@ -280,9 +284,9 @@ class AssertionValidatorTest {
 		var incoming = now.plus(5, ChronoUnit.MINUTES);
 		var response = givenSamlResponse();
 		response.setIssueInstant(incoming); // 5 minutes before our time
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseIssueInstant(response, now, properties);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseIssueInstant(response, now, properties)
+		);
 	}
 
 	@Test
@@ -322,75 +326,114 @@ class AssertionValidatorTest {
 		var response = givenSamlResponse();
 		response.setIssueInstant(Instant.now().plusSeconds(1)); // valid since 1 sec
 
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateResponseIssueInstant(response, Instant.now(), properties);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateResponseIssueInstant(response, Instant.now(), properties)
+		);
 	}
 
 	@Test
 	void validateSubjectConfirmationEmptyFailTest() {
 		var expectedRequestId = "123";
 		String actualRequestId = null;
-		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId);
+		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties)
+		);
 	}
 
 	@Test
 	void validateSubjectConfirmationEmptyOkTest() {
 		var expectedRequestId = "123";
 		String actualRequestId = null;
-		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId);
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateAssertionSubject(assertion, Instant.now(), expectedRequestId, false, false,
-					null, properties);
-		});
+		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
+		assertFalse(AssertionValidator.validateAssertionSubject(assertion, Instant.now(), expectedRequestId, false, false,
+					null, properties));
 	}
 
 	@Test
 	void validateSubjectConfirmationNotSameRequestIdTest() {
 		var expectedRequestId = "123";
 		var actualRequestId = "4343";
-		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId);
+		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties)
+		);
 	}
 
 	@Test
 	void validateSubjectConfirmationNotSameRecipientTest() {
 		var expectedRequestId = "123";
 		var expectedRecipient = "rpOther";
-		var assertion = givenAssertionWithSubjectConfirmation(expectedRequestId);
+		var assertion = givenAssertionWithSubjectConfirmation(expectedRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () -> {
+		assertThrows(RequestDeniedException.class, () ->
 			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, expectedRecipient,
-					properties);
-		});
+					properties)
+		);
 	}
 
-	@Test
-	void validateSubjectConfirmationSameTest() {
+	@ParameterizedTest
+	@CsvSource({
+			SecurityChecks.HOLDER_OF_KEY_SUBJECT_CONFIRMATION + ",false",
+			SecurityChecks.BEARER_SUBJECT_CONFIRMATION + ",true"
+	})
+	void validateSubjectConfirmationSameTest(String method, boolean expectedBearer) {
 		var expectedRequestId = "123";
 		var actualRequestId = expectedRequestId;
-		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId);
+		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, method);
 		var now = Instant.now();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, TEST_RECIPIENT, properties);
-		});
+		assertThat(AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, TEST_RECIPIENT,
+				properties), is(expectedBearer));
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			"true,false,true", // bearer SubjectConfirmation
+			"false,true,false" // non-bearer SubjectConfirmation
+	})
+	void validateOptionalConditionsMissingTest(boolean requireAudienceRestriction, boolean requireAudienceRestrictionBearer,
+			boolean bearerSubjectConfirmation) {
+		var assertion = givenAssertion();
+		var now = Instant.now();
+		var secPol = new SecurityPolicies();
+		secPol.setRequireAudienceRestriction(requireAudienceRestriction);
+		secPol.setRequireAudienceRestrictionForBearerSubjectConfirmation(requireAudienceRestrictionBearer);
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateConditions(assertion.getConditions(), now, null, false, properties, secPol,
+					bearerSubjectConfirmation, assertion)
+		);
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			"false,true,true", // bearer SubjectConfirmation
+			"true,true,false" // non-bearer SubjectConfirmation
+	})
+	void validateRequiredConditionsMissingTest(boolean requireAudienceRestriction, boolean requireAudienceRestrictionBearer,
+			boolean bearerSubjectConfirmation) {
+		var assertion = givenAssertion();
+		var conditions = assertion.getConditions();
+		var now = Instant.now();
+		var secPol = new SecurityPolicies();
+		secPol.setRequireAudienceRestriction(requireAudienceRestriction);
+		secPol.setRequireAudienceRestrictionForBearerSubjectConfirmation(requireAudienceRestrictionBearer);
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateConditions(conditions, now, null, false, properties, secPol,
+					bearerSubjectConfirmation, assertion)
+		);
 	}
 
 	@Test
 	void validateAudienceEmptyTest() {
 		String trustbrokerIssuer = null;
 		var assertion = givenAssertionWithAudienceRestrictions(trustbrokerIssuer);
+		var conditions = assertion.getConditions();
 		var now = Instant.now();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateConditions(assertion.getConditions(), now, null, false, properties, null, assertion);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, false, assertion)
+		);
 	}
 
 	@Test
@@ -399,9 +442,9 @@ class AssertionValidatorTest {
 		var assertion = givenAssertionWithAudienceRestrictions(trustbrokerIssuer);
 		var conditions = assertion.getConditions();
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, assertion);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, false, assertion)
+		);
 	}
 
 	@Test
@@ -410,9 +453,9 @@ class AssertionValidatorTest {
 		var assertion = givenAssertionWithAudienceRestrictions(trustbrokerIssuer);
 		var now = Instant.now();
 		var conditions = assertion.getConditions();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, assertion);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, false, assertion)
+		);
 	}
 
 	@Test
@@ -421,9 +464,9 @@ class AssertionValidatorTest {
 		var assertion = givenAssertionWithAudienceRestrictions(trustbrokerAcUrl);
 		var now = Instant.now();
 		var conditions = assertion.getConditions();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, assertion);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateConditions(conditions, now, null, false, properties, null, false, assertion)
+		);
 	}
 
 	@Test
@@ -431,9 +474,9 @@ class AssertionValidatorTest {
 		var assertion = givenAssertionWithAudienceRestrictions("otherAudience");
 		var now = Instant.now();
 		var conditions = assertion.getConditions();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateConditions(conditions, now, "expectedAudience", false, properties, null, assertion);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateConditions(conditions, now, "expectedAudience", false, properties, null, false, assertion)
+		);
 	}
 
 	@Test
@@ -442,9 +485,9 @@ class AssertionValidatorTest {
 		var assertion = givenAssertionWithAudienceRestrictions(audience);
 		var now = Instant.now();
 		var conditions = assertion.getConditions();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateConditions(conditions, now, audience, false, properties, null, assertion);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateConditions(conditions, now, audience, false, properties, null, false, assertion)
+		);
 	}
 
 	@ParameterizedTest
@@ -469,14 +512,14 @@ class AssertionValidatorTest {
 		var secPol = new SecurityPolicies();
 		secPol.setRequireAudienceRestriction(policyRestriction);
 		if (expectException) {
-			assertThrows(RequestDeniedException.class, () -> {
-				AssertionValidator.validateAudienceRestrictions(audienceRestrictions, "other", properties, secPol, null);
-			});
+			assertThrows(RequestDeniedException.class, () ->
+				AssertionValidator.validateAudienceRestrictions(audienceRestrictions, "other", properties, secPol, false, null)
+			);
 		}
 		else {
-			assertDoesNotThrow(() -> {
-				AssertionValidator.validateAudienceRestrictions(audienceRestrictions, "other", properties, secPol, null);
-			});
+			assertDoesNotThrow(() ->
+				AssertionValidator.validateAudienceRestrictions(audienceRestrictions, "other", properties, secPol, false, null)
+			);
 		}
 	}
 
@@ -527,7 +570,7 @@ class AssertionValidatorTest {
 	private void samlRedirectContext(AuthnRequest authnRequest, SignatureContext signatureContext, boolean redirectSigned) {
 		var encodedRequest = SamlIoUtil.encodeSamlRedirectData(authnRequest);
 		var relayState = "myRelayState";
-		var sigAlg = redirectSigned ? SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1 : null;
+		var sigAlg = redirectSigned ? SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256 : null;
 		String signature = null;
 		if (redirectSigned) {
 			signature = SamlIoUtil.buildEncodedSamlRedirectSignature(authnRequest, SamlTestBase.dummyCredential(),
@@ -557,9 +600,9 @@ class AssertionValidatorTest {
 	void validateRequestSignatureNotSignedTest() {
 		var authnRequest = givenUnsignedAuthnRequest();
 		var signatureContext = signed();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRequestSignature(authnRequest, null, properties, signatureContext);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, signatureContext)
+		);
 	}
 
 	@Test
@@ -567,15 +610,15 @@ class AssertionValidatorTest {
 		var authnRequest = givenUnsignedAuthnRequest();
 		var signatureContext = signed();
 		samlRedirectContext(authnRequest, signatureContext, false);
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRequestSignature(authnRequest, null, properties, signatureContext);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, signatureContext)
+		);
 	}
 
 	@Test
 	void validateRequestSignatureNotSignedAllowedByRp() {
 		var authnRequest = givenUnsignedAuthnRequest();
-		AssertionValidator.validateRequestSignature(authnRequest, null, properties, unsigned());
+		AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, unsigned());
 	}
 
 	@Test
@@ -583,33 +626,35 @@ class AssertionValidatorTest {
 		var authnRequest = givenUnsignedAuthnRequest();
 		var signatureContext = unsigned();
 		samlRedirectContext(authnRequest, signatureContext, false);
-		AssertionValidator.validateRequestSignature(authnRequest, null, properties, signatureContext);
+		AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, signatureContext);
 	}
 
 	@Test
 	void validateRequestSignatureNotSignedTestAllowedByProperties() {
 		var authnRequest = givenUnsignedAuthnRequest();
 		properties.getSecurity().setRequireSignedAuthnRequest(false);
-		AssertionValidator.validateRequestSignature(authnRequest, null, properties, signed());
+		AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, signed());
 	}
 
 	@Test
 	void validateRequestSignatureNoTrustStore() {
 		var authnRequest = givenSignedAuthnRequest();
 		var signatureContext = signed();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRequestSignature(authnRequest, null, properties, signatureContext);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRequestSignature(authnRequest, null, null, properties, signatureContext)
+		);
 	}
 
 	@Test
 	void validateRequestSignatureInvalid() {
 		var authnRequest = givenSignedAuthnRequest();
 		var credentials = SamlTestBase.dummyInvalidCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = signed();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRequestSignature(authnRequest, credentials, properties, signatureContext);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRequestSignature(authnRequest, credentials, allowedSignatureAlgorithms, properties,
+					signatureContext)
+		);
 	}
 
 	@ParameterizedTest
@@ -617,10 +662,12 @@ class AssertionValidatorTest {
 	void validateRequestSignatureIncomplete(boolean emptyKeyInfo) {
 		var authnRequest = givenIncompletelySignedAuthnRequest(emptyKeyInfo);
 		var credentials = SamlTestBase.dummyInvalidCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = signed();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRequestSignature(authnRequest, credentials, properties, signatureContext);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRequestSignature(authnRequest, credentials, allowedSignatureAlgorithms, properties,
+					signatureContext)
+		);
 	}
 
 	@ParameterizedTest
@@ -628,8 +675,10 @@ class AssertionValidatorTest {
 	void validateRequestIgnoreSignatureIncomplete(boolean emptyKeyInfo) {
 		var authnRequest = givenIncompletelySignedAuthnRequest(emptyKeyInfo);
 		var credentials = SamlTestBase.dummyInvalidCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = unsigned();
-		assertFalse(AssertionValidator.validateRequestSignature(authnRequest, credentials, properties, signatureContext)
+		assertFalse(AssertionValidator.validateRequestSignature(authnRequest, credentials, allowedSignatureAlgorithms,
+											  properties, signatureContext)
 									  .isSignatureValidated());
 	}
 
@@ -637,18 +686,21 @@ class AssertionValidatorTest {
 	void validateResponseSignatureInvalidTest() {
 		var authnRequest = givenSamlResponse();
 		var credentials = SamlTestBase.dummyInvalidCredential();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateResponseSignature(authnRequest, credentials, true);
-		});
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseSignature(authnRequest, credentials, allowedSignatureAlgorithms, true, properties)
+		);
 	}
 
 	@Test
 	void validateRequestSignatureValidTest() {
 		var authnRequest = givenSignedAuthnRequest();
 		var claimTrustStore = givenClaimTrustStore();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = signed();
 
-		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, properties, signatureContext)
+		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, allowedSignatureAlgorithms,
+											 properties, signatureContext)
 									 .isSignatureValidated());
 	}
 
@@ -657,10 +709,12 @@ class AssertionValidatorTest {
 		// redirect is signed, SAML request not
 		var authnRequest = givenUnsignedAuthnRequest();
 		var claimTrustStore = givenClaimTrustStore();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = signed();
 		samlRedirectContext(authnRequest, signatureContext, true);
 
-		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, properties, signatureContext)
+		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, allowedSignatureAlgorithms,
+											 properties, signatureContext)
 									 .isSignatureValidated());
 	}
 
@@ -669,43 +723,46 @@ class AssertionValidatorTest {
 		// redirect is unsigned, SAML request is signed
 		var authnRequest = givenSignedAuthnRequest();
 		var claimTrustStore = givenClaimTrustStore();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureContext = signed();
 		samlRedirectContext(authnRequest, signatureContext, false);
 
-		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, properties, signatureContext)
+		assertTrue(AssertionValidator.validateRequestSignature(authnRequest, claimTrustStore, allowedSignatureAlgorithms,
+											 properties, signatureContext)
 									 .isSignatureValidated());
 	}
 
 	@Test
 	void validateRequestIdNullTest() {
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateAuthnRequestId(null);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAuthnRequestId(null)
+		);
 	}
 
 	@Test
 	void validateRequestIdEmptyTest() {
 		var authnRequest = givenSignedAuthnRequest();
 		authnRequest.setID("");
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateAuthnRequestId(authnRequest);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAuthnRequestId(authnRequest)
+		);
 	}
 
 	@Test
 	void validateRequestIdValidTest() {
 		var authnRequest = givenSignedAuthnRequest();
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateAuthnRequestId(authnRequest);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateAuthnRequestId(authnRequest)
+		);
 	}
 
 	@Test
 	void validateAssertionWrongSignerTest() {
 		var expectedRequestId = "req123";
-		var assertion = givenSignedAssertionWithSubjectConfirmation(expectedRequestId);
+		var assertion = givenSignedAssertionWithSubjectConfirmation(expectedRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
 		var now = Instant.now();
 		var credentials = SamlTestBase.dummyInvalidCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var expectedAssertionId = assertion.getID();
 		var expectedValues = AssertionValidator.ExpectedAssertionValues
 				.builder()
@@ -713,44 +770,50 @@ class AssertionValidatorTest {
 				.expectedAssertionId(expectedAssertionId)
 				.build();
 		assertThrows(RequestDeniedException.class, () -> AssertionValidator.validateAssertion(assertion, now,
-					credentials, properties, null, null,  expectedValues));
+					credentials, allowedSignatureAlgorithms, properties, null, null,  expectedValues));
 	}
 
 	@Test
 	void validateAssertionWrongSignerTestSignatureOptional() {
 		properties.getSecurity().setRequireSignedAssertion(false);
 		var expectedRequestId = "req123";
-		var assertion = givenSignedAssertionWithSubjectConfirmation(expectedRequestId);
+		var assertion = givenSignedAssertionWithSubjectConfirmation(expectedRequestId,
+				SecurityChecks.HOLDER_OF_KEY_SUBJECT_CONFIRMATION);
 		var now = Instant.now();
 		var credentials = SamlTestBase.dummyInvalidCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var expectedIssuer = assertion.getIssuer().getValue();
 		var expectedValues = AssertionValidator.ExpectedAssertionValues
 				.builder()
 				.expectedRequestId(expectedRequestId)
 				.expectedIssuer(expectedIssuer)
 				.build();
-		assertFalse(AssertionValidator.validateAssertion(assertion, now, credentials, properties, null, null, expectedValues)
+		assertFalse(AssertionValidator.validateAssertion(assertion, now, credentials, allowedSignatureAlgorithms, properties,
+											  null, null, expectedValues)
 									  .isSignatureValidated());
 	}
 
 	@Test
 	void validateRedirectBindingSignature() {
 		var claimTrustStore = givenClaimTrustStore();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var samlMessage = "mySamlMessage"; // content not relevant for signature validation
 		var relayState = UUID.randomUUID().toString();
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		var queryString = SamlIoUtil.buildSamlRedirectQueryString(sigAlg,
 				true, samlMessage, relayState, null);
-		var signature = SamlUtil.buildRedirectBindingSignature(claimTrustStore.get(0), sigAlg,
+		var signature = SamlUtil.buildRedirectBindingSignature(claimTrustStore.getFirst(), sigAlg,
 				queryString.getBytes(StandardCharsets.UTF_8));
 		// path is not relevant:
 		var url = "/adfs/ls?" + SamlIoUtil.buildSamlRedirectQueryString(sigAlg,
 				true, samlMessage, relayState, Base64Util.encode(signature, Base64Util.Base64Encoding.UNCHUNKED));
 		var signatureContext = SignatureContext.forRedirectBinding(url);
+		var signatureAlgorithmValidation = new AssertionValidator.SignatureAlgorithmValidation(allowedSignatureAlgorithms, true);
 
-		assertDoesNotThrow(() -> {
-			AssertionValidator.validateRedirectBindingSignature(signatureContext, claimTrustStore, false);
-		});
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateRedirectBindingSignature(signatureContext, claimTrustStore, signatureAlgorithmValidation,
+					false)
+		);
 	}
 
 	@Test
@@ -760,7 +823,8 @@ class AssertionValidatorTest {
 		var incoming = now.minusSeconds(SecurityChecks.TOLERANCE_NOT_BEFORE_SEC - 1);
 		var xmlobj = OpenSamlUtil.buildSamlObject(Response.class);
 		assertThrows(RequestDeniedException.class,
-				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now, -5L, 480L,	xmlobj));
+				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now,
+						SecurityChecks.TOLERANCE_NOT_BEFORE_SEC, SecurityChecks.TOLERANCE_NOT_AFTER_SEC, xmlobj));
 	}
 
 	@Test
@@ -769,7 +833,8 @@ class AssertionValidatorTest {
 		var incoming = now.minusSeconds(-SecurityChecks.TOLERANCE_NOT_BEFORE_SEC);
 		var xmlobj = OpenSamlUtil.buildSamlObject(Response.class);
 		assertDoesNotThrow(
-				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now, -5L, 480L,	xmlobj));
+				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now,
+						SecurityChecks.TOLERANCE_NOT_BEFORE_SEC, SecurityChecks.TOLERANCE_NOT_AFTER_SEC, xmlobj));
 	}
 
 	@Test
@@ -778,7 +843,8 @@ class AssertionValidatorTest {
 		var incoming = now.minusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC);
 		var xmlobj = OpenSamlUtil.buildSamlObject(Response.class);
 		assertDoesNotThrow(
-				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now, -5L, 480L,	xmlobj));
+				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now,
+						SecurityChecks.TOLERANCE_NOT_BEFORE_SEC,SecurityChecks.TOLERANCE_NOT_AFTER_SEC, xmlobj));
 	}
 
 	@Test
@@ -788,7 +854,8 @@ class AssertionValidatorTest {
 		var incoming = now.minusSeconds(SecurityChecks.TOLERANCE_NOT_AFTER_SEC + 1);
 		var xmlobj = OpenSamlUtil.buildSamlObject(Response.class);
 		assertThrows(RequestDeniedException.class,
-				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now, -5L, 480L,	xmlobj));
+				() -> AssertionValidator.validateTimestampInRange("Test", incoming, now,
+						SecurityChecks.TOLERANCE_NOT_BEFORE_SEC, SecurityChecks.TOLERANCE_NOT_AFTER_SEC, xmlobj));
 	}
 
 	@Test
@@ -837,9 +904,9 @@ class AssertionValidatorTest {
 
 	@ParameterizedTest
 	@CsvSource(value = {
-			"479,false", // valid for another 1 sec
-			"480,true", // expired just now
-			"481,true" // valid for 1 sec still
+			"4,false", // valid for another 1 sec
+			"5,true", // expired just now
+			"6,true" // valid for 1 sec still
 	})
 	void testTimestampValidNotOnOrAfter(long secondsAfterNow, boolean expectException) {
 		var now = Instant.now();
@@ -860,6 +927,7 @@ class AssertionValidatorTest {
 	@Test
 	void testDoubleSignature() {
 		var truststore = givenClaimTrustStore();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var assertion = givenAssertion();
 		// response and assertion need to have differing IDs for the references
 		assertion.setID(OpenSamlUtil.generateSecureRandomId());
@@ -878,9 +946,10 @@ class AssertionValidatorTest {
 		var responseStr = SamlIoUtil.xmlObjectToString(response, false);
 		var responseCopy =
 				SamlIoUtil.unmarshallResponse(new ByteArrayInputStream(responseStr.getBytes(StandardCharsets.UTF_8)));
-		assertTrue(AssertionValidator.validateResponseSignature(responseCopy, truststore, true)
+		assertTrue(AssertionValidator.validateResponseSignature(responseCopy, truststore, allowedSignatureAlgorithms, true, properties)
 									 .isSignatureValidated());
-		assertTrue(AssertionValidator.validateAssertionSignature(responseCopy.getAssertions().get(0), truststore, properties)
+		assertTrue(AssertionValidator.validateAssertionSignature(responseCopy.getAssertions().getFirst(), truststore,
+											 allowedSignatureAlgorithms, properties)
 									 .isSignatureValidated());
 	}
 
@@ -890,9 +959,11 @@ class AssertionValidatorTest {
 		var artifact = SamlFactory.createArtifact(ARTIFACT_ID);
 		var artifactResolve = SamlFactory.createArtifactResolve(artifact, TEST_ISSUER, ARTIFACT_RESOLUTION_SERVICE_URL);
 		var credential = SamlTestBase.dummyCredential();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		var signatureParams = SignatureParameters.builder().credential(credential).build();
 		SamlFactory.signSignableObject(artifactResolve, signatureParams);
-		assertTrue(AssertionValidator.validateArtifactResolve(artifactResolve, properties, List.of(credential))
+		assertTrue(AssertionValidator.validateArtifactResolve(artifactResolve, properties, List.of(credential),
+											 allowedSignatureAlgorithms)
 									 .isSignatureValidated());
 	}
 
@@ -901,7 +972,8 @@ class AssertionValidatorTest {
 		mockArtifactProperties(false);
 		var artifact = SamlFactory.createArtifact(ARTIFACT_ID);
 		var artifactResolve = SamlFactory.createArtifactResolve(artifact, TEST_ISSUER, ARTIFACT_RESOLUTION_SERVICE_URL);
-		assertFalse(AssertionValidator.validateArtifactResolve(artifactResolve, properties, Collections.emptyList())
+		assertFalse(AssertionValidator.validateArtifactResolve(artifactResolve, properties, TRUST_CREDENTIALS,
+											  ALLOWED_SIGNATURE_ALGORITHMS)
 									  .isSignatureValidated());
 	}
 
@@ -910,9 +982,10 @@ class AssertionValidatorTest {
 		mockArtifactProperties(true);
 		var artifact = SamlFactory.createArtifact(ARTIFACT_ID);
 		var artifactResolve = SamlFactory.createArtifactResolve(artifact, TEST_ISSUER, ARTIFACT_RESOLUTION_SERVICE_URL);
-		List<Credential> trustCredentials = Collections.emptyList();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		assertThrows(RequestDeniedException.class, () ->
-				AssertionValidator.validateArtifactResolve(artifactResolve, properties, trustCredentials));
+				AssertionValidator.validateArtifactResolve(artifactResolve, properties, TRUST_CREDENTIALS,
+						allowedSignatureAlgorithms));
 	}
 
 	@Test
@@ -920,9 +993,10 @@ class AssertionValidatorTest {
 		mockArtifactProperties(false);
 		var artifact = SamlFactory.createArtifact(ARTIFACT_ID);
 		var artifactResolve = SamlFactory.createArtifactResolve(artifact, TEST_ISSUER, "https://other.localdomain");
-		List<Credential> trustCredentials = Collections.emptyList();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		assertThrows(RequestDeniedException.class, () ->
-				AssertionValidator.validateArtifactResolve(artifactResolve, properties, trustCredentials));
+				AssertionValidator.validateArtifactResolve(artifactResolve, properties, TRUST_CREDENTIALS,
+						allowedSignatureAlgorithms));
 	}
 
 	@Test
@@ -931,37 +1005,49 @@ class AssertionValidatorTest {
 		var artifact = SamlFactory.createArtifact(ARTIFACT_ID);
 		var artifactResolve = SamlFactory.createArtifactResolve(artifact, TEST_ISSUER, "https://other.localdomain");
 		artifactResolve.setIssueInstant(Instant.EPOCH);
-		List<Credential> trustCredentials = Collections.emptyList();
+		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
 		assertThrows(RequestDeniedException.class, () ->
-				AssertionValidator.validateArtifactResolve(artifactResolve, properties, trustCredentials));
+				AssertionValidator.validateArtifactResolve(artifactResolve, properties, TRUST_CREDENTIALS,
+						allowedSignatureAlgorithms));
 	}
 
 	@ParameterizedTest
-	@MethodSource(value = "requireRestrictions")
-	void requireAudienceRestriction(Boolean cpRequire, boolean propsRequire, boolean expectedRequire) {
-		var secPol = SecurityPolicies.builder().requireAudienceRestriction(cpRequire).build();
+	@CsvSource(value = {
+			// non-bearer
+			"false,false,true,false,false,false",
+			"false,true,false,false,false,true",
+			"false,null,true,false,false,true",
+			// bearer
+			"true,false,false,false,true,false",
+			"true,false,false,true,false,true",
+			"true,false,false,null,true,true",
+	}, nullValues = "null")
+	void requireAudienceRestriction(boolean bearerSubjectConfirmation, Boolean cpRequire, boolean propsRequire,
+			Boolean cpBearerRequire, boolean bearerRequire, boolean expectedRequire) {
+		var secPol = SecurityPolicies.builder()
+									 .requireAudienceRestriction(cpRequire)
+									 .requireAudienceRestrictionForBearerSubjectConfirmation(cpBearerRequire)
+									 .build();
 		properties.getSecurity().setRequireAudienceRestriction(propsRequire);
+		properties.getSecurity().setRequireAudienceRestrictionForBearerSubjectConfirmation(bearerRequire);
 
-		assertThat(AssertionValidator.requireAudienceRestriction(properties, secPol), is(expectedRequire));
-		assertThat(AssertionValidator.requireAudienceRestriction(properties, null), is(propsRequire));
+		assertThat(AssertionValidator.requireAudienceRestriction(properties, secPol, bearerSubjectConfirmation), is(expectedRequire));
+		assertThat(AssertionValidator.requireAudienceRestriction(properties, null, bearerSubjectConfirmation), is(
+				bearerSubjectConfirmation ? bearerRequire : propsRequire));
 	}
 
 	@ParameterizedTest
-	@MethodSource(value = "requireRestrictions")
+	@CsvSource(value = {
+			"false,true,false",
+			"true,false,true",
+			"null,true,true"
+	}, nullValues = "null")
 	void requireSignedResponse(Boolean cpRequire, boolean propsRequire, boolean expectedRequire) {
 		var secPol = SecurityPolicies.builder().requireSignedResponse(cpRequire).build();
 		properties.getSecurity().setRequireSignedResponse(propsRequire);
 
 		assertThat(AssertionValidator.requireSignedResponse(properties, secPol), is(expectedRequire));
 		assertThat(AssertionValidator.requireSignedResponse(properties, null), is(propsRequire));
-	}
-
-	static Boolean[][] requireRestrictions() {
-		return new Boolean[][] {
-				{ false, true, false },
-				{ true, false, true },
-				{ null, true, true }
-		};
 	}
 
 	@Test
@@ -1021,9 +1107,10 @@ class AssertionValidatorTest {
 				.builder()
 				.requireAudienceRestriction(false)
 				.build();
-		assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(null, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(null, properties, null, secPol, null, null, NO_CREDENTIALS,
+					ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 	}
 
 	@Test
@@ -1034,9 +1121,10 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.setID("");
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("ID missing", ex);
 	}
 
@@ -1048,9 +1136,9 @@ class AssertionValidatorTest {
 				.builder()
 				.requireAudienceRestriction(false)
 				.build();
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS));
 		assertException("ID missing", ex);
 	}
 
@@ -1062,9 +1150,10 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.setSubject(null);
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("Subject missing", ex);
 	}
 
@@ -1075,9 +1164,10 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion(null, TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("NameId missing", ex);
 	}
 
@@ -1088,9 +1178,10 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion("", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("NameId missing", ex);
 	}
 
@@ -1102,9 +1193,10 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.getSubject().getSubjectConfirmations().clear();
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("SubjectConfirmations missing", ex);
 	}
 
@@ -1115,9 +1207,10 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, "Invalid-Method");
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("SubjectConfirmation.Method missing", ex);
 	}
 
@@ -1129,9 +1222,10 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.setIssuer(null); // empty
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("Assertion.Issuer missing", ex);
 	}
 
@@ -1143,9 +1237,10 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.getIssuer().setValue(""); // empty
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("Assertion.Issuer missing", ex);
 	}
 
@@ -1156,9 +1251,10 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", "Invalid-Audience", SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("Audience missing or invalid", ex);
 	}
 
@@ -1169,7 +1265,8 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(true)
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS)
+		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+											  NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
 									  .isSignatureValidated());
 	}
 
@@ -1180,9 +1277,10 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", "invalidAudience", SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		var ex = assertThrows(RequestDeniedException.class, () -> {
-			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS);
-		});
+		var ex = assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+					NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
+		);
 		assertException("Audience missing or invalid", ex);
 	}
 
@@ -1194,7 +1292,8 @@ class AssertionValidatorTest {
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
 		assertion.getAttributeStatements().clear();
-		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS)
+		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+											  NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
 									  .isSignatureValidated());
 		assertLog("AttributeStatements missing", Level.INFO);
 	}
@@ -1206,7 +1305,8 @@ class AssertionValidatorTest {
 				.requireAudienceRestriction(false)
 				.build();
 		Assertion assertion = givenRstAssertion("NameID", TEST_AUDIENCE, SubjectConfirmation.METHOD_HOLDER_OF_KEY);
-		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null, NO_CREDENTIALS)
+		assertFalse(AssertionValidator.validateRstAssertion(assertion, properties, null, secPol, null, null,
+											  NO_CREDENTIALS, ALLOWED_SIGNATURE_ALGORITHMS)
 									  .isSignatureValidated());
 	}
 
@@ -1218,15 +1318,15 @@ class AssertionValidatorTest {
 		map.put(SamlContextClass.PASSWORD_PROTECTED_TRANSPORT, 20);
 
 		if (isException) {
-			var ex = assertThrows(RequestDeniedException.class, () -> {
-				AssertionValidator.validateAuthnContextClassRefs(config, requestCtxClasses, AuthnContextComparisonTypeEnumeration.EXACT, map, enforceQoaIfMissing);
-			});
+			var ex = assertThrows(RequestDeniedException.class, () ->
+				AssertionValidator.validateAuthnContextClassRefs(config, requestCtxClasses, AuthnContextComparisonTypeEnumeration.EXACT, map, enforceQoaIfMissing)
+			);
 			assertException("Missing request context class from request or SetupRp configuration with ID=Issuer", ex);
 		} else {
 
-			assertDoesNotThrow(() -> {
-				AssertionValidator.validateAuthnContextClassRefs(config, requestCtxClasses, AuthnContextComparisonTypeEnumeration.EXACT, map, enforceQoaIfMissing);
-			});
+			assertDoesNotThrow(() ->
+				AssertionValidator.validateAuthnContextClassRefs(config, requestCtxClasses, AuthnContextComparisonTypeEnumeration.EXACT, map, enforceQoaIfMissing)
+			);
 		}
 	}
 
@@ -1255,6 +1355,10 @@ class AssertionValidatorTest {
 
 	private List<Credential> givenClaimTrustStore() {
 		return List.of(SamlTestBase.dummyCredential());
+	}
+
+	private static List<String> givenSignatureAlgorithms() {
+		return List.of(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
 	}
 
 	private AuthnRequest givenSignedAuthnRequest() {
@@ -1296,9 +1400,10 @@ class AssertionValidatorTest {
 		return audience;
 	}
 
-	private List<SubjectConfirmation> givenSubjectConfirmation(String requestId) {
+	private List<SubjectConfirmation> givenSubjectConfirmation(String requestId, String method) {
 		var subjectConfirmation = OpenSamlUtil.buildSamlObject(SubjectConfirmation.class);
 		subjectConfirmation.setSubjectConfirmationData(givenSubjectConfirmationData(requestId));
+		subjectConfirmation.setMethod(method);
 		return List.of(subjectConfirmation);
 	}
 
@@ -1337,11 +1442,12 @@ class AssertionValidatorTest {
 		return OpenSamlUtil.buildAssertionObject();
 	}
 
-	private Assertion givenAssertionWithSubjectConfirmation(String actualRequestId) {
+	private Assertion givenAssertionWithSubjectConfirmation(String actualRequestId, String method) {
 		var assertion = givenAssertion();
 		assertion.setSubject(givenSubject());
 		if (actualRequestId != null) {
-			assertion.getSubject().getSubjectConfirmations().addAll(givenSubjectConfirmation(actualRequestId));
+			assertion.getSubject().getSubjectConfirmations().addAll(
+					givenSubjectConfirmation(actualRequestId, method));
 		}
 		return assertion;
 	}
@@ -1355,8 +1461,8 @@ class AssertionValidatorTest {
 		return assertion;
 	}
 
-	private Assertion givenSignedAssertionWithSubjectConfirmation(String actualRequestId) {
-		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId);
+	private Assertion givenSignedAssertionWithSubjectConfirmation(String actualRequestId, String method) {
+		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, method);
 		assertion.setID(UUID.randomUUID().toString());
 		assertion.setIssueInstant(Instant.now());
 		var issuer = OpenSamlUtil.buildSamlObject(Issuer.class);
@@ -1512,8 +1618,8 @@ class AssertionValidatorTest {
 
 	private String getLastLogLine() {
 		List<ILoggingEvent> list = memoryAppender.getLoggedEvents();
-		if (list.size() >0) {
-			return list.get(list.size() - 1).getFormattedMessage();
+		if (!list.isEmpty()) {
+			return list.getLast().getFormattedMessage();
 		}
 		return "empty log";
 	}

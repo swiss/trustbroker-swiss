@@ -22,14 +22,14 @@ cn: max1-app1
 uid: max1
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: z-114336
+mail: maxine.z-114336@trustbroker.swiss
+adminGlobalId: z-114336
 adminTechAppName: app1
 adminExtId: C123
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
-adminMemberOf: 100:app1-tester-org1
-adminMemberOf: 200:app1-tester-org2
+adminMemberOf: 100:app1-tester-org100
+adminMemberOf: 200:app1-tester-org200
 adminOrgId: 100
 adminOrgId: 200
 
@@ -39,17 +39,16 @@ cn: max1-app1-ext
 uid: max1
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: p-999887
+mail: maxine.p-999887@trustbroker.swiss
+adminGlobalId: p-999887
 adminTechAppName: app1
 adminExtId: C123
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
-adminOrgId: 100
-adminOrgId: 200
-adminOrgId: 300
-adminMemberOf: 100:app1-admin-org1
-adminMemberOf: 300:app1-guest-org3
+adminOrgId: 101
+adminOrgId: 1012
+adminMemberOf: 101:app1-admin-org101
+adminMemberOf: 1012:app1-guest-org1012
 
 dn: cn=max1-app2-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
@@ -57,14 +56,14 @@ cn: max1-app2-ext
 uid: max1
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: p-999887
+mail: maxine.p-999887@trustbroker.swiss
+adminGlobalId: p-999887
 adminTechAppName: app2
 adminExtId: C123
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
 adminOrgId: 100
-adminMemberOf: 100:app1-admin-org1
+adminMemberOf: 100:app2-admin-org100
 
 dn: cn=max2-app1-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
@@ -72,8 +71,8 @@ cn: max2-app1-ext
 uid: max2
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: p-999887
+mail: maxine.p-999887@trustbroker.swiss
+adminGlobalId: p-999887
 adminTechAppName: app1
 adminExtId: C123
 adminDataRoomId: uid-123
@@ -87,8 +86,8 @@ uid: max2
 cn: max2
 sn: Muster
 givenName: Max
-mail: max.muster@trustbroker.swiss
-adminglobalId: x-999887
+mail: max.x-999887@trustbroker.swiss
+adminGlobalId: x-999887
 adminTechAppName: app1
 adminTechAppName: app2
 adminExtId: C123
@@ -96,7 +95,7 @@ adminDataRoomId: uid-123
 adminEnv: DEV+TEST
 adminOrgId: 100
 adminOrgId: 300
-adminMemberOf: 100:app1-admin-org1
+adminMemberOf: 100:app1-admin-org100
 
 # no organization for user
 dn: cn=max3-app2-ext,dc=users,dc=trustbroker,dc=ch
@@ -105,8 +104,8 @@ cn: max3-app2-ext
 uid: max3
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: p-999887
+mail: maxine.p-999887@trustbroker.swiss
+adminGlobalId: p-999887
 adminTechAppName: app2
 adminExtId: C123
 adminDataRoomId: uid-123
@@ -118,8 +117,8 @@ cn: max4-app2-ext
 uid: max4
 sn: Monde
 givenName: Maxine
-mail: maxine.monde@trustbroker.swiss
-adminglobalId: p-999887
+mail: maxine.p-999887@trustbroker.swiss
+adminGlobalId: p-999887
 adminTechAppName: app2
 adminExtId: C125
 adminDataRoomId: uid-123
@@ -130,12 +129,12 @@ objectClass: top
 objectClass: adminOrganization
 cn: org1
 adminDataRoomId: uid-123
-adminOrgId: 100
-adminDisplayNameDE: Org100De
-adminDisplayNameEN: Org100En
-adminDisplayNameFR: Org100Fr
-adminDisplayNameIT: Org100It
-displayName: Org100
+adminOrgId: 101
+adminDisplayNameDE: Org101De
+adminDisplayNameEN: Org101En
+adminDisplayNameFR: Org101Fr
+adminDisplayNameIT: Org101It
+displayName: Org101
 organizationIdentifier: treenode
 
 dn: cn=org2,dc=organization,dc=trustbroker,dc=ch
@@ -143,12 +142,12 @@ objectClass: top
 objectClass: adminOrganization
 cn: org2
 adminDataRoomId: uid-123
-adminOrgId: 200
-adminDisplayNameDE: Org200De
-adminDisplayNameEN: Org200En
-adminDisplayNameFR: Org200Fr
-adminDisplayNameIT: Org200It
-displayName: Org200
+adminOrgId: 1012
+adminDisplayNameDE: Org1012De
+adminDisplayNameEN: Org1012En
+adminDisplayNameFR: Org1012Fr
+adminDisplayNameIT: Org1012It
+displayName: Org1012
 organizationIdentifier: treenode
 
 dn: cn=org3,dc=organization,dc=trustbroker,dc=ch

@@ -1,7 +1,7 @@
 buildscript {
 	ext {
 		top = ''
-		buildVersion = '1.14.0'
+		buildVersion = '1.15.0'
 		buildTimestamp = null
 		// build promotion
 		buildName = System.env.BUILD_NAME
@@ -18,7 +18,7 @@ buildscript {
 plugins {
 	id 'base'
 	// https://central.sonatype.com/artifact/org.springframework.boot/spring-boot/versions
-	id 'org.springframework.boot' version '3.5.14' apply false
+	id 'org.springframework.boot' version '4.0.7' apply false
 	// https://plugins.gradle.org/plugin/org.ajoberstar.grgit
 	id 'org.ajoberstar.grgit' version '4.1.1' apply true
 	// https://plugins.gradle.org/plugin/org.unbroken-dome.test-sets
@@ -49,6 +49,42 @@ subprojects {
 		}
 	}
 
+	// Javadoc needs to operate on delomboked source
+
+	configurations {
+		lombok
+	}
+
+	dependencies {
+		lombok 'org.projectlombok:lombok:'
+	}
+
+	def delombok = tasks.findByName('delombok') ?: tasks.register('delombok', JavaExec) {
+		group = 'build'
+		description = 'Delombok source code'
+
+		mainClass = 'lombok.launch.Main'
+		classpath = configurations.lombok
+
+		args = [
+			'delombok',
+			'src/main/java',
+			'-d',
+			"$buildDir/delombok"
+		]
+	}.get()
+
+	def javadocjar = tasks.findByName('javadocjar') ?: tasks.register('javadocjar', Jar) {
+		dependsOn tasks.withType(Javadoc)
+		group = 'build'
+		archiveClassifier = 'javadoc'
+		destinationDirectory = file("$buildDir/libs")
+		archiveBaseName = project.name
+		description = 'Build jar of generated JavaDoc'
+		from("$buildDir/docs/javadoc")
+		include('**')
+	}.get()
+
 	// Set JUnit 5 as default testing platform for all Java modules + AssertJ for assertions
 	pluginManager.withPlugin('java') {
 		// all modules use dpedency management
@@ -68,10 +104,17 @@ subprojects {
 				mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
 				// spring-cloud: https://spring.io/projects/spring-cloud
 				// https://central.sonatype.com/artifact/org.springframework.cloud/spring-cloud-dependencies/versions
-				mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.0.1'
+				mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.1.1'
 			}
 			// dependency management for libraries used in multiple components
 			dependencies {
+				// tomcat upgrade AHEAD of spring-boot/4.1.1 (remove on upgrade to this version and consider JwtGenerator:160 Date issue)
+				dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.23'
+				dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.23'
+				dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.23'
+				dependency 'org.apache.httpcomponents.core5:httpcore5:5.4.3'
+				dependency 'org.apache.httpcomponents.core5:httpcore5-h2:5.4.3'
+
 				// opensaml
 				// https://build.shibboleth.net/maven/releases/org/opensaml/opensaml-core/
 				// https://shibboleth.atlassian.net/wiki/spaces/IDP5/pages/3199500367/ReleaseNotes
@@ -90,15 +133,15 @@ subprojects {
 				// https://central.sonatype.com/artifact/org.apache.cxf/apache-cxf/versions
 				// https://central.sonatype.com/artifact/com.sun.xml.messaging.saaj/saaj-impl/versions
 				// NOTE: WS-import from wsdl not managed here, see trustbroker-wstrust-service for that.
-				dependencySet(group: 'org.apache.cxf', version: '4.2.0') {
+				dependencySet(group: 'org.apache.cxf', version: '4.2.2') {
 					entry 'cxf-rt-transports-http'
 					entry 'cxf-rt-frontend-jaxws'
 				}
 
 				// git integration
 				// https://central.sonatype.com/artifact/org.eclipse.jgit/org.eclipse.jgit/versions
-				dependency 'org.eclipse.jgit:org.eclipse.jgit:7.5.0.202512021534-r'
-				dependency 'org.eclipse.jgit:org.eclipse.jgit.ssh.apache:7.5.0.202512021534-r'
+				dependency 'org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r'
+				dependency 'org.eclipse.jgit:org.eclipse.jgit.ssh.apache:7.6.0.202603022253-r'
 
 				// apache baseline (opensaml mainly depends on these)
 				// https://central.sonatype.com/artifact/org.apache.commons/commons-text/versions
@@ -108,26 +151,26 @@ subprojects {
 				dependency 'org.apache.commons:commons-text:1.15.0'
 				dependency 'org.apache.commons:commons-lang3:3.20.0'
 				dependency 'commons-beanutils:commons-beanutils:1.11.0'
-				dependency 'commons-io:commons-io:2.21.0'
+				dependency 'commons-io:commons-io:2.22.0'
 
 				// state cache feature
 				// https://central.sonatype.com/artifact/org.mariadb.jdbc/mariadb-java-client/versions
 				// https://mariadb.com/kb/en/mariadb-connector-j-release-notes/
-				dependency 'org.mariadb.jdbc:mariadb-java-client:3.5.7'
+				dependency 'org.mariadb.jdbc:mariadb-java-client:3.5.8'
 				// https://central.sonatype.com/artifact/org.postgresql/postgresql/versions
-				dependency 'org.postgresql:postgresql:42.7.10'
+				dependency 'org.postgresql:postgresql:42.7.12'
 
 				// script support
 				// dependency 'org.codehaus.groovy:groovy-all' is too much for security so reduce to the max
 				// https://central.sonatype.com/artifact/org.apache.groovy/groovy-jsr223/versions
-				dependencySet(group: 'org.apache.groovy', version: '4.0.30') {
+				dependencySet(group: 'org.apache.groovy', version: '4.0.32') {
 					entry 'groovy-jsr223'
 					entry 'groovy'
 				}
 
 				// OIDC support (JSON parsing) - trustbroker-api needs the version
 				// https://central.sonatype.com/artifact/com.nimbusds/nimbus-jose-jwt/versions
-				dependency 'com.nimbusds:nimbus-jose-jwt:9.48'
+				dependency 'com.nimbusds:nimbus-jose-jwt:10.4'
 
 				// JCE provider
 				// https://www.bouncycastle.org/latest_releases.html
@@ -149,13 +192,13 @@ subprojects {
 
 				// exclude old opensaml stuff from spring-security too
 				// https://central.sonatype.com/artifact/org.springframework.security/spring-security-saml2-service-provider/versions
-				dependency('org.springframework.security:spring-security-saml2-service-provider:6.5.9') {
+				dependency('org.springframework.security:spring-security-saml2-service-provider:7.0.5') {
 					exclude group: 'org.opensaml', name: 'opensaml-core'
 				}
 
 				// monitoring
 				// https://central.sonatype.com/artifact/io.micrometer/micrometer-registry-prometheus/versions
-				dependency 'io.micrometer:micrometer-registry-prometheus:1.16.3'
+				dependency 'io.micrometer:micrometer-registry-prometheus:1.16.5'
 
 				// JAX-WS
 				// https://central.sonatype.com/artifact/org.glassfish.jaxb/jaxb-xjc/versions
@@ -178,7 +221,7 @@ subprojects {
 			testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 			// boilerplate
-			compileOnly 'org.projectlombok:lombok:'
+			compileOnly 'org.projectlombok:lombok'
 			annotationProcessor 'org.projectlombok:lombok'
 		}
 
@@ -205,6 +248,15 @@ subprojects {
 				options.deprecation = true
 				options.compilerArgs += ["-Xlint:unchecked"]
 			}
+		}
+
+		tasks.withType(Javadoc).configureEach {
+			dependsOn delombok
+
+			source = fileTree("$buildDir/delombok")
+			classpath = sourceSets.main.compileClasspath
+
+			options.encoding = 'UTF-8'
 		}
 	}
 

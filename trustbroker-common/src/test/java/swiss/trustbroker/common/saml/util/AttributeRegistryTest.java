@@ -53,7 +53,7 @@ class AttributeRegistryTest {
 		assertThat(AttributeRegistry.forName(originalCopy.getNamespaceUri()), is(CoreAttributeName.CLAIMS_NAME));
 		assertThat(AttributeRegistry.forName(overwrite.getNamespaceUri()), is(overwrite));
 		assertThat(AttributeRegistry.forName(overwrite.getAltName()), is(overwrite));
-		assertThat(AttributeRegistry.forName(overwrite.getOidcNameList().get(0)), is(overwrite));
+		assertThat(AttributeRegistry.forName(overwrite.getOidcNameList().getFirst()), is(overwrite));
 		assertThat(AttributeRegistry.forName(overwrite.getOidcNameList().get(1)), is(overwrite));
 	}
 
@@ -86,7 +86,7 @@ class AttributeRegistryTest {
 		assertThat(AttributeRegistry.forName(names.getName()), is(expected));
 		assertThat(AttributeRegistry.forName(names.getNamespaceUri()), is(expected));
 		assertThat(AttributeRegistry.forName(names.getAltName()), is(expected));
-		assertThat(AttributeRegistry.forName(names.getOidcNameList().get(0)), is(expected));
+		assertThat(AttributeRegistry.forName(names.getOidcNameList().getFirst()), is(expected));
 		assertThat(AttributeRegistry.forName(names.getOidcNameList().get(1)), is(expected));
 	}
 

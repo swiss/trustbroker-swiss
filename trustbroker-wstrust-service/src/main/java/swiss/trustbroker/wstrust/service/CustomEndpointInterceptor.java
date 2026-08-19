@@ -164,7 +164,7 @@ public class CustomEndpointInterceptor implements SoapEndpointInterceptor {
 	}
 
 	private static void processSecurityHeader(Security securityHeader, SoapMessageHeader requestHeader) {
-		log.info("Incoming Security header with namespace uri={}", securityHeader.getElementQName());
+		log.debug("Incoming Security header with namespace uri={}", securityHeader.getElementQName());
 
 		List<XMLObject> orderedChildren = securityHeader.getOrderedChildren();
 		if (orderedChildren == null) {

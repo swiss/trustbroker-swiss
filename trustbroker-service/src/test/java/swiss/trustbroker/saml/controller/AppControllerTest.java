@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -63,8 +64,8 @@ import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.xmlsec.signature.Signature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -96,11 +97,17 @@ import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.QualityOfAuthenticationConfig;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.config.dto.SamlProperties;
+import swiss.trustbroker.config.dto.SsoConfig;
 import swiss.trustbroker.federation.xmlconfig.ArtifactBinding;
 import swiss.trustbroker.federation.xmlconfig.ArtifactBindingMode;
+import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
+import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
+import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
 import swiss.trustbroker.federation.xmlconfig.Saml;
+import swiss.trustbroker.federation.xmlconfig.SecurityPolicies;
 import swiss.trustbroker.homerealmdiscovery.controller.HrdController;
+import swiss.trustbroker.homerealmdiscovery.service.RedirectOutputService;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.mapping.service.QoaMappingService;
 import swiss.trustbroker.saml.service.ArtifactResolutionService;
@@ -109,8 +116,8 @@ import swiss.trustbroker.saml.service.AuthenticationService;
 import swiss.trustbroker.saml.service.ClaimsProviderService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
 import swiss.trustbroker.saml.service.SamlOutputService;
+import swiss.trustbroker.saml.service.SkinnyHrdService;
 import swiss.trustbroker.saml.test.util.ServiceSamlTestUtil;
-import swiss.trustbroker.saml.util.SkinnyHrd;
 import swiss.trustbroker.script.service.ScriptService;
 import swiss.trustbroker.sessioncache.service.StateCacheService;
 import swiss.trustbroker.sso.service.SsoService;
@@ -128,10 +135,11 @@ import swiss.trustbroker.util.SamlValidator;
 		RelyingPartyDefinitions.class,
 		SamlValidator.class,
 		ApiSupport.class,
-		AuthenticationService.class
+		AuthenticationService.class,
+		RedirectOutputService.class
 })
 @AutoConfigureMockMvc
-@TestPropertySource(properties="trustbroker.config.saml.enabled=true")
+@TestPropertySource(properties = "trustbroker.config.saml.enabled=true")
 class AppControllerTest {
 
 	private static final String URL_TEMPLATE = ApiSupport.SAML_API;
@@ -181,6 +189,12 @@ class AppControllerTest {
 	@MockitoBean
 	private SamlOutputService outputService;
 
+	@MockitoBean
+	private SkinnyHrdService skinnyHrdService;
+
+	@MockitoBean
+	private RelyingPartySetupService relyingPartySetupService;
+
 	@Autowired
 	private WebApplicationContext webApplicationContext;
 
@@ -202,6 +216,9 @@ class AppControllerTest {
 	@MockitoBean
 	private HrdService hrdService;
 
+	@MockitoBean
+	private RedirectOutputService redirectOutputService;
+
 	private MockMvc mockMvc;
 
 	@BeforeAll
@@ -218,10 +235,37 @@ class AppControllerTest {
 	@BeforeEach
 	void setup() {
 		this.mockMvc = MockMvcBuilders.webAppContextSetup(this.webApplicationContext).build();
+		var sso = new SsoConfig();
+		sso.setEnabled(true);
+		when(trustBrokerProperties.getSso()).thenReturn(sso);
 		when(trustBrokerProperties.getGui()).thenReturn(new GuiProperties());
 		when(trustBrokerProperties.getSaml()).thenReturn(new SamlProperties());
 		when(trustBrokerProperties.getOidc()).thenReturn(new OidcProperties());
+		SecurityPolicies securityPolicies = new SecurityPolicies();
+		securityPolicies.setValidateXmlSchema(true);
+		when(relyingPartySetupService.getPartySecurityPolicies(any())).thenReturn(securityPolicies);
+		rpConfigs();
+		cpConfigs();
 		doAnswer(invocation -> invocation.getArgument(1)).when(hrdService).adaptClaimsProviderMappings(any(), any());
+		// simulate RedirectOutputService just returning the redirects as is for simple validation:
+		doAnswer(invocation -> invocation.getArgument(2)).when(redirectOutputService).handleRedirect(any(), any(), any());
+	}
+
+	private void cpConfigs() {
+		ClaimsProviderSetup claimsProviderSetup = ServiceSamlTestUtil.loadClaimsProviderSetup();
+		when(relyingPartyDefinitions.getClaimsProviderSetup()).thenReturn(claimsProviderSetup);
+		for (ClaimsParty claimsParty : claimsProviderSetup.getClaimsParties()) {
+			when(relyingPartySetupService.getClaimsProviderSetupByIssuerId(eq(claimsParty.getId()), any())).thenReturn(claimsParty);
+			when(relyingPartySetupService.getClaimsProviderSetupByIssuerId(eq(claimsParty.getId()), any(), eq(true))).thenReturn(claimsParty);
+			when(relyingPartySetupService.getClaimsProviderSetupByResponseIssuerId(claimsParty.getId())).thenReturn(claimsProviderSetup.getClaimsParties());
+		}
+	}
+
+	private void rpConfigs() {
+		RelyingPartySetup relyingPartySetup = ServiceSamlTestUtil.loadBaseClaimMergeTest();
+		for (RelyingParty relyingParty : relyingPartySetup.getRelyingParties()) {
+			when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(eq(relyingParty.getId()), any())).thenReturn(relyingParty);
+		}
 	}
 
 	@Test
@@ -306,11 +350,11 @@ class AppControllerTest {
 		var authnRequest = prepareValidIncomingAuthnRequest();
 		String encodedMessage = SamlUtil.encode(authnRequest);
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION,
-						apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
+					.andExpect(status().isFound())
+					.andExpect(header().string(HttpHeaders.LOCATION,
+							apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
 	}
 
 	@Test
@@ -322,8 +366,9 @@ class AppControllerTest {
 		mockRequestConfiguration();
 		var relyingParty = getRelyingParty(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID);
 		relyingParty.setSaml(Saml.builder()
-				.artifactBinding(ArtifactBinding.builder().inboundMode(ArtifactBindingMode.REQUIRED).build())
-				.build());
+								 .artifactBinding(ArtifactBinding.builder().inboundMode(ArtifactBindingMode.REQUIRED).build())
+								 .build());
+		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(eq(relyingParty.getId()), any())).thenReturn(relyingParty);
 		var exception = assertThrows(ServletException.class, () -> {
 			this.mockMvc.perform(
 					post(URL_TEMPLATE)
@@ -332,7 +377,7 @@ class AppControllerTest {
 		});
 		var cause = exception.getCause();
 		assertTrue(cause instanceof RequestDeniedException, "Got unexpected exception " + cause);
-		var rex = (RequestDeniedException)cause;
+		var rex = (RequestDeniedException) cause;
 		assertThat(rex.getInternalMessage(), containsString("does not support inbound binding"));
 	}
 
@@ -342,9 +387,9 @@ class AppControllerTest {
 		var authnRequest = prepareValidIncomingAuthnRequest();
 		var encodedMessage = SamlIoUtil.encodeSamlRedirectData(authnRequest);
 		this.mockMvc.perform(get(URL_TEMPLATE).queryParam(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION,
-						apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
+					.andExpect(status().isFound())
+					.andExpect(header().string(HttpHeaders.LOCATION,
+							apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
 	}
 
 	@Test
@@ -361,9 +406,9 @@ class AppControllerTest {
 		var authnRequest = prepareValidIncomingAuthnRequest();
 		var query = SamlTestBase.buildRedirectQueryString(authnRequest, doubleSignature);
 		this.mockMvc.perform(get(new URI(URL_TEMPLATE + '?' + query)))
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION,
-						apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
+					.andExpect(status().isFound())
+					.andExpect(header().string(HttpHeaders.LOCATION,
+							apiSupport.getHrdUrl(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID())));
 	}
 
 	@Test
@@ -401,10 +446,10 @@ class AppControllerTest {
 		var expectedLocation = op.skipCpAuthentication() ? apiSupport.getDeviceInfoUrl(cpIssuer, rpIssuer, authnRequest.getID()) :
 				apiSupport.getHrdUrl(rpIssuer, authnRequest.getID());
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION, expectedLocation));
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
+					.andExpect(status().isFound())
+					.andExpect(header().string(HttpHeaders.LOCATION, expectedLocation));
 	}
 
 	@Test
@@ -413,16 +458,15 @@ class AppControllerTest {
 		var authnRequest = prepareValidIncomingAuthnRequest(rpIssuer);
 		String encodedMessage = SamlUtil.encode(authnRequest);
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isOk());
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
+					.andExpect(status().isOk());
 	}
 
 	@Test
 	void handleIncomingMessagesValidPostAuthnRequestSkinnyHrdTest() throws Exception {
 		var skinny = "showSkinny";
-		var skinnyHrdTriggers =
-				List.of(RegexNameValue.builder().name(skinny).regex("true").value(SkinnyHrd.SKINNY_HRD_HTML).build());
+		var skinnyHrdTriggers = List.of(RegexNameValue.builder().name(skinny).regex("true").build());
 		doReturn(skinnyHrdTriggers).when(trustBrokerProperties).getSkinnyHrdTriggers();
 		doReturn(VERSION_INFO).when(trustBrokerProperties).getVersionInfo();
 		var authnRequest = prepareValidIncomingAuthnRequest();
@@ -432,11 +476,8 @@ class AppControllerTest {
 						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage)
 						.header(skinny, "true")
 				)
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION, containsString(SkinnyHrd.SKINNY_HRD_HTML)))
-				.andExpect(header().string(HttpHeaders.LOCATION,
-						containsString(ApiSupport.encodeUrlParameter(authnRequest.getID()))))
-				.andExpect(header().string(HttpHeaders.LOCATION, containsString(VERSION_INFO)));
+				.andExpect(status().isOk())
+				.andExpect(content().string("")); // Velocity is mocked
 	}
 
 	@Test
@@ -447,14 +488,14 @@ class AppControllerTest {
 		var referer = "https://saml-test.localdomain/caller";
 		var origin = "https://saml-test.localdomain";
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage)
-						.header(HttpHeaders.REFERER, referer)
-						.header(HttpHeaders.ORIGIN, origin)
-				)
-				.andExpect(status().isFound())
-				.andExpect(header().string(HttpHeaders.LOCATION, apiSupport.getAnnouncementsUrl(
-						ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID(), null)));
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage)
+					.header(HttpHeaders.REFERER, referer)
+					.header(HttpHeaders.ORIGIN, origin)
+			)
+					.andExpect(status().isFound())
+					.andExpect(header().string(HttpHeaders.LOCATION, apiSupport.getAnnouncementsUrl(
+							ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID, authnRequest.getID(), null)));
 	}
 
 	private AuthnRequest prepareValidIncomingAuthnRequest() {
@@ -550,9 +591,9 @@ class AppControllerTest {
 		params.add(SamlIoUtil.SAML_RELAY_STATE, TEST_RELAY_STATE);
 
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.params(params))
-				.andExpect(status().isOk());
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.params(params))
+					.andExpect(status().isOk());
 	}
 
 	@Test
@@ -576,13 +617,11 @@ class AppControllerTest {
 		params.add(SamlIoUtil.SAML_RESPONSE_NAME, encodedMessage);
 		params.add(SamlIoUtil.SAML_RELAY_STATE, TEST_RELAY_STATE);
 
-		Exception exception = assertThrows(ServletException.class, () -> {
+		assertThrows(ServletException.class, () -> {
 			this.mockMvc.perform(post(URL_TEMPLATE)
 					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 					.params(params));
 		});
-		Throwable cause = exception.getCause();
-		assertTrue(cause instanceof RequestDeniedException, "Got unexpected exception " + cause);
 	}
 
 	@Test
@@ -674,10 +713,10 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 		assertion.setSubject(null);
@@ -709,10 +748,10 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 		assertion.getSubject().setNameID(null);
@@ -744,10 +783,10 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignatureWithWrongSignature(authnResponse);
 		authnResponse.getAssertions().clear();
@@ -778,12 +817,12 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
-		Assertion assertion = authnResponse.getAssertions().get(0);
+		Assertion assertion = authnResponse.getAssertions().getFirst();
 		assertion.setSignature(null);
 		authnResponse.getAssertions().clear();
 		authnResponse.getAssertions().add(assertion);
@@ -840,10 +879,10 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 		authnResponse.getAssertions().clear();
@@ -876,10 +915,10 @@ class AppControllerTest {
 		authnResponse.setIssueInstant(Instant.now());
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 		authnResponse.getAssertions().clear();
@@ -916,12 +955,12 @@ class AppControllerTest {
 		authnResponse.setInResponseTo(ServiceSamlTestUtil.CP_AUTHN_REQUEST_ID);
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().get(0).getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getConditions().setNotBefore(Instant.now());
-		authnResponse.getAssertions().get(0).getSubject().getSubjectConfirmations().get(0).getSubjectConfirmationData()
+		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		authnResponse.getAssertions().getFirst().getConditions().setNotBefore(Instant.now());
+		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
 				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().get(0).getAuthnStatements().get(0).setAuthnInstant(Instant.now());
-		authnResponse.getAssertions().get(0).setIssueInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
+		authnResponse.getAssertions().getFirst().setIssueInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 
@@ -939,9 +978,9 @@ class AppControllerTest {
 		params.add(SamlIoUtil.SAML_RELAY_STATE, TEST_RELAY_STATE);
 
 		this.mockMvc.perform(post(entryUrl)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.params(params))
-				.andExpect(status().isOk());
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.params(params))
+					.andExpect(status().isOk());
 	}
 
 	@Test
@@ -953,7 +992,7 @@ class AppControllerTest {
 
 	private RelyingParty getRelyingParty(String rpId) {
 		return relyingPartyDefinitions.getRelyingPartySetup().getRelyingParties().stream()
-						.filter(rp -> rp.getId().equals(rpId)).findFirst().orElseThrow();
+									  .filter(rp -> rp.getId().equals(rpId)).findFirst().orElseThrow();
 	}
 
 	private Assertion resetAssertionSignature(Response response) {
@@ -961,7 +1000,7 @@ class AppControllerTest {
 				ServiceSamlTestUtil.givenSignature(SamlTestBase.TEST_TB_KEYSTORE_JKS, SamlTestBase.TEST_KEYSTORE_PW,
 						SamlTestBase.TEST_KEYSTORE_TB_ALIAS);
 
-		Assertion assertion = response.getAssertions().get(0);
+		Assertion assertion = response.getAssertions().getFirst();
 		assertion.setSignature(null);
 		assertion.setSignature(newSignature);
 		SamlUtil.signSamlObject(assertion, newSignature);
@@ -976,7 +1015,7 @@ class AppControllerTest {
 		Signature newSignature = ServiceSamlTestUtil.givenSignature(SamlTestBase.TEST_IDP_MOCK_KEYSTORE_JKS,
 				SamlTestBase.TEST_KEYSTORE_PW, SamlTestBase.TEST_IDP_MOCK_KEYSTORE_ALIAS);
 
-		Assertion assertion = authnResponse.getAssertions().get(0);
+		Assertion assertion = authnResponse.getAssertions().getFirst();
 		assertion.setSignature(null);
 		assertion.setSignature(newSignature);
 		SamlUtil.signSamlObject(assertion, newSignature);
@@ -1030,9 +1069,9 @@ class AppControllerTest {
 		var request = prepareIncomingLogoutRequest();
 		var encodedMessage = SamlUtil.encode(request);
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isOk());
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
+					.andExpect(status().isOk());
 		verify(relyingPartyService).handleLogoutRequest(any(), any(), any(), any(), any(), any());
 	}
 
@@ -1043,8 +1082,8 @@ class AppControllerTest {
 		var mockResponse = new MockHttpServletResponse();
 		OpenSamlUtil.encodeSamlSoapMessage(mockResponse, context);
 		this.mockMvc.perform(post(URL_TEMPLATE)
-							.contentType(mockResponse.getContentType())
-							.content(mockResponse.getContentAsByteArray()))
+					.contentType(mockResponse.getContentType())
+					.content(mockResponse.getContentAsByteArray()))
 					.andExpect(status().isOk());
 		verify(relyingPartyService).handleLogoutRequest(any(), any(), any(), any(), any(), any());
 	}
@@ -1055,8 +1094,8 @@ class AppControllerTest {
 		var request = prepareIncomingLogoutRequest();
 		var encodedMessage = SamlIoUtil.encodeSamlRedirectData(request);
 		this.mockMvc.perform(get(URL_TEMPLATE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
-				.andExpect(status().isOk());
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage))
+					.andExpect(status().isOk());
 		verify(relyingPartyService).handleLogoutRequest(any(), any(), any(), any(), any(), any());
 	}
 
@@ -1077,10 +1116,10 @@ class AppControllerTest {
 		var logoutResponse = prepareIncomingLogoutResponse();
 		var encodedMessage = SamlUtil.encode(logoutResponse);
 		this.mockMvc.perform(post(URL_TEMPLATE)
-						.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-						.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage)
-						.param(SamlIoUtil.SAML_RELAY_STATE, "relayStateId"))
-				.andExpect(status().isOk());
+					.contentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+					.param(SamlIoUtil.SAML_REQUEST_NAME, encodedMessage)
+					.param(SamlIoUtil.SAML_RELAY_STATE, "relayStateId"))
+					.andExpect(status().isOk());
 	}
 
 	private void handleIncomingMessagesValidRedirectLogoutRequest(boolean doubleSignature) throws Exception {
@@ -1088,7 +1127,7 @@ class AppControllerTest {
 		var query = SamlTestBase.buildRedirectQueryString(request, doubleSignature);
 
 		this.mockMvc.perform(get(new URI(URL_TEMPLATE + '?' + query)))
-				.andExpect(status().isOk());
+					.andExpect(status().isOk());
 	}
 
 	private LogoutRequest prepareIncomingLogoutRequest() {

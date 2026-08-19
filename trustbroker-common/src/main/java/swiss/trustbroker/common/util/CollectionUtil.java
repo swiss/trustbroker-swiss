@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -128,7 +129,7 @@ public class CollectionUtil {
 		if (list.size() > 1) {
 			log.info("Potential ambiguity: Picking first value for name={} from values={}", nameForTracing, list);
 		}
-		return list.get(0);
+		return list.getFirst();
 	}
 
 	public static <K, T> T getSingleValue(Optional<Map.Entry<K, List<T>>> entry) {
@@ -164,4 +165,32 @@ public class CollectionUtil {
 		return entry -> keys.add(id.apply(entry));
 	}
 
+	// Convert a collection to a list by applying the converter
+	public static <T, K> List<K> convertToList(Collection<T> collection, Function<T, K> converter) {
+		if (collection == null) {
+			return new ArrayList<>();
+		}
+		return collection.stream().map(converter).toList();
+	}
+
+	// Convert a collection to a set by applying the converter
+	public static <T, K> Set<K> convertToSet(Collection<T> collection, Function<T, K> converter) {
+		if (collection == null) {
+			return new HashSet<>();
+		}
+		return collection.stream().map(converter).collect(Collectors.toSet());
+	}
+
+	// add value to a list without modifying it, returns unmodifiable list
+	public static <K> List<K> addToList(List<K> values, K valueToAdd) {
+		if (values == null) {
+			return valueToAdd == null ? Collections.emptyList() : List.of(valueToAdd);
+		}
+		if (valueToAdd == null) {
+			return Collections.unmodifiableList(values);
+		}
+		List<K> result = new ArrayList<>(values);
+		result.add(valueToAdd);
+		return Collections.unmodifiableList(result);
+	}
 }

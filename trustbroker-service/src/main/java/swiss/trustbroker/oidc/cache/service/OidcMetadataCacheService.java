@@ -52,6 +52,7 @@ import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethods;
 import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.OidcClaimsSource;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.oidc.OidcHttpClientProvider;
 import swiss.trustbroker.oidc.client.dto.OpenIdProviderConfiguration;
 
@@ -64,6 +65,20 @@ import swiss.trustbroker.oidc.client.dto.OpenIdProviderConfiguration;
 @AllArgsConstructor
 @Slf4j
 public class OidcMetadataCacheService {
+
+	@Data
+	private static class CacheKey {
+
+		private final String oidcClientId;
+
+		private final String counterPartyId;
+
+		private final String type;
+
+		public static CacheKey of(CounterParty counterParty, OidcClient oidcClient) {
+			return new CacheKey(oidcClient.getId(), counterParty.getId(), counterParty.getClass().getSimpleName());
+		}
+	}
 
 	@Data
 	private static class CacheEntry {
@@ -109,7 +124,7 @@ public class OidcMetadataCacheService {
 
 	private final ExecutorService executorService;
 
-	private final Map<String, CacheEntry> oidcConfigurations = new ConcurrentHashMap<>();
+	private final Map<CacheKey, CacheEntry> oidcConfigurations = new ConcurrentHashMap<>();
 
 	/**
 	 * Provide key by token key ID.
@@ -145,7 +160,8 @@ public class OidcMetadataCacheService {
 		return Optional.ofNullable(key);
 	}
 
-	public Function<String, Optional<JWK>> jwtKeySupplier(ClaimsParty claimsParty, OidcClient oidcClient) {
+	public Function<String, Optional<JWK>> jwtKeySupplier(ClaimsParty claimsParty) {
+		var oidcClient = claimsParty.getSingleOidcClient();
 		return id -> getKey(claimsParty, id, oidcClient);
 	}
 
@@ -154,27 +170,28 @@ public class OidcMetadataCacheService {
 		return getCachedConfig(claimsParty, oidcClient).getConfig();
 	}
 
-	public OpenIdProviderConfiguration getOidcConfiguration(CounterParty counterParty, OidcClient oidcClient) {
-		return getCachedConfig(counterParty, oidcClient).getConfig();
+	public OpenIdProviderConfiguration getOidcConfiguration(RelyingParty relyingParty, OidcClient oidcClient) {
+		return getCachedConfig(relyingParty, oidcClient).getConfig();
 	}
 
-	private CacheEntry getCachedConfig(CounterParty claimsParty, OidcClient oidcClient) {
-		return oidcConfigurations.computeIfAbsent(oidcClient.getId(),
-				clientId -> new CacheEntry(fetchProviderMetadata(oidcClient, claimsParty.getCertificates())));
+	private CacheEntry getCachedConfig(CounterParty counterParty, OidcClient oidcClient) {
+		return oidcConfigurations.computeIfAbsent(CacheKey.of(counterParty, oidcClient),
+				clientId -> new CacheEntry(fetchProviderMetadata(oidcClient, counterParty.getCertificates())));
 	}
 
-	private Optional<CacheEntry> refreshCachedConfig(CounterParty claimsParty, OidcClient oidcClient) {
-		var cacheEntry = oidcConfigurations.get(oidcClient.getId());
+	private Optional<CacheEntry> refreshCachedConfig(CounterParty counterParty, OidcClient oidcClient) {
+		var cacheKey = CacheKey.of(counterParty, oidcClient);
+		var cacheEntry = oidcConfigurations.get(cacheKey);
 		if (cacheEntry != null) {
 			long minimumCacheTimeSecs = trustBrokerProperties.getOidc().getMinimumMetadataCacheTimeSecs();
 			if (cacheEntry.keep(minimumCacheTimeSecs)) {
-				log.info("Skipped reload of OIDC metadata for clientId={} loaded less than minimumCacheTimeSecs={} ago",
-						oidcClient.getId(), minimumCacheTimeSecs);
+				log.info("Skipped reload of OIDC metadata for clientId={} type={} loaded less than minimumCacheTimeSecs={} ago",
+						oidcClient.getId(), cacheKey.getType(), minimumCacheTimeSecs);
 				return Optional.empty();
 			}
 		}
-		cacheEntry = new CacheEntry(fetchProviderMetadata(oidcClient, claimsParty.getCertificates()));
-		oidcConfigurations.put(oidcClient.getId(), cacheEntry);
+		cacheEntry = new CacheEntry(fetchProviderMetadata(oidcClient, counterParty.getCertificates()));
+		oidcConfigurations.put(cacheKey, cacheEntry);
 		return Optional.of(cacheEntry);
 	}
 

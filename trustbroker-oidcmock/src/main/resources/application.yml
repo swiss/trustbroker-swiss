@@ -10,6 +10,7 @@ spring:
       authorizationserver:
         client:
           XTB-dev:
+            require-proof-key: false
             registration:
               client-id: XTB-dev
               client-secret: "{noop}secret"
@@ -29,6 +30,9 @@ spring:
                 - email
             require-authorization-consent: false
 oidcmock:
+  # generateJwkFromFile: true
+  # jwkFilePath: "classpath:enc-private-key.pem"
+  # jwkKeyFilePassword: "changeit"
   encryptIdToken: false
   signEncIdToken: false
   encryptionAlgorithm: "RSA-OAEP-256"

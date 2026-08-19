@@ -26,7 +26,6 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
 import { HTTP_INTERCEPTORS, HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { MissingTranslationHandler, MissingTranslationHandlerParams, TranslateLoader, TranslateModule, TranslationObject } from '@ngx-translate/core';
@@ -120,7 +119,7 @@ export class BTBTranslateLoader extends TranslateLoader {
 	bootstrap: [AppComponent],
 	imports: [
 		BrowserModule,
-		BrowserAnimationsModule,
+
 		MatGridListModule,
 		MatMenuModule,
 		MatIconModule,

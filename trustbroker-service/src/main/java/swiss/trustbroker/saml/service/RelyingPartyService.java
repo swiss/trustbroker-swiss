@@ -51,18 +51,17 @@ import org.springframework.transaction.annotation.Transactional;
 import swiss.trustbroker.api.accessrequest.dto.AccessRequestHttpData;
 import swiss.trustbroker.api.accessrequest.service.AccessRequestService;
 import swiss.trustbroker.api.idm.dto.IdmProvisioningRequest;
+import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.idm.service.IdmProvisioningService;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionData;
 import swiss.trustbroker.api.profileselection.dto.ProfileSelectionResult;
-import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
 import swiss.trustbroker.api.saml.dto.DestinationType;
 import swiss.trustbroker.api.saml.dto.EncodingParameters;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.audit.service.AuditService;
 import swiss.trustbroker.audit.service.InboundAuditMapper;
 import swiss.trustbroker.audit.service.OutboundAuditMapper;
-import swiss.trustbroker.common.config.ExternalStores;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
@@ -84,8 +83,6 @@ import swiss.trustbroker.federation.xmlconfig.Definition;
 import swiss.trustbroker.federation.xmlconfig.Encryption;
 import swiss.trustbroker.federation.xmlconfig.EncryptionKeyInfo;
 import swiss.trustbroker.federation.xmlconfig.EncryptionKeyPlacement;
-import swiss.trustbroker.federation.xmlconfig.IdmLookup;
-import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.SloProtocol;
@@ -93,6 +90,7 @@ import swiss.trustbroker.homerealmdiscovery.dto.ProfileRequest;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.homerealmdiscovery.util.DefaultIdmStatusPolicyCallback;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
+import swiss.trustbroker.homerealmdiscovery.util.RelyingPartyUtil;
 import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.mapping.service.ClaimsMapperService;
 import swiss.trustbroker.mapping.service.QoaMappingService;
@@ -173,27 +171,21 @@ public class RelyingPartyService {
 	private final JwtClaimsService jwtClaimsService;
 
 	private void getAttributesFromIdm(CpResponse cpResponse, String requestIssuer, boolean audited) {
-		var relyingPartyConfig = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(requestIssuer, null);
+		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(requestIssuer, null);
 		var callback = new DefaultIdmStatusPolicyCallback(cpResponse);
-		var originalUserDetailCount = 0;
-		var originalPropertiesCount = 0;
-		Set<String> lookupStores = new HashSet<>();
-		for (var idmService : idmQueryServices) {
-			var queryResponse = audited ?
-					idmService.getAttributesAudited(relyingPartyConfig, cpResponse, cpResponse.getIdmLookup(), callback) :
-					idmService.getAttributes(relyingPartyConfig, cpResponse, cpResponse.getIdmLookup(), callback);
-			if (queryResponse.isPresent()) {
-				DefinitionUtil.mapAttributeList(queryResponse.get().getUserDetails(), cpResponse.getUserDetails());
-				originalUserDetailCount += queryResponse.get().getOriginalUserDetailsCount();
-				DefinitionUtil.mapAttributeListIgnoringSource(queryResponse.get().getProperties(), cpResponse.getProperties());
-				originalPropertiesCount += queryResponse.get().getOriginalPropertiesCount();
-				cpResponse.getAdditionalIdmData().putAll(queryResponse.get().getAdditionalData());
-				lookupStores.addAll(queryResponse.get().getQueriedStores());
-			}
+		var result = RelyingPartyUtil.performIdmLookups(cpResponse, relyingParty, audited, callback, idmQueryServices);
+		if (result.isPresent()) {
+			processQueryResult(cpResponse, result.get());
 		}
-		cpResponse.setOriginalUserDetailsCount(originalUserDetailCount);
-		cpResponse.setOriginalPropertiesCount(originalPropertiesCount);
-		cpResponse.setQueriedStores(lookupStores);
+	}
+
+	private static void processQueryResult(CpResponse cpResponse, IdmResult queryResponse) {
+		DefinitionUtil.mapAttributeList(queryResponse.getUserDetails(), cpResponse.getUserDetails());
+		DefinitionUtil.mapAttributeListIgnoringSource(queryResponse.getProperties(), cpResponse.getProperties());
+		cpResponse.setOriginalUserDetailsCount(queryResponse.getOriginalUserDetailsCount());
+		cpResponse.setOriginalPropertiesCount(queryResponse.getOriginalPropertiesCount());
+		cpResponse.setAdditionalIdmData(queryResponse.getAdditionalData());
+		cpResponse.setQueriedStores(queryResponse.getQueriedStores());
 	}
 
 	public void setProperties(CpResponse cpResponse) {
@@ -423,7 +415,7 @@ public class RelyingPartyService {
 														   .oidcClientId(idpStateData.getRpOidcClientId())
 														   .ignoreEmptyProfiles(!hasAccessRequest)
 														   .build();
-			final var profileSelectionService = getProfileSelectionService(relyingParty.getIdmLookup());
+			var profileSelectionService = profileSelectionServiceFactory.getProfileSelectionService(relyingParty.getIdmLookup());
 			psResult = profileSelectionService.doInitialProfileSelection(
 					profileSelectionData, relyingParty, cpResponse, idpStateData);
 			if (psResult.getRedirectUrl() != null) {
@@ -451,7 +443,7 @@ public class RelyingPartyService {
 		if (stateDataForResponse != null) {
 			log.debug("Session state={} found based on cookie, checking SSO for incomingDeviceId={}",
 					stateDataForResponse.getId(), incomingDeviceId);
-			if (ssoService.ssoStateValidForDeviceInfo(hrdSelectedClaimsParty, relyingParty, stateDataForResponse, idpStateData,
+			if (ssoService.ssoStateValidForJoin(hrdSelectedClaimsParty, relyingParty, stateDataForResponse, idpStateData,
 					incomingDeviceId, hrdSelectedClaimsParty.getId())) {
 				ssoService.completeDeviceInfoPreservingStateForSso(stateDataForResponse, idpStateData, relyingParty);
 				log.info("Joined SSO sessionId={} for authnSessionId={}", stateDataForResponse.getId(), idpStateData.getId());
@@ -490,7 +482,7 @@ public class RelyingPartyService {
 													   .applicationName(idpStateData.getRpApplicationName())
 													   .oidcClientId(idpStateData.getRpOidcClientId())
 													   .build();
-		final var profileSelectionService = getProfileSelectionService(relyingParty.getIdmLookup());
+		var profileSelectionService = profileSelectionServiceFactory.getProfileSelectionService(relyingParty.getIdmLookup());
 		psResult = profileSelectionService.doFinalProfileSelection(profileSelectionData, relyingParty, cpResponse,
 				idpStateData);
 
@@ -532,7 +524,7 @@ public class RelyingPartyService {
 													   .oidcClientId(stateData.getRpOidcClientId())
 													   .selectedProfileId(stateData.getSelectedProfileExtId())
 													   .build();
-		final var profileSelectionService = getProfileSelectionService(relyingParty.getIdmLookup());
+		var profileSelectionService = profileSelectionServiceFactory.getProfileSelectionService(relyingParty.getIdmLookup());
 		if (!profileSelectionService.isValidSelectedProfile(profileSelectionData, cpResponse)) {
 			log.info("Reset selectedProfileId={} due to new IDM data for rpIssuer={}",
 					stateData.getSelectedProfileExtId(), cpResponse.getRpIssuer());
@@ -656,8 +648,7 @@ public class RelyingPartyService {
 
 		// make IDM context available RP side scripting
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(requestIssuer, requestReferer);
-		var idmLookUp = relyingPartySetupService.getIdmLookUp(relyingParty);
-		idmLookUp.ifPresent(idmLookup -> cpResponse.setIdmLookup(idmLookup.shallowClone()));
+		cpResponse.cloneIdmLookup(relyingParty.getIdmLookup());
 		cpResponse.setClientExtId(relyingPartySetupService.getRpClientExtId(relyingParty));
 
 		// scripts BeforeIdm RP side
@@ -952,7 +943,8 @@ public class RelyingPartyService {
 		// NOTE: We could do a freshness check here in case the state data is older than X because of changes in IDM => LATER
 		var originalParticipantId = cpResponse.getRpIssuer();
 		var newParticipant = !authnIssuerId.equals(originalParticipantId);
-		var ssoForceIdmRefresh = relyingParty.isSsoEnabled() && Boolean.TRUE.equals(relyingParty.getSso().getForceIdmRefresh());
+		var ssoForceIdmRefresh = relyingParty.isSsoEnabled(trustBrokerProperties.getSso().isEnabled())
+				&& Boolean.TRUE.equals(relyingParty.getSso().getForceIdmRefresh());
 		if (!newParticipant && !ssoForceIdmRefresh) {
 			log.info("Skip refreshing user data because IDP response already initiated by rpIssuer={} for configRpId={} "
 					+ "(without SSO or forceIdmRefresh=true)", originalParticipantId, relyingParty.getId());
@@ -999,7 +991,7 @@ public class RelyingPartyService {
 				.applicationName(stateDataByAuthnReq.getRpApplicationName())
 				.oidcClientId(stateDataByAuthnReq.getRpOidcClientId())
 				.build();
-		final var profileSelectionService = getProfileSelectionService(relyingParty.getIdmLookup());
+		var profileSelectionService = profileSelectionServiceFactory.getProfileSelectionService(relyingParty.getIdmLookup());
 		var psResult = profileSelectionService.doSsoProfileSelection(
 				profileSelectionData, relyingParty, cpResponse, stateDataByAuthnReq);
 		if (psResult.getSelectedProfileId() != null) {
@@ -1308,6 +1300,7 @@ public class RelyingPartyService {
 						signingRp, signatureContext.getBinding(), null, trustBrokerProperties, false);
 				signatureContext.setRequireSignature(signingRp.requireSignedLogoutRequest());
 				AssertionValidator.validateRequestSignature(logoutRequest, signingRp.getRpTrustCredentials(),
+						signingRp.getAllowedSignatureAlgorithms(trustBrokerProperties.getSecurity().getAllowedSignatureAlgorithms()),
 						trustBrokerProperties, signatureContext);
 			}
 			else {
@@ -1474,7 +1467,7 @@ public class RelyingPartyService {
 													   .applicationName(idpStateData.getApplicationName())
 													   .oidcClientId(idpStateData.getRpOidcClientId())
 													   .build();
-		final var profileSelectionService = getProfileSelectionService(relyingParty.getIdmLookup());
+		var profileSelectionService = profileSelectionServiceFactory.getProfileSelectionService(relyingParty.getIdmLookup());
 		var psResult = profileSelectionService.doFinalProfileSelection(
 				profileSelectionData, relyingParty, cpResponse, idpStateData);
 
@@ -1522,29 +1515,6 @@ public class RelyingPartyService {
 			return rpIssuerId;
 		}
 		return null;
-	}
-
-	public ProfileSelectionService getProfileSelectionService(IdmLookup idmLookup) {
-		String storeType = null;
-		if (idmLookup != null) {
-			// Check IDMLookup.store
-			var directStore = idmLookup.getStore();
-			if (ExternalStores.isValid(directStore)) {
-				storeType = directStore;
-			}
-			else {
-				// Check IDMLookup.IDMQuery[].store
-				List<IdmQuery> queries = idmLookup.getQueries();
-				if (queries != null) {
-					storeType = queries.stream()
-									   .map(IdmQuery::getStore)
-									   .filter(ExternalStores::isValid)
-									   .findFirst()
-									   .orElse(null);
-				}
-			}
-		}
-		return profileSelectionServiceFactory.getService(storeType);
 	}
 
 	public Map<String, Object> getTokenExchangeUserData(Map<String, Object> tokenClaims, Map<Definition, List<String>> cpOriginalAttributes,

@@ -86,7 +86,7 @@ public class AuthorizationCodeFlowService {
 	}
 
 	/**
-	 * Process response to Authorization Code Flow request, fetch tokens, and convert to <codeCpResponse></code>.
+	 * Process response to Authorization Code Flow request, fetch tokens, and convert to <code>CpResponse></code>.
 	 */
 	public CpResponse handleCpResponse(String realm, String code, ClaimsParty claimsParty, StateData stateData) {
 		log.info("Processing code response for sessionId={} realm={}", stateData.getId(), realm);

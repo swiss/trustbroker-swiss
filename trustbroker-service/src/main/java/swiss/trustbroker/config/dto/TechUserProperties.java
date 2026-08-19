@@ -15,6 +15,8 @@
 
 package swiss.trustbroker.config.dto;
 
+import java.util.Set;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,4 +40,11 @@ public class TechUserProperties {
 	 * User profile in IDM.
 	 */
 	private String profile;
+
+	/**
+	 * Roles in IDM.
+	 *
+	 * @since 1.15.0
+	 */
+	private Set<String> roles;
 }

@@ -29,9 +29,9 @@ import org.opensaml.soap.wsfed.impl.EndPointReferenceUnmarshaller;
 /**
  * Unmarshaller for opensaml4 compatibility that can handle this nesting:
  * <pre>
- * <wsa:EndPointReference xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing">
- *   <wsa:Address xmlns:wsa="http://www.w3.org/2005/08/addressing">urn:SAMPLE_RP</wsa:Address>
- * </wsa:EndPointReference>
+ * &lt;wsa:EndPointReference xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"&gt;
+ *   &lt;wsa:Address xmlns:wsa="http://www.w3.org/2005/08/addressing">urn:SAMPLE_RP&lt;/wsa:Address&gt;
+ * &lt;/wsa:EndPointReference&gt;
  * </pre>
  */
 @Slf4j

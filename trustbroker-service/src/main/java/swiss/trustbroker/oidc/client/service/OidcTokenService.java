@@ -15,13 +15,16 @@
 
 package swiss.trustbroker.oidc.client.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import io.micrometer.core.annotation.Timed;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.tracing.Traced;
@@ -29,7 +32,6 @@ import swiss.trustbroker.common.util.HttpUtil;
 import swiss.trustbroker.common.util.JsonUtil;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.StringUtil;
-import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.federation.xmlconfig.AuthorizationGrantType;
 import swiss.trustbroker.federation.xmlconfig.Certificates;
 import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethod;
@@ -55,23 +57,13 @@ class OidcTokenService {
 			OpenIdProviderConfiguration configuration, String redirectUri, String code) {
 		String clientSecretPost = null;
 		Map<String, String> headers = new HashMap<>();
-		var authenticationMethods = configuration.getAuthenticationMethods().getMethods();
-		boolean clientSecretBasicSupported = authenticationMethods.contains(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
-		boolean clientSecretPostSupported = authenticationMethods.contains(ClientAuthenticationMethod.CLIENT_SECRET_POST);
-		if (clientSecretPostSupported && !clientSecretBasicSupported) {
+		var authenticationMethod = selectAuthenticationMethod(client, configuration);
+		if (authenticationMethod == ClientAuthenticationMethod.CLIENT_SECRET_POST) {
 			clientSecretPost = configuration.getClientSecret();
-			log.debug("Using client_secret_post");
 		}
 		else {
-			var authorization = WebUtil.getBasicAuthorizationHeader(client.getId(), configuration.getClientSecret());
+			var authorization = OidcUtil.getBasicAuthorizationHeader(client.getId(), configuration.getClientSecret());
 			headers.put(HttpHeaders.AUTHORIZATION, authorization);
-			if (clientSecretBasicSupported) {
-				log.debug("Using client_secret_basic");
-			}
-			else {
-				log.warn("None of the authenticationMethods={} of client={} supported, using client_secret_basic",
-						authenticationMethods, client.getId());
-			}
 		}
 		var params = buildTokenRequestParameters(client, code, redirectUri, clientSecretPost);
 		var tokenEndpoint = configuration.getTokenEndpoint();
@@ -80,12 +72,18 @@ class OidcTokenService {
 					tokenEndpoint, redirectUri, StringUtil.maskSecrets(params.toString(), clientSecretPost, code));
 		}
 		try (var httpClient = httpClientProvider.createHttpClient(client, certificates, tokenEndpoint)) {
-			var response = HttpUtil.getHttpFormPostString(httpClient, tokenEndpoint, params, headers);
-			if (response.isEmpty()) {
+			var responseOpt = HttpUtil.getHttpFormPostStringResonse(httpClient, tokenEndpoint, params, headers);
+			if (responseOpt.isEmpty()) {
 				throw new TechnicalException(String.format("oidcClientId=%s failed POST to tokenEndpoint=%s",
 						client.getId(), tokenEndpoint));
 			}
-			return JsonUtil.parseJsonObject(response.get(), false);
+			var response = responseOpt.get();
+			if (response.statusCode() != HttpStatus.OK.value()) {
+				throw new TechnicalException(String.format(
+						"oidcClientId=%s POST to tokenEndpoint=%s returned HTTP statusCode=%d body='%s'",
+						client.getId(), tokenEndpoint, response.statusCode(), response.body()));
+			}
+			return JsonUtil.parseJsonObject(response.body(), false);
 		}
 	}
 
@@ -101,6 +99,30 @@ class OidcTokenService {
 			params.put(OidcUtil.CLIENT_SECRET, clientSecret);
 		}
 		return params;
+	}
+
+	static ClientAuthenticationMethod selectAuthenticationMethod(OidcClient client,
+			OpenIdProviderConfiguration configuration) {
+		List<ClientAuthenticationMethod> authenticationMethods =
+				new ArrayList<>(configuration.getAuthenticationMethods().getMethods());
+		if (client.getClientAuthenticationMethods() != null) {
+			authenticationMethods.retainAll(client.getClientAuthenticationMethods().getMethods());
+			log.debug("Possible for issuerId={} : authenticationMethods={}", configuration.getIssuerId(), authenticationMethods);
+		}
+		boolean clientSecretBasicSupported = authenticationMethods.contains(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+		boolean clientSecretPostSupported = authenticationMethods.contains(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+		if (clientSecretPostSupported && !clientSecretBasicSupported) {
+			log.debug("Using client_secret_post");
+			return ClientAuthenticationMethod.CLIENT_SECRET_POST;
+		}
+		if (clientSecretBasicSupported) {
+			log.debug("Using client_secret_basic");
+		}
+		else {
+			log.warn("None of the authenticationMethods={} of client={} supported, using client_secret_basic",
+					authenticationMethods, client.getId());
+		}
+		return ClientAuthenticationMethod.CLIENT_SECRET_BASIC;
 	}
 
 }

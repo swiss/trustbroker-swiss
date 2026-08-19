@@ -99,7 +99,7 @@ export class ProfileSelectionComponent implements OnInit {
 
 	getTranslation(key: string, value: Record<string, string[]>) {
 		const currentLang = this.translateService.getCurrentLang();
-		const attributeName = key + currentLang.toLowerCase();
+		const attributeName = key + currentLang.toUpperCase();
 		return value[attributeName] ?? [key];
 	}
 

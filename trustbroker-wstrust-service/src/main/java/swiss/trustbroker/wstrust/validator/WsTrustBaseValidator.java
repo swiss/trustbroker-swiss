@@ -63,15 +63,16 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 	private final Clock clock;
 
 	/**
-	 * @return true if credentials present and the assertion has a signature that was successfully validated
+	 * @return signatureValidated true if credentials present and the assertion has a signature that was successfully validated
 	 */
 	protected AssertionValidator.MessageValidationResult validateAssertion(Assertion assertion,
 			AssertionValidator.ExpectedAssertionValues expectedValues, Optional<List<Credential>> credentials,
-			boolean requireSignedAssertion, RequestSecurityToken request, ClaimsParty claimsParty, RelyingParty relyingParty) {
+			List<String> allowedSignatureAlgorithms, boolean requireSignedAssertion, RequestSecurityToken request,
+			ClaimsParty claimsParty, RelyingParty relyingParty) {
 		// Validate the assertion on XTB level only per default. The wss4j layer doing the same is deprecated and can be dropped.
 		if (trustBrokerProperties.getSecurity().isValidateSecurityTokenRequestAssertion()) {
 			try {
-				return validateAssertionWithCorrection(assertion, expectedValues, credentials,
+				return validateAssertionWithCorrection(assertion, expectedValues, credentials, allowedSignatureAlgorithms,
 						request, claimsParty, relyingParty);
 			}
 			catch (RequestDeniedException ex) {
@@ -89,10 +90,12 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 
 	private AssertionValidator.MessageValidationResult validateAssertionWithCorrection(Assertion assertion,
 			AssertionValidator.ExpectedAssertionValues expectedValues, Optional<List<Credential>> credentials,
-			RequestSecurityToken request, ClaimsParty claimsParty, RelyingParty relyingParty) {
+			List<String> allowedSignatureAlgorithms, RequestSecurityToken request,
+			ClaimsParty claimsParty, RelyingParty relyingParty) {
 		try {
 			return AssertionValidator.validateRstAssertion(
-					assertion, trustBrokerProperties, null, null, clock.instant(), expectedValues, credentials);
+					assertion, trustBrokerProperties, null, null, clock.instant(), expectedValues,
+					credentials, allowedSignatureAlgorithms);
 		}
 		catch (RequestDeniedException ex) {
 			if (assertion == null || ex.getErrorCode() != StandardErrorCode.SIGNATURE_NOT_OK) {
@@ -112,7 +115,8 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 			}
 			log.info("Retrying assertion validation with patched assertion after exception error={}", ex.getInternalMessage());
 			return AssertionValidator.validateRstAssertion(
-					assertions.get(0), trustBrokerProperties, null, null, clock.instant(), expectedValues, credentials);
+					assertions.getFirst(), trustBrokerProperties, null, null, clock.instant(), expectedValues,
+					credentials, allowedSignatureAlgorithms);
 		}
 	}
 
@@ -150,7 +154,7 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 					"Assertion in RSTR with assertionID='%s' expected to have a single audience but has audiences='%s'",
 					assertion.getID(), audiences));
 		}
-		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(audiences.get(0), null);
+		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(audiences.getFirst(), null);
 		if (CollectionUtils.isEmpty(relyingParty.getRpTrustCredentials())) {
 			throw new RequestDeniedException(String.format(
 					"Assertion in RSTR with assertionID='%s' audience rpIssuerId='%s' has no SignerTruststore",
@@ -236,5 +240,9 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 		var properties = getTrustBrokerProperties();
 		var wstrust = properties.getWstrust();
 		return wstrust != null && wstrust.isEnabled() && wstrust.getWsTrustBindings().contains(getBinding());
+	}
+
+	protected List<String> getAllowedSignatureAlgorithms(CounterParty cp) {
+		return cp.getAllowedSignatureAlgorithms(trustBrokerProperties.getSecurity().getAllowedSignatureAlgorithms());
 	}
 }

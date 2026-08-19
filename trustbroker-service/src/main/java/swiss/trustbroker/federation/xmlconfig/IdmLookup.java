@@ -34,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import swiss.trustbroker.api.idm.dto.IdmRequest;
 import swiss.trustbroker.api.idm.dto.IdmRequests;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
+import swiss.trustbroker.common.util.CollectionUtil;
 
 /**
  * Specify a list of queries that are executed in the specified order.
@@ -86,16 +87,10 @@ public class IdmLookup implements Serializable, IdmRequests {
 		return Collections.unmodifiableList(queries);
 	}
 
-	public void updateIdmQueries(List<IdmRequest> idmRequests) {
-		if (idmRequests == null) {
-			queries = new ArrayList<>();
-			return;
-		}
-		if (!idmRequests.equals(queries)) {
-			queries = new ArrayList<>();
-			for (var idmRequest : idmRequests) {
-				queries.add(IdmQuery.of(idmRequest));
-			}
+	public void updateIdmQueries(List<IdmQuery> idmQueries) {
+		var convertedList = CollectionUtil.convertToList(idmQueries, IdmQuery::of);
+		if (!convertedList.equals(queries)) {
+			queries = convertedList;
 		}
 	}
 }

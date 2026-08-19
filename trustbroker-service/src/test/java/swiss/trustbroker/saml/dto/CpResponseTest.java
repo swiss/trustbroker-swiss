@@ -45,11 +45,11 @@ class CpResponseTest {
 		cpResponse.setAttribute("NULL", null);
 		cpResponse.setAttributes("NULL", List.of());
 		assertThat(cpResponse.getAttributes()
-							 .size(), is(0));
+							 .size(), is(1));
 		cpResponse.setAttribute("attr1", "value1");
 		cpResponse.setAttributes("attr1", List.of("value2", "value3"));
 		assertThat(cpResponse.getAttributes()
-							 .size(), is(1));
+							 .size(), is(2));
 		assertThat(cpResponse.getAttributes("attr1"), contains("value2", "value3"));
 		assertThat(cpResponse.getAttribute("attr1"), is("value2"));
 		assertThat(cpResponse.getAttribute("attr2"), is(nullValue()));

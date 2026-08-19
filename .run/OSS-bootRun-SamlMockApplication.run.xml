@@ -1,0 +1,18 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="OSS-bootRun-SamlMockApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="GIT_URL" value="https://github.com/swiss/gitops.trustbroker.swiss.git" />
+      <env name="PKI_PASSPHRASE" value="changeit" />
+      <env name="SPRING_PROFILES_ACTIVE" value="DEMO" />
+      <env name="STORE_PASS" value="secret" />
+      <env name="TRUSTBROKER_HOME" value="./home" />
+      <env name="CONFIG_BRANCH" value="main" />
+    </envs>
+    <module name="trustbroker-swiss.trustbroker-samlmock.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="swiss.trustbroker.samlmock.SamlMockApplication" />
+    <option name="WORKING_DIRECTORY" value="file://$PROJECT_DIR$/trustbroker-samlmock" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

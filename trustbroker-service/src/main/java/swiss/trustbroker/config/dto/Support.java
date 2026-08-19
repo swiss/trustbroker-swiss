@@ -74,4 +74,12 @@ public class Support {
 	 */
 	private Map<String, String> level;
 
+	/**
+	 * Configure in-memory limits so network traffic cannot crash pods.
+	 *
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private int memoryLimitBytes = 262144;
+
 }

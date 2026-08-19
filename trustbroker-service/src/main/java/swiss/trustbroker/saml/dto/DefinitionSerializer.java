@@ -15,28 +15,27 @@
 
 package swiss.trustbroker.saml.dto;
 
-import java.io.IOException;
 import java.io.StringWriter;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
 import swiss.trustbroker.federation.xmlconfig.Definition;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
 
 /**
  * Because jackson cannot properly deal with complex map keys, custom serialization support on maps are necessary.
  * https://github.com/FasterXML/jackson-docs/wiki/JacksonHowToCustomSerializers
  */
-public class DefinitionSerializer extends JsonSerializer<Definition> {
+public class DefinitionSerializer extends ValueSerializer<Definition> {
 
 	private ObjectMapper mapper = new ObjectMapper();
 
 	@Override
-	public void serialize(Definition value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-		StringWriter writer = new StringWriter();
+	public void serialize(Definition value, JsonGenerator gen, SerializationContext serializers) {
+		var writer = new StringWriter();
 		mapper.writeValue(writer, value);
-		gen.writeFieldName(writer.toString());
+		gen.writeName(writer.toString());
 	}
 
 }

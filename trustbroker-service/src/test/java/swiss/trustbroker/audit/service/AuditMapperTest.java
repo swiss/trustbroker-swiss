@@ -662,4 +662,47 @@ class AuditMapperTest {
 		assertEquals(expectedSource, AuditMapper.mapSource(querySource, existingSource));
 	}
 
+	@Test
+	void testMapFromRequestParamsValue() {
+		// null parameter map
+		var auditDto = new InboundAuditMapper(trustBrokerProperties)
+				.mapFromTokenRequestParams((Map<String, String[]>) null)
+				.build();
+
+		assertThat(auditDto.getTokenRequestParams(), nullValue());
+
+		// empty parameter map
+		Map<String, String[]> emptyParams = Collections.emptyMap();
+		auditDto = new InboundAuditMapper(trustBrokerProperties)
+				.mapFromTokenRequestParams(emptyParams)
+				.build();
+
+		assertThat(auditDto.getTokenRequestParams(), nullValue());
+
+		// multiple parameters
+		var params = new HashMap<String, String[]>();
+		params.put("param1", new String[]{"value1"});
+		params.put("param2", new String[]{"value2"});
+		params.put("param3", null);
+		params.put("scope", new String[]{"read", "write", "admin"});
+		params.put("emptyArray", new String[]{});
+		params.put("client_secret", new String[]{"verySecretValue"});
+		params.put("client_secret_short", new String[]{"abc"});
+		params.put("access_token", new String[]{"tokenValue123"});
+
+		auditDto = new InboundAuditMapper(trustBrokerProperties)
+				.mapFromTokenRequestParams(params)
+				.build();
+
+		assertThat(auditDto.getTokenRequestParams(), is(not(nullValue())));
+		assertThat(auditDto.getTokenRequestParams().get("param1"), is("value1"));
+		assertThat(auditDto.getTokenRequestParams().get("param2"), is("value2"));
+		assertThat(auditDto.getTokenRequestParams().get("param3"), is(""));
+		assertThat(auditDto.getTokenRequestParams().get("scope"), is("read,write,admin"));
+		assertThat(auditDto.getTokenRequestParams().get("emptyArray"), is(""));
+		assertThat(auditDto.getTokenRequestParams().get("client_secret"), is("veryS***"));
+		assertThat(auditDto.getTokenRequestParams().get("client_secret_short"), is("abc***"));
+		assertThat(auditDto.getTokenRequestParams().get("access_token"), is("token***"));
+		assertThat(auditDto.getTokenRequestParams().size(), is(8));
+	}
 }

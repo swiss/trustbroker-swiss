@@ -253,8 +253,8 @@ class OidcExceptionHelperTest {
 		var resultErrors = OidcExceptionHelper.enrichResponseError(properties, response, errors);
 		assertThat(resultErrors, hasSize(2));
 		// first one is the mapped one
-		assertThat(resultErrors.get(0).getErrorCode(), is("unknown_principal"));
-		assertThat(resultErrors.get(0).getDescription(), containsString(StatusCode.UNKNOWN_PRINCIPAL));
+		assertThat(resultErrors.getFirst().getErrorCode(), is("unknown_principal"));
+		assertThat(resultErrors.getFirst().getDescription(), containsString(StatusCode.UNKNOWN_PRINCIPAL));
 		assertThat(resultErrors.get(1).getErrorCode(), is(error.getErrorCode()));
 		assertThat(resultErrors.get(1).getDescription(), is(error.getDescription()));
 	}

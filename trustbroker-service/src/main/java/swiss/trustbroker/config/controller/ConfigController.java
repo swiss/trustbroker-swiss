@@ -25,7 +25,9 @@ import swiss.trustbroker.homerealmdiscovery.dto.GuiConfig;
 import swiss.trustbroker.util.ApiSupport;
 
 /**
- * Controller for the version API.
+ * Controller for the version and UI config APIs.
+ * <br/>
+ * Required for HRD UI hence always enabled.
  */
 @RestController
 @AllArgsConstructor

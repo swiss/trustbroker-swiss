@@ -22,6 +22,7 @@ import static org.mockito.Mockito.doReturn;
 
 import java.util.function.BiConsumer;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -54,14 +55,21 @@ class OidcTxResponseWrapperTest {
 
 	private OidcTxResponseWrapper oidcTxResponseWrapper;
 
+	private AutoCloseable mocks;
+
 	@BeforeEach
 	void setUp() {
-		MockitoAnnotations.openMocks(this);
+		mocks = MockitoAnnotations.openMocks(this);
 		properties = new TrustBrokerProperties();
 		request = new MockHttpServletRequest();
 		response = new MockHttpServletResponse();
 		oidcTxResponseWrapper = new OidcTxResponseWrapper(request, response, definitions, properties, apiSupport,
 				oidcFrameAncestorHandler);
+	}
+
+	@AfterEach
+	void tearDown() throws Exception {
+		mocks.close();
 	}
 
 	@Test

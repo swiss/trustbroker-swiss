@@ -130,7 +130,7 @@ class DefinitionUtilTest {
 		var resultSource = DefinitionUtil.findListByNameOrNamespace(definition, source, input);
 		assertThat(resultSource, is(values));
 
-		var expectedValue = expected.isEmpty() ? null : expected.get(0);
+		var expectedValue = expected.isEmpty() ? null : expected.getFirst();
 		var singleValue = DefinitionUtil.findSingleValueByNameOrNamespace(inputName, null, input);
 		assertThat(singleValue, is(expectedValue));
 
@@ -141,7 +141,7 @@ class DefinitionUtilTest {
 		assertThat(singleValueOtherSource, is(nullValue()));
 
 		var singleValueSource = DefinitionUtil.findSingleValueByNameOrNamespace(definition, source, input);
-		assertThat(singleValueSource, is(values.get(0)));
+		assertThat(singleValueSource, is(values.getFirst()));
 
 		Map<AttributeName, List<String>> inputCp =
 				Map.of(Definition.ofName(CoreAttributeName.NAME), List.of("other"), definition, values);

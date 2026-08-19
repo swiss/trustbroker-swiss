@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,7 @@ import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.tracing.TraceSupport;
 import swiss.trustbroker.common.util.CollectionUtil;
+import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
@@ -288,14 +290,14 @@ public abstract class AuditMapper {
 		var cid = isCid(name);
 		var values = SamlUtil.getAttributeValues(attribute);
 		if (values.size() == 1) {
-			addResponseAttribute(name, null, values.get(0), AuditDto.AttributeSource.SAML_RESPONSE, null, cid); // single value
+			addResponseAttribute(name, null, values.getFirst(), AuditDto.AttributeSource.SAML_RESPONSE, null, cid); // single value
 		}
 		else {
 			addResponseAttribute(name, null, values, AuditDto.AttributeSource.SAML_RESPONSE, null, cid); // list
 		}
 		// overwrite conversationId if attribute was set by caller as a claim
 		if (CoreAttributeName.CONVERSATION_ID.equalsByNameOrNamespace(name)) {
-			var conversationId = values.get(0);
+			var conversationId = values.getFirst();
 			setIfNotNull(builder::conversationId, conversationId);
 			TraceSupport.switchToConversation(conversationId);
 		}
@@ -353,6 +355,32 @@ public abstract class AuditMapper {
 			setIfNotNull(builder::cpIssuer, claimsParty.getId());
 		}
 		return this;
+	}
+
+	public AuditMapper mapFromTokenRequestParams(Map<String, String[]> requestParams) {
+		if (requestParams != null && !requestParams.isEmpty()) {
+			Map<String, String> params = requestParams.entrySet().stream().collect(
+					Collectors.toMap(Map.Entry::getKey,
+							e -> {
+								String[] values = e.getValue();
+								var joined = "";
+								if (values != null) {
+									joined = values.length == 1 ? values[0] : String.join(",", values);
+								}
+								return maskIfSensitive(e.getKey(), joined);
+							}
+					));
+			builder.tokenRequestParams(params);
+		}
+		return this;
+	}
+
+	private String maskIfSensitive(String key, String value) {
+		if (value == null || value.isEmpty() || key == null) {
+			return "";
+		}
+		value = StringUtil.cleanForNameValue(value);
+		return StringUtil.maskSecret(key, value);
 	}
 
 	private void mapResponse(Response response) {
@@ -466,7 +494,7 @@ public abstract class AuditMapper {
 
 	private static Object flattenList(Object value) {
 		if (value instanceof List<?> list) {
-			value = list.size() == 1 ? list.get(0) : value;
+			value = list.size() == 1 ? list.getFirst() : value;
 		}
 		return value;
 	}

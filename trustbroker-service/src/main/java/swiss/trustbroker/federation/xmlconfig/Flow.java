@@ -151,7 +151,7 @@ public class Flow implements Serializable {
 		return Boolean.TRUE.equals(reLogin);
 	}
 
-	private boolean doAppContinue() {
+	public boolean doAppContinue() {
 		return Boolean.TRUE.equals(appContinue);
 	}
 

@@ -30,8 +30,7 @@ public class PolicyDecider {
 			log.debug("trustbroker.config.security.validateXmlSchema={} SecurityPolicy.validateXmlSchema={}",
 					properties.getSecurity().isValidateXmlSchema(), policies);
 		}
-		return properties.getSecurity().isValidateXmlSchema() &&
-				(policies == null || policies.getValidateXmlSchema());
+		return properties.getSecurity().isValidateXmlSchema() && (policies == null || policies.getValidateXmlSchema());
 	}
 
 }

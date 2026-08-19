@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.shibboleth.shared.codec.HTMLEncoder;
 import org.apache.velocity.app.VelocityEngine;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
@@ -74,7 +75,8 @@ public class RedirectOutputService {
 		var split = WebUtil.splitQueryParameters(redirectUrl, true);
 		Map<String, Object> velocityParams = new HashMap<>();
 		velocityParams.put(VelocityUtil.VELOCITY_PARAM_XTB_HTTP_METHOD, HttpMethod.GET.name());
-		velocityParams.put(VelocityUtil.VELOCITY_PARAM_ACTION, split.getKey());
+		velocityParams.put(VelocityUtil.VELOCITY_PARAM_ACTION, HTMLEncoder.encodeForHTMLAttribute(split.getKey()));
+		// attribute keys and values are HTML encoded already:
 		velocityParams.put(VelocityUtil.VELOCITY_PARAM_ADDITIONAL_FIELDS, split.getValue());
 		VelocityUtil.renderTemplate(velocityEngine, response, VelocityUtil.VELOCITY_REDIRECT_TEMPLATE_ID, velocityParams);
 		return null;

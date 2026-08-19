@@ -15,12 +15,17 @@
 
 package swiss.trustbroker.profileselection.service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
+import swiss.trustbroker.common.config.ExternalStores;
+import swiss.trustbroker.common.exception.TechnicalException;
+import swiss.trustbroker.federation.xmlconfig.IdmLookup;
+import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 
 @Component
 public class ProfileSelectionServiceFactory {
@@ -35,7 +40,7 @@ public class ProfileSelectionServiceFactory {
 		this.defaultService = defaultService;
 	}
 
-	public ProfileSelectionService getService(String type) {
+	public ProfileSelectionService getProfileSelectionService(String type) {
 		if (services.size() == 1) {
 			return services.values().iterator().next();
 		}
@@ -43,7 +48,30 @@ public class ProfileSelectionServiceFactory {
 			return defaultService;
 		}
 		return Optional.ofNullable(services.get(type.toLowerCase()))
-					   .orElseThrow(() -> new IllegalArgumentException("Unknown profile selection service type: " + type));
+					   .orElseThrow(() -> new TechnicalException(
+							   String.format("Unknown profile selection service type=%s", type)));
 	}
 
+	public ProfileSelectionService getProfileSelectionService(IdmLookup idmLookup) {
+		String storeType = null;
+		if (idmLookup != null) {
+			// Check IDMLookup.store
+			var directStore = idmLookup.getStore();
+			if (ExternalStores.isValid(directStore)) {
+				storeType = directStore;
+			}
+			else {
+				// Check IDMLookup.IDMQuery[].store
+				List<IdmQuery> queries = idmLookup.getQueries();
+				if (queries != null) {
+					storeType = queries.stream()
+							.map(IdmQuery::getStore)
+							.filter(ExternalStores::isValid)
+							.findFirst()
+							.orElse(null);
+				}
+			}
+		}
+		return getProfileSelectionService(storeType);
+	}
 }

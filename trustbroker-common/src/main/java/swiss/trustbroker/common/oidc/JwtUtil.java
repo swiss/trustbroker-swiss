@@ -254,19 +254,14 @@ public class JwtUtil {
 		}
 
 		var privateKey = credential.getPrivateKey();
-		if (privateKey == null) {
-			throw new TechnicalException(String.format("No PrivateKey found for id=%s in credential=%s", clientId, credential));
-		}
-
-		// BASE64URL(UTF8(JWE Protected Header)) '.' BASE64URL(JWE Encrypted Key) '.' BASE64URL(JWE Initialization Vector) '.'   BASE64URL(JWE Ciphertext) '.'  BASE64URL(JWE Authentication Tag)
-		if (privateKey instanceof RSAPrivateKey key) {
-			parse.decrypt(new RSADecrypter(key));
-		}
-		else if (privateKey instanceof BCECPrivateKey key) {
-			parse.decrypt(new ECDHDecrypter(key));
-		}
-		else {
-			throw new TechnicalException(String.format("Invalid decryption credential alg=%s found for id=%s", privateKey.getAlgorithm(), clientId));
+		switch (privateKey) {
+			case null -> throw new TechnicalException(
+					String.format("No PrivateKey found for id=%s in credential=%s", clientId, credential));
+			// BASE64URL(UTF8(JWE Protected Header)) '.' BASE64URL(JWE Encrypted Key) '.' BASE64URL(JWE Initialization Vector) '.'   BASE64URL(JWE Ciphertext) '.'  BASE64URL(JWE Authentication Tag)
+			case RSAPrivateKey key -> parse.decrypt(new RSADecrypter(key));
+			case BCECPrivateKey key -> parse.decrypt(new ECDHDecrypter(key));
+			default -> throw new TechnicalException(
+					String.format("Invalid decryption credential alg=%s found for id=%s", privateKey.getAlgorithm(), clientId));
 		}
 
 		// Header

@@ -243,6 +243,24 @@ public class QoaMappingUtil {
 		}
 	}
 
+	public static void missingQoaException(QoaComparison comparison, List<String> expectedContextClasses,
+	                                       QoaConfig qoaConf) {
+		if (!qoaConf.hasConfig()) {
+			return;
+		}
+
+		var cpEnforce = qoaConf.config().enforce();
+
+		var msg = String.format("Missing Qoa in request issuer=%s, expectedCtxClasses=%s comparison=%s",
+				qoaConf.issuerId(), expectedContextClasses, comparison);
+		if (cpEnforce) {
+			throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
+		}
+		else {
+			log.warn(msg);
+		}
+	}
+
 	static List<AcClass> getConfigAcClasses(String contextClass, Qoa configQoa, Boolean outbound) {
 		if (configQoa == null || CollectionUtils.isEmpty(configQoa.getClasses())) {
 			return Collections.emptyList();

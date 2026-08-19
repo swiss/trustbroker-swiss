@@ -103,8 +103,8 @@ public class OIdcMockJwtCustomizer implements OAuth2TokenCustomizer<JwtEncodingC
 					.build();
 			var jwkSelector = new JWKSelector(new JWKMatcher.Builder().build());
 			List<JWK> jwks = jwkSource.get(jwkSelector, null);
-			var signer = new RSASSASigner(jwks.get(0).toRSAKey());
-			var publicJWK = jwks.get(0).toPublicJWK();
+			var signer = new RSASSASigner(jwks.getFirst().toRSAKey());
+			var publicJWK = jwks.getFirst().toPublicJWK();
 			var signedJWT = new SignedJWT(
 					new JWSHeader.Builder(JWSAlgorithm.RS256)
 							.type(new JOSEObjectType("dpop+jwt"))
@@ -128,7 +128,7 @@ public class OIdcMockJwtCustomizer implements OAuth2TokenCustomizer<JwtEncodingC
 				if (valueList == null || valueList.isEmpty()) {
 					return;
 				}
-				Object claimValue = valueList.size() == 1 ? valueList.get(0) : valueList;
+				Object claimValue = valueList.size() == 1 ? valueList.getFirst() : valueList;
 				customClaims.put(key, claimValue);
 			});
 		}

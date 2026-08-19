@@ -15,8 +15,6 @@
 
 package swiss.trustbroker.ldap.service;
 
-import static org.springframework.core.Ordered.LOWEST_PRECEDENCE;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,14 +22,13 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.Order;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
-import swiss.trustbroker.api.idm.dto.IdmRequests;
+import swiss.trustbroker.api.idm.dto.IdmRequest;
 import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.api.idm.service.IdmStatusPolicyCallback;
@@ -50,76 +47,71 @@ import swiss.trustbroker.util.IdmAttributeUtil;
 
 @Service
 @Slf4j
-@Order(LOWEST_PRECEDENCE)
 @AllArgsConstructor
+@ConditionalOnBooleanProperty("trustbroker.config.ldap.enabled")
 public class LdapService implements IdmQueryService {
 
-	public static final String PROFILE_SEPARATOR = LdapIdentitySelectionService.PROFILE_SEPARATOR;
+	private static final String PROFILE_SEPARATOR = LdapIdentitySelectionService.PROFILE_SEPARATOR;
+
+	static final String UNPROCESSED_ATTRIBUTES = "UNPROCESSED_ATTRIBUTES";
 
 	private final LdapClient ldapClient;
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
 	@Override
-	public Optional<IdmResult> getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse, IdmRequests idmRequests, IdmStatusPolicyCallback statusPolicyCallback) {
-		final var requestedStore = ExternalStores.LDAP.name();
-		var ldapStoreConfig = trustBrokerProperties.getLdap();
-		if (!ldapStoreConfig.isEnabled() || !hasQueryOfStore(requestedStore, idmRequests, null)) {
-			log.trace("Skipping idmService={} for idmRequests={}", ExternalStores.LDAP, idmRequests);
-			return Optional.empty();
-		}
-		var result = getLdapAttributes(relyingPartyConfig, cpResponse, idmRequests);
+	public boolean getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+			IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback, Map<String, Object> state, IdmResult result) {
+		getLdapAttributes(relyingPartyConfig, cpResponse, idmRequest, state, result);
 		log.info("LDAP result: attributeCount={} propertyCount={}", result.getUserDetails().size(), result.getProperties().size());
-		return Optional.of(result);
+		return true;
 	}
 
-	public IdmResult getLdapAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse, IdmRequests idmRequests) {
-		var result = new IdmResult();
-		List<Map<String, List<String>>> unprocessedAttributes = new LinkedList<>();
+	@Override
+	public Integer getServiceDefaultOrder() {
+		return Integer.MAX_VALUE;
+	}
+
+	public void getLdapAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+			IdmRequest idmQuery, Map<String, Object> state, IdmResult result) {
 		var attributeCount = 0;
-		var querySuccessCount = 0;
+		var querySuccess = false;
+		List<Map<String, List<String>>> unprocessedAttributes = getUnprocessedAttributes(state);
 
-		// iterate over all queries skipping all not addressed to store LDAP
-		final var requestedStore = ExternalStores.LDAP.name();
-		for (var idmQuery : idmRequests.getQueryList()) {
-			if (!isQueryOfStore(requestedStore, idmQuery, idmRequests.getStore())) {
-				log.trace("Skipping idmService={} for idmQuery={}", ExternalStores.LDAP, idmQuery);
-				continue;
-			}
-			result.getQueriedStores().add(requestedStore);
-
-			var attrs = ldapClient.search(relyingPartyConfig, cpResponse, idmQuery, unprocessedAttributes);
-
-			if (!attrs.isEmpty()) {
-				querySuccessCount += 1;
-				unprocessedAttributes.addAll(attrs);
-			}
+		var attrs = ldapClient.search(relyingPartyConfig, cpResponse, idmQuery, unprocessedAttributes, result);
+		if (!attrs.isEmpty()) {
+			querySuccess = true;
+			unprocessedAttributes.addAll(attrs);
 		}
 
 		final var profileSelectionProperties = ((RelyingParty) relyingPartyConfig).getProfileSelection();
-		List<Map<String, List<String>>> prefixedProfiles = new ArrayList<>();
+		List<Map<String, List<String>>> attributesForAggregation = attrs;
 		if (profileSelectionProperties != null && profileSelectionProperties.isProfileSelectionEnabled() &&
 				!ProfileSelectionMode.SILENT.name().equals(profileSelectionProperties.getProfileSelectionMode())) {
-			prefixedProfiles = prefixProfileAttributes(relyingPartyConfig, profileSelectionProperties, unprocessedAttributes);
+			attributesForAggregation = prefixProfileAttributes(relyingPartyConfig, profileSelectionProperties, unprocessedAttributes);
 		}
-		final var attributes = aggregateAndFindAttributes(prefixedProfiles, relyingPartyConfig);
+		final var attributes = aggregateAndFindAttributes(attributesForAggregation, relyingPartyConfig);
 		result.getUserDetails().putAll(attributes);
 		attributeCount += attributes.size();
 
 		if (log.isInfoEnabled()) {
-			log.info("IDM result ({}): Called directory with issuer={} nameID={} resultCount={} successCount={}",
-					ExternalStores.LDAP.name(), cpResponse.getIssuerId(), cpResponse.getNameId(), attributeCount, querySuccessCount);
+			log.info("IDM result ({}): Called directory with query={} issuer={} nameID={} resultCount={} success={}",
+					ExternalStores.LDAP.name(), idmQuery.getName(), cpResponse.getIssuerId(), cpResponse.getNameId(), attributeCount, querySuccess);
 		}
 
-		result.setOriginalUserDetailsCount(attributeCount);
-		return result;
+		result.addOriginalUserDetailsCount(attributeCount);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static List<Map<String, List<String>>> getUnprocessedAttributes(Map<String, Object> state) {
+		return (List<Map<String, List<String>>>) state.computeIfAbsent(UNPROCESSED_ATTRIBUTES,key -> new LinkedList<>());
 	}
 
 	List<Map<String, List<String>>> prefixProfileAttributes(RelyingPartyConfig relyingPartyConfig, ProfileSelection profileSelectionProperties, List<Map<String, List<String>>> attrs) {
 		final var profileSelector = getProfileSelector(profileSelectionProperties.getProfileSelector(), relyingPartyConfig.getId());
 		if (profileSelector == null) {
 			throw new TechnicalException(String.format(
-					"LDAP ProfileSelection.profileSelector cannot be null or empty for rp=%s. HINT: set RelyingParty.ProfileSelection.profileSelector",  relyingPartyConfig.getId()));
+					"LDAP ProfileSelection.profileSelector cannot be null or empty for rp=%s. HINT: set RelyingParty.ProfileSelection.profileSelector", relyingPartyConfig.getId()));
 		}
 		final var orgSelector = getProfileSelector(profileSelectionProperties.getOrganizationSelector(), relyingPartyConfig.getId());
 		final var organizationSelector = profileSelectionProperties.getOrganizationSelector();
@@ -179,7 +171,7 @@ public class LdapService implements IdmQueryService {
 			}
 			return values.stream().map(value -> {
 				boolean containsSeparator = value.contains(n2kSeparator);
-				boolean containsOrg = orgId != null && value.contains(orgId);
+				boolean containsOrg = orgId != null && valueContainsOrg(value, List.of(orgId));
 				boolean containsProfile = profileSelectorValue != null && value.contains(profileSelectorValue);
 				if (containsSeparator && (containsOrg || containsProfile)) {
 					String[] split = value.split(n2kSeparator);
@@ -202,7 +194,8 @@ public class LdapService implements IdmQueryService {
 				List<String> orgProfiles = profile.get(organizationSelector);
 				if (orgProfiles == null || orgProfiles.isEmpty()) {
 					log.warn("Invalid profile. Missing organization entry for profile={}", profile);
-				} else {
+				}
+				else {
 					log.debug("Splitting profile={} by organizationSelector={}", profile, organizationSelector);
 					splitProfileByOrgs(organizationSelector, profiles, profile, orgProfiles);
 				}
@@ -224,12 +217,20 @@ public class LdapService implements IdmQueryService {
 																  e -> e.getValue()
 																		.stream()
 																		// If data contains orgId -> drop data from different organization
-																		.filter(v -> unselectedOrgs.stream().noneMatch(v::contains))
+																		.filter(v -> !valueContainsOrg(v, unselectedOrgs))
 																		.toList()
 														  ));
 			newProfile.put(organizationSelector, organizationAttr);
 			profiles.add(newProfile);
 		}
+	}
+
+	private static boolean valueContainsOrg(String value, List<String> unselectedOrgs) {
+		if (!value.contains(PROFILE_SEPARATOR) || unselectedOrgs.isEmpty()) {
+			return false;
+		}
+		String[] valueParts = value.split(PROFILE_SEPARATOR);
+		return unselectedOrgs.contains(valueParts[0]);
 	}
 
 	private void addAttributesToProfile(Map<String, List<String>> profile, Map<String, List<String>> orgEntry) {
@@ -242,8 +243,8 @@ public class LdapService implements IdmQueryService {
 
 	private Map<String, List<String>> getOrgEntryByOrgId(List<Map<String, List<String>>> organizations, String orgId, String organizationSelector) {
 		List<Map<String, List<String>>> collect = organizations.stream()
-															  .filter(orgEntry -> orgEntry.get(organizationSelector) != null && orgEntry.get(organizationSelector).contains(orgId))
-															  .toList();
+															   .filter(orgEntry -> orgEntry.get(organizationSelector) != null && orgEntry.get(organizationSelector).contains(orgId))
+															   .toList();
 		return collect.isEmpty() ? Collections.emptyMap() : collect.getFirst();
 	}
 
@@ -302,5 +303,10 @@ public class LdapService implements IdmQueryService {
 		IdmQuery idmQuery = IdmQuery.builder().name(ExternalStores.LDAP.name()).build();
 		var attributeSelection = IdmAttributeUtil.getIdmAttributeSelection(relyingPartyConfig, idmQuery);
 		return IdmAttributeUtil.getAttributesForQueryResponse(aggregatedAttributes, idmQuery.getName(), attributeSelection);
+	}
+
+	@Override
+	public String getStoreName() {
+		return ExternalStores.LDAP.name();
 	}
 }

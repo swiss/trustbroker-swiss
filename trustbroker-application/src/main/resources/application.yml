@@ -477,7 +477,6 @@ trustbroker:
     #skinnyHrdTriggers:
     #  - name: 'User-Agent'
     #    regex: '.*Trident/7.*'
-    #    value: '/skinnyColHRD.html'
     monitoringHints:
       - name: 'X-Simulated-Forwarded-For'
         regex: '10\.10\.10\.[2-254]*'

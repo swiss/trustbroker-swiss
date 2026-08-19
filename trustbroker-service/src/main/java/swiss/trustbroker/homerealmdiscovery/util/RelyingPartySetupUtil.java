@@ -15,11 +15,11 @@
 
 package swiss.trustbroker.homerealmdiscovery.util;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.util.CollectionUtils;
-import swiss.trustbroker.api.idm.dto.IdmRequest;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.DirectoryUtil;
@@ -130,9 +129,13 @@ public class RelyingPartySetupUtil {
 			var rulePath = resolvePath(definitionPath, pullConfigPath, baseRule, relyingParty.getSubPath(), trustBrokerProperties);
 			var basePath = Path.of(rulePath, baseRule).toString();
 			var baseParty = ClaimsProviderUtil.loadRelyingParty(basePath, environment);
-			mergeRelyingParty(relyingParty, baseParty, idmQueryServices, claimsProviderSetup);
+			mergeRelyingParty(relyingParty, baseParty, claimsProviderSetup);
 			applyGlobalCertificates(relyingParty, trustBrokerProperties);
 			validateScripts(relyingParty, scriptService);
+		}
+
+		if (relyingParty.getIdmLookup() != null) {
+			sortIdmQueries(relyingParty, idmQueryServices);
 		}
 
 		// apply global defaults from ClaimsProviderDefinition.xml )backward compat)
@@ -271,8 +274,8 @@ public class RelyingPartySetupUtil {
 		}
 	}
 
-	static void mergeRelyingParty(RelyingParty relyingParty, RelyingParty baseRelyingParty, List<IdmQueryService> idmQueryServices,
-								  ClaimsProviderSetup claimsProviderSetup) {
+	static void mergeRelyingParty(RelyingParty relyingParty, RelyingParty baseRelyingParty,
+			ClaimsProviderSetup claimsProviderSetup) {
 		if (relyingParty == null) {
 			throw new TechnicalException("RelyingParty is missing");
 		}
@@ -345,7 +348,7 @@ public class RelyingPartySetupUtil {
 			}
 			else {
 				mergeMultiQueryPolicy(relyingParty, baseRelyingParty);
-				mergeIdmQueries(relyingParty, baseRelyingParty.getIdmLookup(), idmQueryServices);
+				mergeIdmQueries(relyingParty, baseRelyingParty.getIdmLookup());
 			}
 		}
 
@@ -378,8 +381,8 @@ public class RelyingPartySetupUtil {
 			relyingParty.setCertificates(Certificates.builder().build());
 		}
 		var certSetup = relyingParty.getCertificates();
-		var signerCertPath = extractCertName(trustBrokerProperties.getSigner().getSignerCert());
-		var signerKeyPath = extractCertName(trustBrokerProperties.getSigner().getSignerKey());
+		var signerCertPath = checkCertPath(trustBrokerProperties.getSigner().getSignerCert());
+		var signerKeyPath = checkCertPath(trustBrokerProperties.getSigner().getSignerKey());
 		if (certSetup.getSignerKeystore() == null && trustBrokerProperties.getSigner() != null) {
 			var globalSigner = CertificateUtil.toSignerKeystore(trustBrokerProperties.getSigner());
 			globalSigner.setCertPath(signerCertPath);
@@ -388,7 +391,6 @@ public class RelyingPartySetupUtil {
 		}
 		// trust ourselves as a last resort to not have a 'null' truststore
 		if (certSetup.getSignerTruststore() == null && trustBrokerProperties.getSigner() != null) {
-
 			var globalTrust = CertificateUtil.toSignerTruststore(trustBrokerProperties.getSigner());
 			globalTrust.setCertPath(signerCertPath);
 			globalTrust.setKeyPath(signerKeyPath);
@@ -396,12 +398,9 @@ public class RelyingPartySetupUtil {
 		}
 	}
 
-	// In global config certPath contains the whole path, but on load the path is completed
-	private static String extractCertName(String certPath) {
-		if (certPath == null) {
-			return null;
-		}
-		return new File(certPath).getName();
+	// handle empty certPath as unset global keystore
+	private static String checkCertPath(String certPath) {
+		return certPath == null || certPath.trim().isEmpty() ? null : certPath;
 	}
 
 	private static void mergeOidc(RelyingParty relyingParty, Oidc baseOidc) {
@@ -409,12 +408,12 @@ public class RelyingPartySetupUtil {
 				|| relyingParty.getOidc() == null || relyingParty.getOidc().getClients() == null) {
 			return;
 		}
-
-		relyingParty.getOidc().getClients().forEach(client -> mergeOidcClient(client, baseOidc.getClients().get(0), relyingParty));
+		relyingParty.getOidc().getClients().forEach(client -> mergeOidcClient(client, baseOidc.getClients().getFirst(), relyingParty));
 	}
 
 	protected static void mergeOidcClient(OidcClient client, OidcClient baseClient, RelyingParty relyingParty) {
 		PropertyUtil.copyMissingAttributes(client, baseClient);
+		PropertyUtil.copyMissingAttributes(client.getOidcSecurityPolicies(), baseClient.getOidcSecurityPolicies());
 		mergeQoaLevels(client, relyingParty.getQoa());
 	}
 
@@ -601,7 +600,7 @@ public class RelyingPartySetupUtil {
 			throw new TechnicalException(String.format("Configure exactly one AccessRequest Authorized Application for "
 					+ "Profile instead of %d: %s", baseApplications.size(), baseApplications));
 		}
-		var baseApplication = baseApplications.get(0);
+		var baseApplication = baseApplications.getFirst();
 		if (targetApplications.isEmpty()) {
 			targetApplications.add(baseApplication);
 			return;
@@ -866,19 +865,19 @@ public class RelyingPartySetupUtil {
 		}
 	}
 
-	static void mergeIdmQueries(RelyingParty relyingParty, IdmLookup baseLookup, List<IdmQueryService> idmQueryServices) {
+	static void mergeIdmQueries(RelyingParty relyingParty, IdmLookup baseLookup) {
 		if (baseLookup.getQueries() == null) {
 			return;
 		}
 		for (IdmQuery baseIdmQuery : baseLookup.getQueries()) {
 			mergeIdmQuery(relyingParty, baseIdmQuery);
 		}
-		sortIdmQueries(relyingParty, idmQueryServices);
 	}
 
 	private static void mergeIdmQuery(RelyingParty relyingParty, IdmQuery baseIdmQuery) {
 		var idmQuery = getExistingIdmQuery(relyingParty.getIdmLookup(), baseIdmQuery.getName(), baseIdmQuery.getId());
 		if (idmQuery != null) {
+			PropertyUtil.copyAttributeIfMissing(IdmQuery::setOrder, IdmQuery::getOrder, idmQuery, baseIdmQuery);
 			PropertyUtil.copyAttributeIfBlank(IdmQuery::setIssuerNameId, IdmQuery::getIssuerNameId, idmQuery, baseIdmQuery);
 			PropertyUtil.copyAttributeIfBlank(IdmQuery::setIssuerNameIdNS, IdmQuery::getIssuerNameIdNS, idmQuery, baseIdmQuery);
 			PropertyUtil.copyAttributeIfBlank(IdmQuery::setSubjectNameId, IdmQuery::getSubjectNameId, idmQuery, baseIdmQuery);
@@ -896,14 +895,43 @@ public class RelyingPartySetupUtil {
 		}
 	}
 
-
-	private static void sortIdmQueries(RelyingParty relyingParty, List<IdmQueryService> idmQueryServices) {
+	static void sortIdmQueries(RelyingParty relyingParty, List<IdmQueryService> idmQueryServices) {
 		if (relyingParty.getIdmLookup() == null) {
 			return;
 		}
-		for (IdmQueryService idmQueryService : idmQueryServices) {
-			List<IdmRequest> idmRequests = idmQueryService.sortIdmRequests(relyingParty.getIdmLookup());
-			relyingParty.getIdmLookup().updateIdmQueries(idmRequests);
+
+		IdmLookup idmLookup = relyingParty.getIdmLookup();
+		List<IdmQuery> queries = idmLookup.getQueries();
+		setStoreOrderAndSortByName(relyingParty, idmQueryServices);
+		var orderedQueries = queries.stream()
+									.sorted(Comparator.comparing(IdmQuery::getOrder)
+													  .thenComparing(q -> q.isSortByName() && q.getName() != null ? q.getName() : ""))
+									.toList();
+		relyingParty.getIdmLookup().updateIdmQueries(orderedQueries);
+	}
+
+	private static void setStoreOrderAndSortByName(RelyingParty relyingParty, List<IdmQueryService> idmQueryServices) {
+		var idmLookup = relyingParty.getIdmLookup();
+		var queries = idmLookup.getQueries();
+		var defaultStore = idmLookup.getStore();
+		for (var query : queries) {
+			var idmQueryService = RelyingPartyUtil.getServiceForStore(query, defaultStore, idmQueryServices);
+			if (idmQueryService.isEmpty()) {
+				var msg = String.format("Unable to find IdmQueryService for rpIssuerId=%s query=%s with store=%s",
+						relyingParty.getId(), query.getId(), query.getStore());
+				log.error(msg);
+				relyingParty.invalidate(msg);
+			}
+			if (query.getOrder() == null) {
+				Integer order = Integer.MIN_VALUE;
+				boolean sortByName = false;
+				if (idmQueryService.isPresent()) {
+					order = idmQueryService.get().getServiceDefaultOrder();
+					sortByName = idmQueryService.get().sortQueriesByName();
+				}
+				query.setOrder(order);
+				query.setSortByName(sortByName);
+			}
 		}
 	}
 

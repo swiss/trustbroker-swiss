@@ -144,7 +144,16 @@ public class WsTrustConfig {
 	private boolean issueRequireSignedRequests = true;
 
 	/**
-	 * Require signed SOAP requests for WS-Trust RENEW.
+	 * WS-Trust ISSUE requires timestamp.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Builder.Default
+	private boolean issueRequireTimestamp = true;
+
+	/**
+	 * Require signed SOAP requests for WS-Trust ISSUE.
 	 * <br/>
 	 * Default: true
 	 * @since 1.13.0

@@ -179,7 +179,7 @@ public class JwkUtil {
 		} else if (jwks.isEmpty()) {
 			throw new TechnicalException(String.format("Failed to select a JWK signing key for JwkMatcher=%s", jwkMatcher));
 		} else {
-			return jwks.get(0);
+			return jwks.getFirst();
 		}
 	}
 
@@ -225,7 +225,7 @@ public class JwkUtil {
 			return null;
 		}
 		if (encJwks.size() == 1) {
-			return encJwks.get(0);
+			return encJwks.getFirst();
 		}
 		if (encryptionAlgorithm != null) {
 			var keyForAlg = encJwks.stream().filter(key -> key != null && key.getAlgorithm() != null &&
@@ -234,6 +234,6 @@ public class JwkUtil {
 				return keyForAlg;
 			}
 		}
-		return encJwks.get(0);
+		return encJwks.getFirst();
 	}
 }

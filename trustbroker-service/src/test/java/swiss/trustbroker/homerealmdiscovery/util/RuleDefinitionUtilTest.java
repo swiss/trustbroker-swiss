@@ -41,9 +41,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +54,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.api.idm.dto.IdmRequest;
-import swiss.trustbroker.api.idm.dto.IdmRequests;
 import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.api.idm.service.IdmStatusPolicyCallback;
@@ -90,19 +89,54 @@ class RuleDefinitionUtilTest {
 	private static class SortingIdmService implements IdmQueryService {
 
 		@Override
-		public Optional<IdmResult> getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
-				IdmRequests idmRequests, IdmStatusPolicyCallback statusPolicyCallback) {
-			return Optional.empty();
+		public boolean getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+		                                         IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback,
+				Map<String, Object> state, IdmResult result) {
+			return false;
 		}
 
 		@Override
-		public List<IdmRequest> sortIdmRequests(IdmRequests idmRequests) {
-			return idmRequests.getQueryList().stream()
-					.sorted(Comparator.comparing(IdmRequest::getName))
-					.toList();
+		public Integer getServiceDefaultOrder() {
+			return 0;
 		}
+
+		@Override
+		public String getStoreName() {
+			return "TestStore";
+		}
+
+		@Override
+		public boolean sortQueriesByName() {
+			return true;
+		}
+
 	}
 
+	private static class SecondIdmService implements IdmQueryService {
+
+		@Override
+		public boolean getAttributes(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse,
+				IdmRequest idmRequest, IdmStatusPolicyCallback statusPolicyCallback,
+				Map<String, Object> state, IdmResult result) {
+			return false;
+		}
+
+		@Override
+		public Integer getServiceDefaultOrder() {
+			return 50;
+		}
+
+		@Override
+		public String getStoreName() {
+			return "TestStore2";
+		}
+
+		@Override
+		public boolean sortQueriesByName() {
+			return true;
+		}
+
+	}
 
 	private static final String IDENTITY_QUERY = "IDENTITY";
 
@@ -111,6 +145,8 @@ class RuleDefinitionUtilTest {
 	private static final String GLOBAL_QUERY = "GLOBAL";
 
 	private final IdmQueryService idmQueryService = new SortingIdmService();
+
+	private final IdmQueryService secondQueryService = new SecondIdmService();
 
 	@MockitoBean
 	private ScriptService scriptService;
@@ -182,7 +218,7 @@ class RuleDefinitionUtilTest {
 		List<Definition> baseAttribute = givenBaseAttributeList();
 		List<Definition> result = RelyingPartySetupUtil.joinAndDistinctDefinitions(attributeList, baseAttribute);
 
-		assertTrue(result.contains(baseAttribute.get(0)));
+		assertTrue(result.contains(baseAttribute.getFirst()));
 	}
 
 	@Test
@@ -232,7 +268,7 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.mergeAcWhiteList(claimRule, baseClaimWhiteList);
 
 		assertNotNull(claimRule.getAcWhitelist());
-		assertEquals(claimRule.getAcWhitelist().getAcUrls().get(0), baseClaimWhiteList.getAcUrls().get(0));
+		assertEquals(claimRule.getAcWhitelist().getAcUrls().getFirst(), baseClaimWhiteList.getAcUrls().getFirst());
 		assertEquals(claimRule.getAcWhitelist().getAcUrls().size(), baseClaimWhiteList.getAcUrls().size());
 	}
 
@@ -243,7 +279,7 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.mergeAcWhiteList(claimRule, baseClaimWhiteList);
 
 		assertNotNull(claimRule.getAcWhitelist());
-		assertEquals(claimRule.getAcWhitelist().getAcUrls().get(0), baseClaimWhiteList.getAcUrls().get(0));
+		assertEquals(claimRule.getAcWhitelist().getAcUrls().getFirst(), baseClaimWhiteList.getAcUrls().getFirst());
 		assertEquals(claimRule.getAcWhitelist().getAcUrls().size(), baseClaimWhiteList.getAcUrls().size());
 	}
 
@@ -279,8 +315,8 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.mergeIdmRespAttributes(claimQuery, baseIDMRespAttributes);
 
 		assertNotNull(claimQuery.getUserDetailsSelection());
-		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().get(0),
-				baseIDMRespAttributes.getDefinitions().get(0));
+		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().getFirst(),
+				baseIDMRespAttributes.getDefinitions().getFirst());
 		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().size(),
 				baseIDMRespAttributes.getDefinitions().size());
 	}
@@ -292,8 +328,8 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.mergeIdmRespAttributes(claimQuery, baseIDMRespAttributes);
 
 		assertNotNull(claimQuery.getUserDetailsSelection());
-		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().get(0),
-				baseIDMRespAttributes.getDefinitions().get(0));
+		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().getFirst(),
+				baseIDMRespAttributes.getDefinitions().getFirst());
 		assertEquals(claimQuery.getUserDetailsSelection().getDefinitions().size(),
 				baseIDMRespAttributes.getDefinitions().size());
 	}
@@ -319,7 +355,7 @@ class RuleDefinitionUtilTest {
 		List<Definition> attributeDefinitions = claimRule.getConstAttributes().getAttributeDefinitions();
 		List<Definition> baseAttributeDefinitions = baseConstantAttributes.getAttributeDefinitions();
 		assertNotNull(claimRule.getConstAttributes());
-		assertEquals(attributeDefinitions.get(0).getName(), baseAttributeDefinitions.get(0).getName());
+		assertEquals(attributeDefinitions.getFirst().getName(), baseAttributeDefinitions.getFirst().getName());
 		assertEquals(attributeDefinitions.size(), baseAttributeDefinitions.size());
 	}
 
@@ -332,7 +368,7 @@ class RuleDefinitionUtilTest {
 		assertNotNull(claimRule.getConstAttributes());
 		List<Definition> attributeDefinitions = claimRule.getConstAttributes().getAttributeDefinitions();
 		List<Definition> baseAttributeDefinitions = baseConstantAttributes.getAttributeDefinitions();
-		assertEquals(attributeDefinitions.get(0).getName(), baseAttributeDefinitions.get(0).getName());
+		assertEquals(attributeDefinitions.getFirst().getName(), baseAttributeDefinitions.getFirst().getName());
 		assertEquals(attributeDefinitions.size(), baseAttributeDefinitions.size());
 	}
 
@@ -353,7 +389,7 @@ class RuleDefinitionUtilTest {
 		var idmLookUp = givenIdmLookup();
 		relyingParty.setIdmLookup(idmLookUp);
 		var baseLookup = givenIdmLookupWithNullQuery();
-		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup, List.of(idmQueryService));
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
 
 		var original = givenIdmQueries();
 		assertEquals(idmLookUp.getQueries(), original);
@@ -367,7 +403,7 @@ class RuleDefinitionUtilTest {
 
 		var baseLookup = givenIdmLookup();
 		var initialIdmQuerySize = idmLookUp.getQueries().size();
-		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup, List.of(idmQueryService));
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
 
 		assertNotEquals(initialIdmQuerySize, idmLookUp.getQueries().size());
 		assertEquals(baseLookup.getQueries().size(), idmLookUp.getQueries().size());
@@ -379,7 +415,7 @@ class RuleDefinitionUtilTest {
 		var idmLookUp = givenIdmLookupWithNoQueryParams();
 		relyingParty.setIdmLookup(idmLookUp);
 		var baseLookup = givenIdmLookup();
-		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup, List.of(idmQueryService));
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
 
 		assertNotSame("", idmLookUp.getQueries().get(1).getAppFilter());
 		assertNotNull(idmLookUp.getQueries().get(1).getAppFilter());
@@ -389,6 +425,19 @@ class RuleDefinitionUtilTest {
 
 		assertNotSame("", idmLookUp.getQueries().get(1).getIssuerNameId());
 		assertNotNull(idmLookUp.getQueries().get(1).getIssuerNameId());
+	}
+
+	@Test
+	void mergeIdmQueriesWithDuplicatedNamesTest() {
+		var relyingParty = givenRelyingParty();
+		var idmLookUp = givenIdmQueriesWithDuplicates();
+		IdmLookup idmLookup = new IdmLookup();
+		idmLookup.setQueries(idmLookUp);
+		relyingParty.setIdmLookup(idmLookup);
+		var baseLookup = givenBaseIdmLookupWithDuplicates();
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
+
+		assertEquals(3, relyingParty.getIdmLookup().getQueries().size());
 	}
 
 	//Certificates
@@ -442,9 +491,8 @@ class RuleDefinitionUtilTest {
 		RelyingParty baseClaimRule = new RelyingParty();
 		var claimsProviderSetup = ClaimsProviderSetup.builder().build();
 
-		List<IdmQueryService> idmQueryServices = List.of(idmQueryService);
 		TechnicalException exception = assertThrows(TechnicalException.class, () ->
-				RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, idmQueryServices, claimsProviderSetup)
+				RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, claimsProviderSetup)
 		);
 
 		assertEquals("RelyingParty is missing", exception.getInternalMessage());
@@ -455,7 +503,7 @@ class RuleDefinitionUtilTest {
 		RelyingParty claimRule = new RelyingParty();
 		RelyingParty baseClaimRule = null;
 		var claimsProviderSetup = ClaimsProviderSetup.builder().build();
-		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, List.of(idmQueryService), claimsProviderSetup);
+		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, claimsProviderSetup);
 
 		assertNotNull(claimRule);
 	}
@@ -465,7 +513,7 @@ class RuleDefinitionUtilTest {
 		RelyingParty claimRule = new RelyingParty();
 		RelyingParty baseClaimRule = givenClaimWithLookup();
 		var claimsProviderSetup = ClaimsProviderSetup.builder().build();
-		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, List.of(idmQueryService), claimsProviderSetup);
+		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, claimsProviderSetup);
 
 		assertNotNull(claimRule);
 		assertNotNull(claimRule.getIdmLookup());
@@ -477,7 +525,7 @@ class RuleDefinitionUtilTest {
 		RelyingParty claimRule = givenClaimWithLookup();
 		var claimsProviderSetup = ClaimsProviderSetup.builder().build();
 		RelyingParty baseClaimRule = givenBaseClaimWithLookup();
-		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, List.of(idmQueryService), claimsProviderSetup);
+		RelyingPartySetupUtil.mergeRelyingParty(claimRule, baseClaimRule, claimsProviderSetup);
 
 		assertNotNull(claimRule);
 		assertNotNull(claimRule.getIdmLookup());
@@ -529,9 +577,9 @@ class RuleDefinitionUtilTest {
 				null, List.of(idmQueryService), scriptService, claimsProviderSetup, null, null);
 
 		assertNotNull(claimRules);
-		assertNull(claimRules.get(0).getConstAttributes());
-		assertNotNull(claimRules.get(0).getIdmLookup());
-		assertEquals(FeatureEnum.TRUE, claimRules.get(0).getEnabled());
+		assertNull(claimRules.getFirst().getConstAttributes());
+		assertNotNull(claimRules.getFirst().getIdmLookup());
+		assertEquals(FeatureEnum.TRUE, claimRules.getFirst().getEnabled());
 	}
 
 	@Test
@@ -543,7 +591,7 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.loadRelyingParty(claimRules, baseRuleFilePath(), newCacheDefinition, null,
 				List.of(idmQueryService), scriptService, claimsProviderSetup, null, null);
 
-		RelyingParty testRp = claimRules.get(0);
+		RelyingParty testRp = claimRules.getFirst();
 
 		assertEquals(TEST_CACHE_BASE_RULE, testRp.getBase());
 
@@ -644,7 +692,7 @@ class RuleDefinitionUtilTest {
 		RelyingPartySetupUtil.mergeScripts(relyingParty, baseScripts);
 		assertNotNull(relyingParty.getScripts());
 		assertEquals(relyingParty.getScripts().getScripts().size(), baseScripts.getScripts().size());
-		assertEquals(relyingParty.getScripts().getScripts().get(0).getName(), baseScripts.getScripts().get(0).getName());
+		assertEquals(relyingParty.getScripts().getScripts().getFirst().getName(), baseScripts.getScripts().getFirst().getName());
 
 		RelyingParty relyingParty2 = givenRelyingPartyWithScripts();
 		RelyingPartySetupUtil.mergeScripts(relyingParty2, null);
@@ -655,15 +703,15 @@ class RuleDefinitionUtilTest {
 	@Test
 	void joinAndDistinctScriptsTest() {
 		Scripts baseScripts = givenBaseScripts();
-		String baseOldName = baseScripts.getScripts().get(0).getName();
-		String baseOldType = baseScripts.getScripts().get(0).getType();
+		String baseOldName = baseScripts.getScripts().getFirst().getName();
+		String baseOldType = baseScripts.getScripts().getFirst().getType();
 		Scripts rpScripts = givenRpScripts();
 		RelyingPartySetupUtil.joinAndDistinctScripts(rpScripts, baseScripts);
 		assertEquals(3, baseScripts.getScripts().size());
-		assertEquals(baseScripts.getScripts().get(0).getName(), baseOldName);
-		assertEquals(baseScripts.getScripts().get(0).getType(), baseOldType);
+		assertEquals(baseScripts.getScripts().getFirst().getName(), baseOldName);
+		assertEquals(baseScripts.getScripts().getFirst().getType(), baseOldType);
 
-		baseScripts.getScripts().get(0).setName(null);
+		baseScripts.getScripts().getFirst().setName(null);
 		assertThrows(TechnicalException.class, () -> RelyingPartySetupUtil.joinAndDistinctScripts(rpScripts, baseScripts));
 	}
 
@@ -681,6 +729,206 @@ class RuleDefinitionUtilTest {
 		assertDoesNotThrow(() -> RelyingPartySetupUtil.loadRelyingParty(claimRules, definitionPath, CACHE_PATH,
 				null, List.of(idmQueryService), scriptService, claimsProviderSetup, null, null));
 		assertThat(rp.getEnabled(), is(expectedEnabled));
+	}
+
+	@Test
+	void sortIdmQueriesNoOrderTest() {
+		List<IdmQuery> queries = new ArrayList<>();
+		// order=50 sortByName=true
+		queries.add(q("TestStore2", "QueryP", null));
+		queries.add(q("TestStore2", "QueryN", null));
+		// order=0 sortByName=true
+		queries.add(q("TestStore", "QueryK", null));
+		queries.add(q("TestStore", "QueryM", null));
+		queries.add(q("TestStore", "QueryC", null));
+
+
+		var relyingParty = RelyingParty
+				.builder()
+				.idmLookup(IdmLookup.builder().queries(queries).build())
+				.build();
+
+		List<IdmQueryService> idmQueryServices = new ArrayList<>();
+		idmQueryServices.add(idmQueryService);
+		idmQueryServices.add(secondQueryService);
+
+		RelyingPartySetupUtil.sortIdmQueries(relyingParty, idmQueryServices);
+		List<IdmQuery> result = relyingParty.getIdmLookup().getQueries();
+
+		Map<Integer, List<?>> expected = new LinkedHashMap<>();
+		expected.put(0, List.of("QueryC", 0));
+		expected.put(1, List.of("QueryK", 0));
+		expected.put(2, List.of("QueryM", 0));
+		expected.put(3, List.of("QueryN", 50));
+		expected.put(4, List.of("QueryP", 50));
+
+		assertEquals(expected.size(), result.size());
+
+		expected.forEach((index, pair) -> {
+			assertEquals(pair.getFirst(), result.get(index).getName());
+			assertEquals(pair.get(1), result.get(index).getOrder());
+		});
+	}
+
+	@Test
+	void sortIdmQueriesOrderTest() {
+		List<IdmQuery> queries = new ArrayList<>();
+		// sortByName=false
+		queries.add(q("IdmStoreC", "QueryD", 60));
+		queries.add(q("IdmStoreC", "QueryA", 80));
+		// sortByName=false
+		queries.add(q("IdmStoreA", "QueryT", 60));
+		queries.add(q("IdmStoreA", "QueryZ", 40));
+		// sortByName=true
+		queries.add(q("TestStore2", "QueryP", 10));
+		queries.add(q("TestStore2", "QueryN", 20));
+		// sortByName=true
+		queries.add(q("TestStore", "QueryK", 90));
+		queries.add(q("TestStore", "QueryM", 30));
+		queries.add(q("TestStore", "QueryC", 30));
+
+
+		var relyingParty = RelyingParty
+				.builder()
+				.idmLookup(IdmLookup.builder().queries(queries).build())
+				.build();
+
+		List<IdmQueryService> idmQueryServices = new ArrayList<>();
+		idmQueryServices.add(idmQueryService);
+		idmQueryServices.add(secondQueryService);
+
+		RelyingPartySetupUtil.sortIdmQueries(relyingParty, idmQueryServices);
+		List<IdmQuery> result = relyingParty.getIdmLookup().getQueries();
+
+		Map<Integer, List<?>> expected = new LinkedHashMap<>();
+		expected.put(0, List.of("QueryP", 10));
+		expected.put(1, List.of("QueryN", 20));
+		expected.put(2, List.of("QueryM", 30));
+		expected.put(3, List.of("QueryC", 30));
+		expected.put(4, List.of("QueryZ", 40));
+		expected.put(5, List.of("QueryD", 60));
+		expected.put(6, List.of("QueryT", 60));
+		expected.put(7, List.of("QueryA", 80));
+		expected.put(8, List.of("QueryK", 90));
+
+		assertEquals(expected.size(), result.size());
+
+		expected.forEach((index, pair) -> {
+			assertEquals(pair.getFirst(), result.get(index).getName());
+			assertEquals(pair.get(1), result.get(index).getOrder());
+		});
+	}
+
+	@Test
+	void sortIdmQueriesTest() {
+		List<IdmQuery> queries = new ArrayList<>();
+		// order=MIN sortByName=false
+		queries.add(q("IdmStoreC", "QueryD", null));
+		queries.add(q("IdmStoreC", "QueryA", null));
+		// sortByName=false
+		queries.add(q("IdmStoreA", "QueryT", 60));
+		queries.add(q("IdmStoreA", "QueryZ", 40));
+		// order=50 sortByName=true
+		queries.add(q("TestStore2", "QueryP", null));
+		queries.add(q("TestStore2", "QueryN", null));
+		// order=0 sortByName=true
+		queries.add(q("TestStore", "QueryK", null));
+		queries.add(q("TestStore", "QueryM", null));
+		queries.add(q("TestStore", "QueryC", null));
+
+
+		var relyingParty = RelyingParty
+				.builder()
+				.idmLookup(IdmLookup.builder().queries(queries).build())
+				.build();
+
+		List<IdmQueryService> idmQueryServices = new ArrayList<>();
+		idmQueryServices.add(idmQueryService);
+		idmQueryServices.add(secondQueryService);
+
+		RelyingPartySetupUtil.sortIdmQueries(relyingParty, idmQueryServices);
+		List<IdmQuery> result = relyingParty.getIdmLookup().getQueries();
+
+		Map<Integer, List<?>> expected = new LinkedHashMap<>();
+		expected.put(0, List.of("QueryD", Integer.MIN_VALUE));
+		expected.put(1, List.of("QueryA", Integer.MIN_VALUE));
+		expected.put(2, List.of("QueryC", 0));
+		expected.put(3, List.of("QueryK", 0));
+		expected.put(4, List.of("QueryM", 0));
+		expected.put(5, List.of("QueryZ", 40));
+		expected.put(6, List.of("QueryN", 50));
+		expected.put(7, List.of("QueryP", 50));
+		expected.put(8, List.of("QueryT", 60));
+
+		assertEquals(expected.size(), result.size());
+
+		expected.forEach((index, pair) -> {
+			assertEquals(pair.getFirst(), result.get(index).getName());
+			assertEquals(pair.get(1), result.get(index).getOrder());
+		});
+	}
+
+	@Test
+	void sortIdmQueriesDuplicatedNameTest() {
+		List<IdmQuery> queries = new ArrayList<>();
+		// order=MIN sortByName=false
+		queries.add(q("IdmStoreC", "QueryA", null, "3"));
+		queries.add(q("IdmStoreC", "QueryA", null, "4"));
+		// sortByName=false
+		queries.add(q("IdmStoreA", "QueryT", 60, "2"));
+		queries.add(q("IdmStoreA", "QueryT", 40, "7"));
+		// order=50 sortByName=true
+		queries.add(q("TestStore2", "QueryP", null, "1"));
+		queries.add(q("TestStore2", "QueryP", null, "2"));
+		// order=0 sortByName=true
+		queries.add(q("TestStore", "QueryK", null, "1"));
+		queries.add(q("TestStore", "QueryK", null, "2"));
+
+
+		var relyingParty = RelyingParty
+				.builder()
+				.idmLookup(IdmLookup.builder().queries(queries).build())
+				.build();
+
+		List<IdmQueryService> idmQueryServices = new ArrayList<>();
+		idmQueryServices.add(idmQueryService);
+		idmQueryServices.add(secondQueryService);
+
+		RelyingPartySetupUtil.sortIdmQueries(relyingParty, idmQueryServices);
+		List<IdmQuery> result = relyingParty.getIdmLookup().getQueries();
+
+		Map<Integer, List<?>> expected = new LinkedHashMap<>();
+		expected.put(0, List.of("QueryA", Integer.MIN_VALUE));
+		expected.put(1, List.of("QueryA", Integer.MIN_VALUE));
+		expected.put(2, List.of("QueryK", 0));
+		expected.put(3, List.of("QueryK", 0));
+		expected.put(4, List.of("QueryT", 40));
+		expected.put(5, List.of("QueryP", 50));
+		expected.put(6, List.of("QueryP", 50));
+		expected.put(7, List.of("QueryT", 60));
+
+		assertEquals(expected.size(), result.size());
+
+		expected.forEach((index, pair) -> {
+			assertEquals(pair.getFirst(), result.get(index).getName());
+			assertEquals(pair.get(1), result.get(index).getOrder());
+		});
+	}
+
+	private IdmQuery q(String store, String name, Integer order) {
+		IdmQuery.IdmQueryBuilder builder = IdmQuery.builder().store(store).name(name);
+		if (order != null) {
+			builder.order(order);
+		}
+		return builder.build();
+	}
+
+	private IdmQuery q(String store, String name, Integer order, String id) {
+		IdmQuery.IdmQueryBuilder builder = IdmQuery.builder().id(id).store(store).name(name);
+		if (order != null) {
+			builder.order(order);
+		}
+		return builder.build();
 	}
 
 	private Oidc givenOidcClient(List<String> acUrls) {
@@ -1018,6 +1266,70 @@ class RuleDefinitionUtilTest {
 
 		return idmQueries;
 	}
+
+	private List<IdmQuery> givenIdmQueriesWithDuplicates() {
+		List<IdmQuery> idmQueries = new ArrayList<>();
+
+		IdmQuery globalQuery = IdmQuery.builder()
+									   .id("2")
+									   .name(GLOBAL_QUERY)
+									   .userDetailsSelection(givenResponseAttributes())
+									   .clientExtId("1230")
+									   .issuerNameId("1230")
+									   .appFilter("filter")
+									   .build();
+		idmQueries.add(globalQuery);
+
+		IdmQuery globalQuery2 = IdmQuery.builder()
+										.id("1")
+										.name(GLOBAL_QUERY)
+										.userDetailsSelection(givenResponseAttributes())
+										.clientExtId("2323")
+										.issuerNameId("3434")
+										.appFilter("filter")
+										.build();
+		idmQueries.add(globalQuery2);
+
+		IdmQuery identityQuery = IdmQuery.builder()
+										 .name(IDENTITY_QUERY)
+										 .userDetailsSelection(givenResponseAttributes())
+										 .clientExtId("2323")
+										 .issuerNameId("3434")
+										 .appFilter("filter")
+										 .build();
+		idmQueries.add(identityQuery);
+
+		return idmQueries;
+	}
+
+
+	private IdmLookup givenBaseIdmLookupWithDuplicates() {
+		IdmLookup idmLookup = new IdmLookup();
+
+		List<IdmQuery> idmQueries = new ArrayList<>();
+
+		IdmQuery globalQuery = IdmQuery.builder()
+									   .id("2")
+									   .name(GLOBAL_QUERY)
+									   .build();
+		idmQueries.add(globalQuery);
+
+		IdmQuery globalQuery2 = IdmQuery.builder()
+										.id("1")
+										.name(GLOBAL_QUERY)
+										.build();
+		idmQueries.add(globalQuery2);
+
+		IdmQuery identityQuery = IdmQuery.builder()
+										 .name(IDENTITY_QUERY)
+										 .build();
+		idmQueries.add(identityQuery);
+
+		idmLookup.setQueries(idmQueries);
+
+		return idmLookup;
+	}
+
 
 	private AttributesSelection givenResponseAttributes() {
 		AttributesSelection idmUserDetailsSelection = new AttributesSelection();

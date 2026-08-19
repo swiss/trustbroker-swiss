@@ -93,7 +93,7 @@ class SamlFactoryTest extends SamlTestBase {
 	}
 
 	@Test
-	void createSignatureSha1DefaultTest() {
+	void createSignatureSha256DefaultTest() {
 		var signature = SamlFactory.prepareSignableObject(
 				dummyObject(), dummyCredential(), null, null, null);
 		assertNotNull(signature.getSigningCredential());
@@ -154,7 +154,7 @@ class SamlFactoryTest extends SamlTestBase {
 		var authnInstant = Instant.now();
 		var sessionNotOnOrAfter = authnInstant.plusSeconds(180);
 		var authnStates = SamlFactory.createAuthnStatements(List.of(classRef), sessionIndex, sessionNotOnOrAfter, authnInstant);
-		var authnState = authnStates.get(0);
+		var authnState = authnStates.getFirst();
 		assertNotNull(authnState.getAuthnInstant());
 		assertNotNull(authnState.getSessionIndex());
 		assertEquals(sessionIndex, authnState.getSessionIndex());
@@ -184,7 +184,7 @@ class SamlFactoryTest extends SamlTestBase {
 		var attrOriginIssuer = "DEV";
 		var attribute = SamlFactory.createAttribute(type, value, attrOriginIssuer);
 		assertEquals(attribute.getName(), type);
-		XSString attributeValue = (XSString) attribute.getAttributeValues().get(0);
+		XSString attributeValue = (XSString) attribute.getAttributeValues().getFirst();
 		assertEquals(attributeValue.getValue(), value);
 	}
 
@@ -247,7 +247,7 @@ class SamlFactoryTest extends SamlTestBase {
 		assertNotNull(subject.getNameID());
 		assertEquals(1, subject.getSubjectConfirmations().size());
 		var duration = Duration.between(Instant.now(),
-				subject.getSubjectConfirmations().get(0).getSubjectConfirmationData().getNotOnOrAfter());
+				subject.getSubjectConfirmations().getFirst().getSubjectConfirmationData().getNotOnOrAfter());
 		assertThat(duration.getSeconds(), lessThanOrEqualTo((long)validitySec));
 		assertThat(duration.getSeconds(), greaterThanOrEqualTo((long)validitySec-1));
 	}
@@ -280,7 +280,7 @@ class SamlFactoryTest extends SamlTestBase {
 		assertNotNull(signature.getContentReferences());
 		assertEquals(1, signature.getContentReferences().size());
 		assertEquals(expectedDigestMethod,
-				((SAMLObjectContentReference)(signature.getContentReferences().get(0))).getDigestAlgorithm());
+				((SAMLObjectContentReference)(signature.getContentReferences().getFirst())).getDigestAlgorithm());
 	}
 
 	@Test

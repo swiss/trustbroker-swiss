@@ -91,8 +91,8 @@ public class GlobalExceptionHandler {
 			var location = getErrorPageUrl(ex);
 			response.sendRedirect(location);
 		}
-		catch (IOException ioex) {
-			log.info("Handling response to client failed", ex);
+		catch (IOException | IllegalStateException iex) {
+			log.info("Sending exception='{}' to client failed (connection closed or HTTP response commited)", ex.getMessage());
 		}
 	}
 
@@ -160,29 +160,28 @@ public class GlobalExceptionHandler {
 
 	// for use in static context, networkConfig may be null
 	public static int logException(Throwable ex, NetworkConfig networkConfig) {
-		if (ex instanceof RequestDeniedException rex) {
-			logException(rex, rex.getInternalMessage(), log.isDebugEnabled(), networkConfig, rex.getErrorMarker().getLevel());
-			return HttpStatus.FORBIDDEN.value();
-		}
-		else if (ex instanceof TechnicalException tex) {
-			logException(tex, tex.getInternalMessage(), true, networkConfig, tex.getErrorMarker().getLevel());
-		}
-		else if (ex instanceof BeanCreationException bex && bex.getCause() instanceof TrustBrokerException) {
-			logException(bex.getCause(), networkConfig); // handle exceptions in constructors, @PostConstruct etc unwrapped
-		}
-		else if (ex instanceof FileNotFoundException fex) {
-			// sufficient if we know which file is missing
-			var level = fex.getMessage().contains("static/index.html") ? Level.INFO : Level.ERROR;
-			logException(fex, "-", false, networkConfig, level);
-		}
-		else if (ex instanceof Exception eex) {
-			// we see 'java.lang.NullPointerException: null' without stack traces but the message is there
-			// consider: https://stackoverflow.com/questions/2411487/nullpointerexception-in-java-with-no-stacktrace
-			// make sure these cannot be disabled
-			logException(eex, "-", true, networkConfig, Level.ERROR);
-		}
-		else {
-			log.error("Throwable caught: {}", ex.getMessage(), ex);
+		switch (ex) {
+			case RequestDeniedException rex -> {
+				logException(rex, rex.getInternalMessage(), log.isDebugEnabled(), networkConfig,
+						rex.getErrorMarker().getLevel());
+				return HttpStatus.FORBIDDEN.value();
+			}
+			case TechnicalException tex -> logException(tex, tex.getInternalMessage(), true, networkConfig,
+					tex.getErrorMarker().getLevel());
+			case BeanCreationException bex when bex.getCause() instanceof TrustBrokerException ->
+					logException(bex.getCause(), networkConfig);
+				// handle exceptions in constructors, @PostConstruct etc. unwrapped
+			case FileNotFoundException fex -> {
+				// sufficient if we know which file is missing
+				var level = fex.getMessage().contains("static/index.html") ? Level.INFO : Level.ERROR;
+				logException(fex, "-", false, networkConfig, level);
+			}
+			case Exception eex ->
+				// we see 'java.lang.NullPointerException: null' without stack traces but the message is there
+				// consider: https://stackoverflow.com/questions/2411487/nullpointerexception-in-java-with-no-stacktrace
+				// make sure these cannot be disabled
+				logException(eex, "-", true, networkConfig, Level.ERROR);
+			default -> log.error("Throwable caught: {}", ex.getMessage(), ex);
 		}
 		return HttpStatus.INTERNAL_SERVER_ERROR.value();
 	}

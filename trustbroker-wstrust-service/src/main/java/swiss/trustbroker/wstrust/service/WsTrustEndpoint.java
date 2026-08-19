@@ -25,7 +25,7 @@ import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponse;
 import org.opensaml.soap.wstrust.RequestSecurityTokenResponseCollection;
 import org.opensaml.soap.wstrust.WSTrustObject;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.ws.server.endpoint.annotation.Endpoint;
 import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
 import org.springframework.ws.server.endpoint.annotation.RequestPayload;
@@ -44,7 +44,7 @@ import swiss.trustbroker.wstrust.util.WsTrustUtil;
 @Endpoint
 @Slf4j
 @AllArgsConstructor
-@ConditionalOnProperty(value = "trustbroker.config.wstrust.enabled", havingValue = "true")
+@ConditionalOnBooleanProperty(value = "trustbroker.config.wstrust.enabled")
 public class WsTrustEndpoint {
 
 	private static final String NAMESPACE_URI = WSSConstants.WST_NS_05_12;

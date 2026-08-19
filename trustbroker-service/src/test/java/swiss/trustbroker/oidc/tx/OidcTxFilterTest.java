@@ -22,8 +22,10 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import java.util.Optional;
+import java.util.Collections;
+import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -78,13 +80,20 @@ class OidcTxFilterTest {
 
 	private OidcTxFilter filter;
 
+	private AutoCloseable mocks;
+
 	@BeforeEach
 	void setUp() {
-		MockitoAnnotations.openMocks(this);
+		mocks = MockitoAnnotations.openMocks(this);
 		properties = new TrustBrokerProperties();
 		properties.setOidc(new OidcProperties());
 		filter = new OidcTxFilter(relyingPartyDefinitions, properties, new ApiSupport(properties),
 				scriptService, sessionTxWrapper);
+	}
+
+	@AfterEach
+	void tearDown() throws Exception {
+		mocks.close();
 	}
 
 	@ParameterizedTest
@@ -95,9 +104,9 @@ class OidcTxFilterTest {
 		request.setRequestURI(path);
 		request.addHeader(HttpHeaders.ORIGIN, origin);
 		request.addHeader(HttpHeaders.REFERER, referer);
-		Optional<OidcClient> oidcClient =
-				origin.equals(APP_ORIGIN) ? Optional.of(OidcClient.builder().realm("app1").build()) : Optional.empty();
-		when(relyingPartyDefinitions.getOidcClientByPredicate(any())).thenReturn(oidcClient);
+		List<OidcClient> oidcClients =
+				origin.equals(APP_ORIGIN) ? List.of(OidcClient.builder().realm("app1").build()) : Collections.emptyList();
+		when(relyingPartyDefinitions.getOidcClientsByPredicate(any())).thenReturn(oidcClients);
 		var response = new MockHttpServletResponse();
 		properties.setPerimeterUrl(XTB_ORIGIN + "/saml");
 		properties.getOidc().setPerimeterUrl(XTB_ORIGIN + "/oidc");
@@ -147,7 +156,7 @@ class OidcTxFilterTest {
 	}, nullValues = "null")
 	void validateAndSetSecurityHeadersPrivateNetwork(boolean preflight, boolean requestPrivateNetwork, boolean clientOnIntranet,
 			AllowPrivateNetworkAccess allowPrivateNetworkAccess, String expectedAllowPrivateNetwork) {
-		properties.setNetwork(new NetworkConfig());
+		properties.setNetwork(givenNetworkConfig());
 		properties.getCors().setAllowPrivateNetworkAccess(allowPrivateNetworkAccess);
 		var request = new MockHttpServletRequest();
 		if (preflight) {
@@ -173,4 +182,10 @@ class OidcTxFilterTest {
 		assertThat(response.getHeader(HeaderBuilder.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK), is(expectedAllowPrivateNetwork));
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.opensaml.messaging.context.MessageContext;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusCode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,6 +45,7 @@ import swiss.trustbroker.util.SamlValidator;
  */
 @RestController
 @Slf4j
+@ConditionalOnBooleanProperty("trustbroker.config.monitoring.enabled")
 public class MonitoringController extends AbstractSamlController {
 
 	private final RelyingPartySetupService relyingPartySetupService;
@@ -140,11 +142,10 @@ public class MonitoringController extends AbstractSamlController {
 		MessageContext messageContext = OpenSamlUtil.decodeSamlPostMessage(request);
 		var message = decodeSamlMessage(messageContext);
 		validateSamlMessage(message, null);
-		if (!(message instanceof Response)) {
+		if (!(message instanceof Response samlResponse)) {
 			log.error("Unexpected responseType={} for RP='{}' / CP='{}'", message.getClass().getName(), rpId, cpId);
 			return MonitoringResponse.DOWN;
 		}
-		var samlResponse = (Response) message;
 		var statusCode = OpenSamlUtil.getStatusCode(samlResponse);
 		if (!StatusCode.SUCCESS.equals(statusCode)) {
 			log.error("Consumed response {} has status={} for RP='{}' / CP='{}'",

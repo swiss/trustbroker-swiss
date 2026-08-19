@@ -22,7 +22,7 @@ import static swiss.trustbroker.config.TestConstants.LATEST_INVALID_DEFINITION_P
 import static swiss.trustbroker.config.TestConstants.TEST_SETUP_CP;
 import static swiss.trustbroker.config.TestConstants.TEST_SETUP_RP;
 
-import java.util.List;
+import java.util.Collection;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,7 +47,7 @@ class ClaimsProviderUtilTest {
 				"SetupCPInvalidXml.xml").getFile();
 		var claimsProviderSetup = ClaimsProviderUtil.loadClaimsProviderSetup(definition, null);
 		assertThat(claimsProviderSetup.getClaimsParties(), hasSize(1));
-		var cp = claimsProviderSetup.getClaimsParties().get(0);
+		var cp = claimsProviderSetup.getClaimsParties().getFirst();
 		assertThat(cp.getId(), is(definition));
 		assertThat(cp.getValidationStatus().getErrors(), hasSize(2));
 	}
@@ -65,7 +65,7 @@ class ClaimsProviderUtilTest {
 				"SetupRPInvalidXml.xml").getFile();
 		var relyingPartySetup = ClaimsProviderUtil.loadRelyingPartySetup(definition, null);
 		assertThat(relyingPartySetup.getRelyingParties(), hasSize(1));
-		var rp = relyingPartySetup.getRelyingParties().get(0);
+		var rp = relyingPartySetup.getRelyingParties().getFirst();
 		assertThat(rp.getId(), is(definition));
 		assertThat(rp.getValidationStatus().getErrors(), hasSize(2));
 	}
@@ -77,7 +77,7 @@ class ClaimsProviderUtilTest {
 		var setup = RelyingPartySetup.builder().build();
 		ClaimsProviderUtil.addInvalidRelyingParty(setup, rpId, ex, message);
 		assertThat(setup.getRelyingParties(), hasSize(1));
-		var rp = setup.getRelyingParties().get(0);
+		var rp = setup.getRelyingParties().getFirst();
 		assertThat(rp.getId(), is(rpId));
 		assertThat(rp.isValid(), is(false));
 		validateStatus(expectedMessage, rp.getValidationStatus().getErrors());
@@ -90,19 +90,19 @@ class ClaimsProviderUtilTest {
 		var setup = ClaimsProviderSetup.builder().build();
 		ClaimsProviderUtil.addInvalidClaimsParty(setup, cpId, ex, message);
 		assertThat(setup.getClaimsParties(), hasSize(1));
-		var cp = setup.getClaimsParties().get(0);
+		var cp = setup.getClaimsParties().getFirst();
 		assertThat(cp.getId(), is(cpId));
 		assertThat(cp.isValid(), is(false));
 		validateStatus(expectedMessage, cp.getValidationStatus().getErrors());
 	}
 
-	private static void validateStatus(String expectedMessage, List<String> errors) {
+	private static void validateStatus(String expectedMessage, Collection<String> errors) {
 		if (expectedMessage == null) {
 			assertThat(errors, hasSize(0));
 		}
 		else {
 			assertThat(errors, hasSize(1));
-			assertThat(errors.get(0), is(expectedMessage));
+			assertThat(errors.stream().findFirst().get(), is(expectedMessage));
 		}
 	}
 

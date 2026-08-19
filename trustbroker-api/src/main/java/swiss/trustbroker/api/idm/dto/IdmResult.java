@@ -78,4 +78,19 @@ public class IdmResult {
 	@Builder.Default
 	private Map<Object, Object> additionalData = new HashMap<>();
 
+	/**
+	 * @param count Count to add to the current original user details count.
+	 * @since 1.15.0
+	 */
+	public void addOriginalUserDetailsCount(int count) {
+		originalUserDetailsCount += count;
+	}
+
+	/**
+	 * @param count Count to add to the current original properties count.
+	 * @since 1.15.0
+	 */
+	public void addOriginalPropertiesCount(int count) {
+		originalPropertiesCount += count;
+	}
 }

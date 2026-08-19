@@ -13,12 +13,28 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-package swiss.trustbroker.util;
+package swiss.trustbroker.config.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public abstract class  LongMixin {
-	@SuppressWarnings("unused")
-	@JsonProperty("long")
-	Long value;
+/**
+ * Monitoring configuration.
+ *
+ * @since 1.15.0
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MonitoringConfig {
+
+	/**
+	 * Enable the monitoring API.
+	 * <br/>
+	 * Default: false
+	 */
+	private boolean enabled;
 }

@@ -57,8 +57,8 @@ class OidcAuthnRequestContextCustomizer implements Consumer<OpenSaml5Authenticat
 		var authnRequest = authnRequestContext.getAuthnRequest();
 		// Pass on client_id as applicationName too via SAML ProviderName
 		authnRequest.setProviderName(OidcSessionSupport.getOidcClientId(authnRequestContext.getRequest(), relyingPartyDefinitions));
-		// Pass OIDC sessionId as conversationId for E2E tracking
-		authnRequest.setID(TraceSupport.getOwnTraceParentForSaml());
+		// Pass OIDC message data (S2-conversation-session-request) where request changes per try
+		authnRequest.setID(TraceSupport.getOwnTraceParentForSaml(OidcSessionSupport.getOidcSessionId()));
 		// Handle prompt=login as forceAuthn=true
 		if (OidcUtil.isOidcPromptLogin(authnRequestContext.getRequest())) {
 			authnRequest.setForceAuthn(true);

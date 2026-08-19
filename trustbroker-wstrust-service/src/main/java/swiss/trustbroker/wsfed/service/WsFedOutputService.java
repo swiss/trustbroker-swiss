@@ -66,16 +66,13 @@ public class WsFedOutputService implements OutputService {
 			Credential credential, String requestRelayState, String endpoint,
 			HttpServletResponse httpServletResponse, EncodingParameters encodingParameters,
 			DestinationType destinationType) {
-		if (response instanceof LogoutResponse logoutResponse) {
-			// LATER: support SSO notifications (pass through reply URL and use SLO Velocity template)
-			log.debug("LogoutResponse to destination='{}' ignored for WS-Fed - handled by controller",
-					logoutResponse.getDestination());
-		}
-		else if (response instanceof Response samlResponse) {
-			processResponse(requestRelayState, httpServletResponse, samlResponse);
-		}
-		else {
-			throw new TechnicalException(String.format("WsFedOutputService does not support response=%s",
+		switch (response) {
+			case LogoutResponse logoutResponse ->
+				// LATER: support SSO notifications (pass through reply URL and use SLO Velocity template)
+				log.debug("LogoutResponse to destination='{}' ignored for WS-Fed - handled by controller",
+						logoutResponse.getDestination());
+			case Response samlResponse -> processResponse(requestRelayState, httpServletResponse, samlResponse);
+			default -> throw new TechnicalException(String.format("WsFedOutputService does not support response=%s",
 					response.getClass().getName()));
 		}
 	}
@@ -95,7 +92,7 @@ public class WsFedOutputService implements OutputService {
 
 	// LATER: sign RSTR? In that case maybe move this up to the caller where the SAML Response is signed.
 	private RequestSecurityTokenResponse createSecurityTokenResponse(Response samlResponse) {
-		var assertion = samlResponse.getAssertions().get(0);
+		var assertion = samlResponse.getAssertions().getFirst();
 		var audienceUrls = SamlUtil.getAudiences(assertion);
 
 		// note: using wstrust XML objects, not wsfed as AppliesTo of both packages has the same QName
@@ -105,7 +102,7 @@ public class WsFedOutputService implements OutputService {
 		var rst = WsTrustUtil.createRequestedSecurityToken(assertion);
 		var rstResponse = WsTrustUtil.createSecurityTokenResponse(rst);
 		if (!audienceUrls.isEmpty()) {
-			var appliesTo = WsTrustUtil.createResponseAppliesTo(audienceUrls.get(0));
+			var appliesTo = WsTrustUtil.createResponseAppliesTo(audienceUrls.getFirst());
 			rstResponse.getUnknownXMLObjects().add(appliesTo);
 		}
 		return rstResponse;

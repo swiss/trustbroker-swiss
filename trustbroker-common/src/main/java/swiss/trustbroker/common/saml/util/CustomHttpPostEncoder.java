@@ -23,6 +23,8 @@ import org.opensaml.messaging.encoder.MessageEncodingException;
 
 /**
  * SAML encoder that allows custom parameters for a custom template.
+ *
+ * @param <T> Type of context parameter values.
  */
 @SuppressWarnings("java:S110") // number of parent classes not under our control
 public class CustomHttpPostEncoder<T> extends NonFlushingHttpPostEncoder {

@@ -18,6 +18,8 @@ package swiss.trustbroker.oidc.tx;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.util.List;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -46,8 +48,9 @@ class OidcTxUtilTest {
 			ApiSupport.KEYCLOAK_REALMS + "/otherRealm" + ApiSupport.PUBLIC_OIDC_CONFIG_PATH + ",realm1,false",
 	}, nullValues = "null")
 	void validateKeycloakRealm(String path, String realm, boolean expected) {
-		var client = OidcClient.builder().realm(realm).build();
-		var result = OidcTxUtil.validateKeycloakRealm(path, client, "https://localhost");
+		var client1 = OidcClient.builder().realm(ApiSupport.KEYCLOAK_REALMS + "/notMatchingRealm").build();
+		var client2 = OidcClient.builder().realm(realm).build();
+		var result = OidcTxUtil.validateKeycloakRealm(path, List.of(client1, client2), "https://localhost");
 		assertThat(result, is(expected));
 	}
 

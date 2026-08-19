@@ -65,12 +65,15 @@ public class SamlTestBase {
 
 		private String mappers;
 
+		private String source;
+
 		public static TestAttributeName of(AttributeName attributeName) {
 			return TestAttributeName.builder()
 									.name(attributeName.getName())
 									.namespaceUri(attributeName.getNamespaceUri())
 									.altName(attributeName.getAltName())
 									.oidcNameList(attributeName.getOidcNameList())
+									.source(attributeName.getSource())
 									.build();
 		}
 
@@ -244,7 +247,7 @@ public class SamlTestBase {
 	public static Signature givenSignature(boolean emptyKeyInfo) {
 		var signature = OpenSamlUtil.buildSamlObject(Signature.class);
 		signature.setSigningCredential(SamlTestBase.dummyCredential());
-		signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
+		signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
 		signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
 		signature.setSchemaLocation("http://www.w3.org/2000/09/xmldsig#");
 		if (emptyKeyInfo) {

@@ -20,6 +20,7 @@ import java.io.IOException;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +36,7 @@ import swiss.trustbroker.util.ApiSupport;
 @RestController
 @Slf4j
 @AllArgsConstructor
+@ConditionalOnBooleanProperty("trustbroker.config.enabled")
 public class XmlConfigController {
 
 	private final SchemaDefinitionService schemaDefinitionService;

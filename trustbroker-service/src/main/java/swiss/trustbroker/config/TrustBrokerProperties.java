@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -40,12 +41,14 @@ import swiss.trustbroker.config.dto.FrameOptionsPolicies;
 import swiss.trustbroker.config.dto.GuiProperties;
 import swiss.trustbroker.config.dto.IdmConfig;
 import swiss.trustbroker.config.dto.LdapStoreConfig;
+import swiss.trustbroker.config.dto.MonitoringConfig;
 import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.ProfileSelectionConfig;
 import swiss.trustbroker.config.dto.QualityOfAuthenticationConfig;
 import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
+import swiss.trustbroker.config.dto.SsoConfig;
 import swiss.trustbroker.config.dto.StateCacheProperties;
 import swiss.trustbroker.config.dto.Support;
 import swiss.trustbroker.config.dto.WsFedConfig;
@@ -61,7 +64,17 @@ import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 @ConfigurationProperties(prefix = "trustbroker.config")
 @RefreshScope
 @Data
+@Slf4j
+@SuppressWarnings("java:S6539") // core configuration references many sub configurations by design
 public class TrustBrokerProperties {
+
+	/**
+	 * Enable XML schema API.
+	 * <br/>
+	 * Default: false
+	 * @since 1.15.0
+	 */
+	private boolean enabled;
 
 	/**
 	 * Issuer ID used for all SAML2 messages XTB produces.
@@ -209,6 +222,14 @@ public class TrustBrokerProperties {
 	private String configurationPath;
 
 	/**
+	 * Montiforing configuration.
+	 *
+	 * @since 1.15.0
+	 */
+	// LATER: Monitoring-related options to be moved to this config.
+	private MonitoringConfig monitoring = new MonitoringConfig();
+
+	/**
 	 * WS-Trust protocol configuration.
 	 */
 	private WsTrustConfig wstrust = new WsTrustConfig();
@@ -331,7 +352,7 @@ public class TrustBrokerProperties {
 	 *
 	 * @see swiss.trustbroker.federation.xmlconfig.SloResponse
 	 */
-	private int sloNotificationTimoutMillis = 2000;
+	private int sloNotificationTimeoutMillis = 2000;
 
 	/**
 	 * Minimum wait in case of fire-and-forget SLO notifications
@@ -477,6 +498,12 @@ public class TrustBrokerProperties {
 	private String publicPenTestCookie;
 
 	/**
+	 * Testing cookie us used to signal special handling for test users e.g. showing invisible IDPs on the HRD screen.
+	 * @since 1.15.0
+	 */
+	private String publicTestCookie;
+
+	/**
 	 * Network configuration.
 	 */
 	private NetworkConfig network;
@@ -502,6 +529,14 @@ public class TrustBrokerProperties {
 	 * for faster template development - templates will be loaded from the file system on each access
 	 */
 	private String velocityTemplatePath;
+
+	/**
+	 * SSO configuration.
+	 *
+	 * @since 1.15.0
+	 */
+	// LATER: SSO-related options to be moved to this config.
+	private SsoConfig sso = new SsoConfig();
 
 	/**
 	 * Announcement configuration.
@@ -532,6 +567,8 @@ public class TrustBrokerProperties {
 
 	/**
 	 * Legacy clients that get the skinny HRD screen (monitor, testing).
+	 * <br/>
+	 * Note: Since 1.15.0 the value is ignored.
 	 */
 	private List<RegexNameValue> skinnyHrdTriggers;
 
@@ -539,6 +576,29 @@ public class TrustBrokerProperties {
 	 * HTTP markers identifying monitoring clients that cannot deal with new features.
 	 */
 	private List<RegexNameValue> monitoringHints;
+
+	/**
+	 * Request parameter block list.
+	 * <br/>
+	 * If any of these appear in the HTTP request, the request is blocked.
+	 * Default:
+	 * <ul>
+	 *    <li>@class used by Jackson JSON</li>
+	 * </ul>
+	 *
+	 * @since 1.14.0
+	 */
+	private List<String> blockedRequestParameterNames = List.of("@class");
+
+	/**
+	 * Header block list.
+	 * <br/>
+	 * If any of these appear in the HTTP request, the request is blocked.
+	 * Default: none
+	 *
+	 * @since 1.14.0
+	 */
+	private List<String> blockedHeaderNames;
 
 	//  As bootstrap works without spring, we need to handle a few boostrap parameters via ENV and/or system properties.
 	public void setGitParamsFromEnv() {
@@ -567,6 +627,15 @@ public class TrustBrokerProperties {
 			return Collections.emptyMap();
 		}
 		return this.qoa.getMapping();
+	}
+
+	/**
+	 * @deprecated use sloNotificationTimeoutMillis
+	 */
+	@Deprecated(since = "1.15.0", forRemoval = true)
+	public void setSloNotificationTimoutMillis(int timeout) {
+		log.warn("Replace deprecated sloNotificationTimoutMillis with sloNotificationTimeoutMillis");
+		sloNotificationTimeoutMillis = timeout;
 	}
 
 }

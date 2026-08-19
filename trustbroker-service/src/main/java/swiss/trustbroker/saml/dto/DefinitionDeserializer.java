@@ -15,11 +15,10 @@
 
 package swiss.trustbroker.saml.dto;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.KeyDeserializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import swiss.trustbroker.federation.xmlconfig.Definition;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.KeyDeserializer;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Because jackson cannot properly deal with complex map keys, custom deserialization support on maps are necessary.
@@ -30,7 +29,7 @@ public class DefinitionDeserializer extends KeyDeserializer {
 	private ObjectMapper mapper = new ObjectMapper();
 
 	@Override
-	public Definition deserializeKey(String key, DeserializationContext ctxt) throws JsonProcessingException {
+	public Definition deserializeKey(String key, DeserializationContext ctxt) {
 		return mapper.readValue(key, Definition.class);
 	}
 

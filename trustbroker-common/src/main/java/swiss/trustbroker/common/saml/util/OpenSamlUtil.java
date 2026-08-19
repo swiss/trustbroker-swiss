@@ -291,7 +291,7 @@ public class OpenSamlUtil {
 			if (inboundMessageContext.getMessage() == null) {
 				var body = envelope.getBody();
 				if (body != null && !CollectionUtils.isEmpty(body.getUnknownXMLObjects())) {
-					var message = body.getUnknownXMLObjects().get(0);
+					var message = body.getUnknownXMLObjects().getFirst();
 					inboundMessageContext.setMessage(message);
 					log.debug("Unwrapped message={} from body", message.getClass().getName());
 					if (message instanceof ArtifactResponse artifactResponse) {
@@ -377,7 +377,9 @@ public class OpenSamlUtil {
 					return;
 				}
 				var signature = artifactResponse.getSignature();
-				if (!SamlUtil.isSignatureValid(signature, credentials)) {
+				if (!SamlUtil.isSignatureValid(signature, credentials,
+						signatureValidationParameters.getAllowedSignatureAlgorithms(),
+						signatureValidationParameters.isEnforceSignatureAlgorithms())) {
 					throw new RequestDeniedException(StandardErrorCode.SIGNATURE_NOT_OK, String.format(
 							"SAML Signature validation failed using signer='%s' using configured verifiers='%s'. Message "
 									+ "details: %s",
@@ -749,8 +751,8 @@ public class OpenSamlUtil {
 	@SuppressWarnings("java:S4790")
 	public static String calculateArtifactSourceIdFromIssuerId(String issuerId) {
 		try {
-			var sha1Digester = MessageDigest.getInstance(JCAConstants.DIGEST_SHA1);
-			var digest = sha1Digester.digest(issuerId.getBytes(StandardCharsets.UTF_8));
+			var digester = MessageDigest.getInstance(JCAConstants.DIGEST_SHA1);
+			var digest = digester.digest(issuerId.getBytes(StandardCharsets.UTF_8));
 			return Hex.encodeHexString(digest);
 		}
 		catch (NoSuchAlgorithmException ex) {
@@ -1261,7 +1263,7 @@ public class OpenSamlUtil {
 		if (scoping == null || scoping.getIDPList() == null || scoping.getIDPList().getIDPEntrys().isEmpty()) {
 			return null;
 		}
-		return scoping.getIDPList().getIDPEntrys().get(0).getProviderID();
+		return scoping.getIDPList().getIDPEntrys().getFirst().getProviderID();
 	}
 
 }

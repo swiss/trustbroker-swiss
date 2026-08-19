@@ -36,7 +36,7 @@ class SubjectNameMapper {
 		var cpIssuer = cpResponse.getIssuerId();
 		Optional<SubjectName> subjectMapping = Optional.empty();
 		if (nameIdMappings != null && nameIdMappings.getSubjects() != null) {
-			if (!cpResponse.hasOriginalNameId() && nameIdMappings.getPreserve()) {
+			if (!cpResponse.hasOriginalNameId() && Boolean.TRUE.equals(nameIdMappings.getPreserve())) {
 				reason = "NameID already set before"; // i.e. by a groovy script
 			}
 			else {

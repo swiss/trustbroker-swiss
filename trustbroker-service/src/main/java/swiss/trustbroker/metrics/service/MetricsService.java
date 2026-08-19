@@ -74,7 +74,7 @@ public class MetricsService {
 	private static String computeNamePrefix(EventType eventType) {
 		return switch (eventType) {
 			case AUTHN_REQUEST, RESPONSE, LOGOUT_REQUEST, LOGOUT_RESPONSE -> SAML_LABEL;
-			case OIDC_LOGOUT, OIDC_TOKEN, OIDC_IDTOKEN -> OIDC_LABEL;
+			case OIDC_LOGOUT, OIDC_TOKEN_REQUEST, OIDC_TOKEN, OIDC_IDTOKEN -> OIDC_LABEL;
 			case RST_REQUEST, RST_RESPONSE -> WS_TRUST_LABEL;
 			default -> eventType.name().toLowerCase();
 		};

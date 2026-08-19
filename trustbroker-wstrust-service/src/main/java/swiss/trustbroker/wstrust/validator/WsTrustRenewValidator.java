@@ -16,6 +16,7 @@
 package swiss.trustbroker.wstrust.validator;
 
 import java.time.Clock;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -106,7 +107,7 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 			// (e.g. client using same wss4j configuration for ISSUE and RENEW)
 			log.info("RSTR with requestType='{}' validating ignored header assertionID='{}'",
 					REQUEST_TYPE, headerAssertion.getID());
-			validateAssertion(headerAssertion, null, Optional.empty(), true, null, null, null);
+			validateAssertion(headerAssertion, null, Optional.empty(), Collections.emptyList(), true, null, null, null);
 		}
 		var childObjects = requestSecurityToken.getUnknownXMLObjects();
 		log.debug("RSTR RENEW request - assertion is in RenewTarget");
@@ -129,7 +130,9 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 																	   .expectedRecipient(expectedRecipient)
 																	   .renew(true)
 																	   .build();
-		validateAssertion(assertion, expectedValues, signerTrustCredentials, true, null, null, null);
+		validateAssertion(assertion, expectedValues, signerTrustCredentials,
+				getTrustBrokerProperties().getSecurity().getAllowedSignatureAlgorithms(),
+				true,null, null,null);
 		validateSecurityToken(requestHeader.getSecurityToken(), relyingParty);
 		return WsTrustValidationResult.builder()
 									  .requestType(REQUEST_TYPE)
@@ -196,7 +199,11 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 
 	private void validateHeaderElements(SoapMessageHeader requestHeader) {
 		log.debug("Validate WSTrust RENEW SOAP headers....");
-		WsTrustHeaderValidator.validateTimestamp(requestHeader, getClock().instant(), getTrustBrokerProperties().getSecurity());
+		WsTrustHeaderValidator.validateTimestamp(
+				requestHeader, getClock().instant(),
+				getTrustBrokerProperties().getSecurity().getNotBeforeToleranceSec(),
+				getTrustBrokerProperties().getSecurity().getNotOnOrAfterToleranceSec(),
+				true, null, null);
 		var soapAction = WsTrustHeaderValidator.getSoapAction(requestHeader);
 		// must work without action, but wrong action is an error
 		if (soapAction != null && !soapAction.equals(WSTrustConstants.WSA_ACTION_RST_RENEW)) {

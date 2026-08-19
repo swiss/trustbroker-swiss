@@ -99,10 +99,13 @@ public final class CustomRefreshTokenGenerator implements OAuth2TokenGenerator<O
 		}
 
 		// track via session that was established during the federation
-		var sessionId = JwtTokenCustomizer.getSidClaim(context.getPrincipal());
+		var authorizationGrantType = context.getAuthorizationGrantType();
+		var authorizationGrant = context.getAuthorizationGrant();
+		var authorization = context.getAuthorization();
+		var sessionId = JwtTokenCustomizer.getSidClaim(context.getPrincipal(), authorizationGrantType, authorizationGrant, authorization);
 
 		// send back nonce to clients providing it
-		var nonce = JwtTokenCustomizer.getNonce(context.getAuthorization());
+		var nonce = JwtTokenCustomizer.getNonce(authorization);
 
 		// validity range depending on client settings
 		var issuedAt = Instant.now();
@@ -177,11 +180,11 @@ public final class CustomRefreshTokenGenerator implements OAuth2TokenGenerator<O
 												.getRefreshTokenTimeToLive());
 			}
 		}
+		if (expiresAt != null && !issuedAt.isBefore(expiresAt)) {
+			expiresAt =  issuedAt.plus(client.getTokenSettings().getRefreshTokenTimeToLive());
+		}
 		log.debug("Expiration of refresh_token for clientId={} issuedAt={} expiresAt={} from source={}",
 				client.getClientId(), issuedAt, expiresAt, source);
-		if (expiresAt != null && issuedAt.isAfter(expiresAt)) {
-			expiresAt = issuedAt;
-		}
 		return expiresAt;
 	}
 

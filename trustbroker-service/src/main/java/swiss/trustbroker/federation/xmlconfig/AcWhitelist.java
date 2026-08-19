@@ -156,7 +156,7 @@ public class AcWhitelist implements Serializable {
 		if (!Boolean.TRUE.equals(useDefault) || CollectionUtils.isEmpty(acUrls)) {
 			return Optional.empty();
 		}
-		return Optional.of(acUrls.get(0));
+		return Optional.of(acUrls.getFirst());
 	}
 
 	public Optional<String> findFirst(BiPredicate<String, String> matcher, String checkUrl) {

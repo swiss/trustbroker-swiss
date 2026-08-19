@@ -198,7 +198,7 @@ public class WebSupport {
 			// should not happen in a proper requests, might be an attack
 			throw new RequestDeniedException(String.format("Query parameter %s occurs more than once", name));
 		}
-		return params.get(0).getSecond();
+		return params.getFirst().getSecond();
 	}
 
 	public static String getViewRedirectResponse(String url) {
@@ -331,10 +331,11 @@ public class WebSupport {
 		if (origin == null) {
 			return false;
 		}
+		// trailing slash for prefix match to avoid sub-ddmain matches
 		var checkUrl =  origin + '/';
 		return getOwnPerimeterUris(properties)
 				.filter(Objects::nonNull)
-				.anyMatch(uri -> uri.startsWith(checkUrl));
+				.anyMatch(uri ->  uri.equals(origin) || uri.startsWith(checkUrl));
 	}
 
 	public static Set<String> getOwnPerimeterPaths(TrustBrokerProperties properties) {
@@ -356,7 +357,11 @@ public class WebSupport {
 				properties.getPerimeterUrl(),
 				properties.getSamlConsumerUrl(),
 				properties.getOidc() != null ? properties.getOidc().getPerimeterUrl() : null,
-				properties.getOidc() != null ? properties.getOidc().getSessionIFrameEndpoint() : null);
+				properties.getOidc() != null ? properties.getOidc().getSessionIFrameEndpoint() : null,
+				// absolute frontend base URL (local development):
+				properties.getFrontendBaseUrl() != null && properties.getFrontendBaseUrl().contains(":") ?
+						properties.getFrontendBaseUrl() : null
+				);
 	}
 
 	// returns true if referer is the OIDC perimeter URL

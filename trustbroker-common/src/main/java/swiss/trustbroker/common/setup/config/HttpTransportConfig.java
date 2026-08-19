@@ -31,10 +31,13 @@ public class HttpTransportConfig implements TransportConfigCallback {
 
 	private final String accessToken;
 
+	private int transportTimeoutSec = 15;
+
 	public HttpTransportConfig(String accessToken) {
 		var tokenCache = accessTokenFile(accessToken);
 		if (tokenCache.exists()) {
 			try {
+				this.transportTimeoutSec = BootstrapProperties.getGitTransportTimeout();
 				this.accessToken = Files.readString(tokenCache.toPath()).strip();
 				log.info("Accessing git with access token from {}={}",
 						BootstrapProperties.GIT_REPO_TOKEN, tokenCache.getAbsolutePath());
@@ -61,6 +64,7 @@ public class HttpTransportConfig implements TransportConfigCallback {
 		if (transport instanceof HttpTransport httpTransport && accessToken != null) {
 			var provider = new UsernamePasswordCredentialsProvider("git", accessToken);
 			httpTransport.setCredentialsProvider(provider);
+			httpTransport.setTimeout(transportTimeoutSec);
 			// proxy settings from java via https.proxyHost/Port or socksProxyHost/Port out of the box
 		}
 	}

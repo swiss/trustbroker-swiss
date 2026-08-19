@@ -15,7 +15,7 @@
 
 package swiss.trustbroker.federation.dto;
 
-import java.util.List;
+import java.util.Collection;
 
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +29,6 @@ public class ConfigElementStatus {
 
 	private String id;
 
-	private List<String> errors;
+	private Collection<String> errors;
 
 }

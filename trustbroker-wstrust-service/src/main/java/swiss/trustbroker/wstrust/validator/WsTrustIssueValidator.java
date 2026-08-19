@@ -19,6 +19,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 import lombok.extern.slf4j.Slf4j;
 import org.opensaml.saml.saml2.core.Assertion;
@@ -30,7 +31,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.config.TrustBrokerProperties;
-import swiss.trustbroker.config.dto.WsTrustConfig;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
@@ -78,24 +78,29 @@ public class WsTrustIssueValidator extends WsTrustBaseValidator {
 
 	@Override
 	public WsTrustValidationResult validate(RequestSecurityToken requestSecurityToken, SoapMessageHeader requestHeader) {
-		WsTrustHeaderValidator.validateHeaderElements(requestHeader, getTrustBrokerProperties().getIssuer());
-
+		var relyingParty = getRstRelyingParty(requestSecurityToken);
+		var headerAssertion = requestHeader.getAssertion();
+		var claimsParty = getIssuingClaimsParty(headerAssertion);
+		validateHeaderElements(requestHeader, relyingParty, claimsParty);
 		log.debug("RSTR ISSUE request - assertion is in header");
 		if (requestHeader.getSecurityToken() != null) {
 			log.info("RSTR with requestType='{}' ignoring header security token", REQUEST_TYPE);
 		}
-		var headerAssertion = requestHeader.getAssertion();
-		var claimsParty = getIssuingClaimsParty(headerAssertion);
-		var relyingParty = getRstRelyingParty(requestSecurityToken);
 		// each side can provide the WsTrust config default for the other:
 		validateProtocolRestrictions(claimsParty, relyingParty);
 		validateProtocolRestrictions(relyingParty, claimsParty);
-		var requireSignedRequest = requireSignedRequest(claimsParty, relyingParty, getTrustBrokerProperties().getWstrust());
+		var requireSignedRequest = calculateProperty(claimsParty, relyingParty,
+				getTrustBrokerProperties().getWstrust().isIssueRequireSignedRequests(),
+				CounterParty::wsTrustIssueRequireSignedRequest,
+				"requireSignedRequest");
 		List<Credential> messageTrustCredentials = getMessageSignerCredentials(relyingParty, claimsParty);
 		validateSignature(requestHeader, requireSignedRequest, messageTrustCredentials);
-		var requireSignedAssertion = requireSignedAssertion(claimsParty, relyingParty, getTrustBrokerProperties().getWstrust());
-		validateAssertion(headerAssertion, null, Optional.of(claimsParty.getCpTrustCredential()), requireSignedAssertion,
-				requestSecurityToken, claimsParty, relyingParty);
+		var requireSignedAssertion = calculateProperty(claimsParty, relyingParty,
+				getTrustBrokerProperties().getWstrust().isIssueRequireSignedAssertions(),
+				CounterParty::wsTrustIssueRequireSignedAssertion, "requireSignedAssertion");
+		validateAssertion(headerAssertion, null, Optional.of(claimsParty.getCpTrustCredential()),
+				getAllowedSignatureAlgorithms(claimsParty), requireSignedAssertion, requestSecurityToken,
+				claimsParty, relyingParty);
 
 		var keyType = WsTrustUtil.getKeyTypeFromRequest(requestSecurityToken);
 		if (!KeyType.BEARER.equals(keyType)) {
@@ -113,6 +118,23 @@ public class WsTrustIssueValidator extends WsTrustBaseValidator {
 									  .useAssertionLifetime(false)
 									  .createResponseCollection(true)
 									  .build();
+	}
+
+	private void validateHeaderElements(SoapMessageHeader requestHeader, RelyingParty relyingParty, ClaimsParty claimsParty) {
+		var requireTimestamp = calculateProperty(claimsParty, relyingParty,
+				getTrustBrokerProperties().getWstrust().isIssueRequireTimestamp(), CounterParty::wsTrustIssueRequireTimestamp,
+				"requireTimestamp");
+		var notBeforeToleranceSec = calculateProperty(claimsParty, relyingParty,
+				getTrustBrokerProperties().getSecurity().getNotBeforeToleranceSec(),
+				CounterParty::getWsTrustIssueNotBeforeToleranceSec, "notBeforeToleranceSec");
+		var notOnOrAfterToleranceSec = calculateProperty(claimsParty, relyingParty,
+				getTrustBrokerProperties().getSecurity().getNotOnOrAfterToleranceSec(),
+				CounterParty::getWsTrustIssueNotOnOrAfterToleranceSec, "notOnOrAfterToleranceSec");
+		log.debug("Validate WSTrust ISSUE SOAP headers for rpIssuerId={} cpIssuerId={}",
+				relyingParty.getId(), claimsParty.getId());
+		WsTrustHeaderValidator.validateTimestamp(requestHeader, getClock().instant(),
+				notBeforeToleranceSec, notOnOrAfterToleranceSec, requireTimestamp, relyingParty.getId(), claimsParty.getId());
+		WsTrustHeaderValidator.validateHeaderElements(requestHeader, getTrustBrokerProperties().getIssuer());
 	}
 
 	// sender and signer of SOAP can be CP or RP
@@ -138,17 +160,18 @@ public class WsTrustIssueValidator extends WsTrustBaseValidator {
 		return result;
 	}
 
-	static boolean requireSignedRequest(ClaimsParty claimsParty, RelyingParty relyingParty, WsTrustConfig config) {
+	static <T> T calculateProperty(ClaimsParty claimsParty, RelyingParty relyingParty, T defaultValue,
+			BiFunction<CounterParty, T, T> property, String propertyName) {
 		// Explicit CP config value overrides global default:
-		var requireSignedRequest = requireSignedRequest(claimsParty, config.isIssueRequireSignedRequests());
+		var propertyValue = calculateProperty(claimsParty, defaultValue, property);
 		// Explicit RP config value overrides CP:
-		requireSignedRequest = requireSignedRequest(relyingParty, requireSignedRequest);
-		log.info("Enforcing requireSignedRequest={} for cpIssuerId={} rpIssuerId={}",
-				requireSignedRequest, claimsParty.getId(), relyingParty != null ? relyingParty.getId() : null);
-		return requireSignedRequest;
+		propertyValue = calculateProperty(relyingParty, propertyValue, property);
+		log.info("Enforcing {}={} for cpIssuerId={} rpIssuerId={}",
+				propertyName, propertyValue, claimsParty.getId(), relyingParty != null ? relyingParty.getId() : null);
+		return propertyValue;
 	}
 
-	private static boolean requireSignedRequest(CounterParty counterParty, boolean defaultValue) {
+	private static <T> T calculateProperty(CounterParty counterParty, T defaultValue, BiFunction<CounterParty, T, T> property) {
 		if (counterParty == null) {
 			log.debug("Using default requireSignedRequest={} for missing counterParty", defaultValue);
 			return defaultValue;
@@ -157,32 +180,8 @@ public class WsTrustIssueValidator extends WsTrustBaseValidator {
 			log.debug("Using default requireSignedRequest={} for counterParty={}", defaultValue, counterParty.getId());
 			return defaultValue;
 		}
-		var result = counterParty.getSecurityPolicies().isWsTrustIssueRequireSignedRequest(defaultValue);
+		var result = property.apply(counterParty, defaultValue);
 		log.debug("Using configured requireSignedRequest={} for counterParty={}", result, counterParty.getId());
-		return result;
-	}
-
-	static boolean requireSignedAssertion(ClaimsParty claimsParty, RelyingParty relyingParty, WsTrustConfig config) {
-		// Explicit CP config value overrides global default of true:
-		var requireSignedAssertion = requireSignedAssertion(claimsParty, config.isIssueRequireSignedAssertions());
-		// RP overrides CP if set
-		requireSignedAssertion = requireSignedAssertion(relyingParty, requireSignedAssertion);
-		log.info("Enforcing requireSignedAssertion={} for cpIssuerId={} rpIssuerId={}",
-				requireSignedAssertion, claimsParty.getId(), relyingParty != null ? relyingParty.getId() : null);
-		return requireSignedAssertion;
-	}
-
-	private static boolean requireSignedAssertion(CounterParty counterParty, boolean defaultValue) {
-		if (counterParty == null) {
-			log.debug("Using default requireSignedAssertion={} for missing counterParty", defaultValue);
-			return defaultValue;
-		}
-		if (counterParty.getSecurityPolicies() == null) {
-			log.debug("Using default requireSignedAssertion={} for counterParty={}", defaultValue, counterParty.getId());
-			return defaultValue;
-		}
-		var result = counterParty.getSecurityPolicies().isWsTrustIssueRequireSignedAssertion(defaultValue);
-		log.debug("Using configured requireSignedAssertion={} for counterParty={}", result, counterParty.getId());
 		return result;
 	}
 }

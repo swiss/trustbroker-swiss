@@ -42,6 +42,7 @@ public class AuditDto {
 		IDM_RESPONSE("i"), // IDM query results
 		SCRIPT("s"), // Script manipulations
 		DROPPED_RESPONSE("x"), // CP response dropped
+		OIDC_REQUEST(null),
 		OIDC_RESPONSE(null); // no tagging
 
 		private final String shortName;
@@ -139,6 +140,10 @@ public class AuditDto {
 	private String applicationName; // AuthnRequest.ProviderName to handle RP-ID ambiguities
 
 	private String oidcClientId; // allow correlation of a SAML flow with its OIDC initiator
+
+	private String grantType; // token grant type
+
+	private Map<String, String> tokenRequestParams;
 
 	// Authentication process attributes
 

@@ -30,6 +30,7 @@ class OidcResponseValidator
 	private final Converter<OpenSaml5AuthenticationProvider.ResponseToken, Saml2ResponseValidatorResult> delegate;
 
 	@Override
+	@SuppressWarnings("java:S2589") // false positive on result != null (can be null)
 	public Saml2ResponseValidatorResult convert(OpenSaml5AuthenticationProvider.ResponseToken responseToken) {
 		var result = delegate.convert(responseToken);
 		if (result != null && result.hasErrors()) {

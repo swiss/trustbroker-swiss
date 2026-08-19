@@ -158,32 +158,36 @@ public class SamlIoUtil {
 	}
 
 	/**
-	 * Unmarshalls a SAML AuthnRequest from stream resource into its SAMLObject. <saml2:AuthnRequest/> should result in
-	 * org.opensaml.saml.saml2.core.impl.AssertionImpl
+	 * Unmarshalls a SAML AuthnRequest from stream resource into its SAMLObject.
+	 * <code>&lt;saml2:AuthnRequest/&gt;</code> should result in
+	 * <code>org.opensaml.saml.saml2.core.impl.AssertionImpl</code>
 	 */
 	public static AuthnRequest unmarshallAuthnRequest(InputStream stream) {
 		return (AuthnRequest) getXmlObjectFromStream(stream, null);
 	}
 
 	/**
-	 * Unmarshalls a SAML Response from stream resource into its SAMLObject. <saml2:Response/> results in
-	 * org.opensaml.saml.saml2.core.impl.ResponseImpl
+	 * Unmarshalls a SAML Response from stream resource into its SAMLObject.
+	 * <code>&lt;saml2:Response/&gt;</code> results in
+	 * <code>org.opensaml.saml.saml2.core.impl.ResponseImpl</code>
 	 */
 	public static Response unmarshallResponse(InputStream stream) {
 		return (Response) getXmlObjectFromStream(stream, null);
 	}
 
 	/**
-	 * Unmarshalls a SAML Assertion from stream resource into its SAMLObject. <saml2:Assertion/> results in
-	 * org.opensaml.saml.saml2.core.impl.AssertionImpl
+	 * Unmarshalls a SAML Assertion from stream resource into its SAMLObject.
+	 * <code>&lt;saml2:Assertion/&gt;</code> results in
+	 * <code>org.opensaml.saml.saml2.core.impl.AssertionImpl</code>
 	 */
 	public static Assertion unmarshallAssertion(InputStream stream) {
 		return (Assertion) getXmlObjectFromStream(stream, null);
 	}
 
 	/**
-	 * Unmarshalls a WSTrust token request from stream resource into its SAMLObject. <saml2:Assertion/> results in
-	 * org.opensaml.soap.wstrust.impl.RequestSecurityTokenImpl
+	 * Unmarshalls a WSTrust token request from stream resource into its SAMLObject.
+	 * <code>&lt;saml2:Assertion/&gt;</code> results in
+	 * <code>org.opensaml.soap.wstrust.impl.RequestSecurityTokenImpl</code>
 	 */
 	public static RequestSecurityToken unmarshallRequestSecurityToken(InputStream stream) {
 		return (RequestSecurityToken) getXmlObjectFromStream(stream, null);

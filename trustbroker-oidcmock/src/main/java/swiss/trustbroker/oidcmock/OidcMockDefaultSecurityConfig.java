@@ -28,7 +28,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class OidcMockDefaultSecurityConfig {
 
 	@Bean
-	SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) {
 		http
 				.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
 				// Form login handles the redirect to the login page from the

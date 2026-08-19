@@ -69,16 +69,16 @@ public class WsTrustUtil {
 	private WsTrustUtil() {
 	}
 
-	public static Lifetime createLifeTime(Instant createTime, Instant expiresTime) {
+	public static Lifetime createLifeTime(Instant createdTime, Instant expiresTime) {
 		Lifetime lifetime = (Lifetime) XMLObjectSupport.buildXMLObject(Lifetime.ELEMENT_NAME);
-		lifetime.setCreated(createCreated(createTime));
+		lifetime.setCreated(createCreated(createdTime));
 		lifetime.setExpires(createExpires(expiresTime));
 		return lifetime;
 	}
 
-	public static Timestamp createTimestamp(Instant createTime, Instant expiresTime) {
+	public static Timestamp createTimestamp(Instant createdTime, Instant expiresTime) {
 		Timestamp timestamp = (Timestamp) XMLObjectSupport.buildXMLObject(Timestamp.ELEMENT_NAME);
-		timestamp.setCreated(createCreated(createTime));
+		timestamp.setCreated(createCreated(createdTime));
 		timestamp.setExpires(createExpires(expiresTime));
 		return timestamp;
 	}
@@ -89,9 +89,9 @@ public class WsTrustUtil {
 		return expires;
 	}
 
-	public static Created createCreated(Instant createTime) {
+	public static Created createCreated(Instant createdTime) {
 		Created created = (Created) XMLObjectSupport.buildXMLObject(Created.ELEMENT_NAME);
-		created.setDateTime(createTime);
+		created.setDateTime(createdTime);
 		return created;
 	}
 
@@ -236,13 +236,15 @@ public class WsTrustUtil {
 	public static boolean validatePeriod(String periodType, Created created, Expires expires, Instant now,
 			long notBeforeToleranceSec, long notOnOrAfterToleranceSec) {
 		var nowWithBeforeTolerance = now.minusSeconds(notBeforeToleranceSec); // tolerance is negative
-		var createdOk = (created != null) && nowWithBeforeTolerance.isAfter(created.getDateTime());
+		var createdOk =
+				(created != null) && (created.getDateTime() != null) && nowWithBeforeTolerance.isAfter(created.getDateTime());
 		if (!createdOk) {
 			log.error("Invalid {}.Created={} in the future now={} notOnOrAfterToleranceSec={}",
 					periodType, (created != null) ? created.getDateTime() : null, now, notOnOrAfterToleranceSec);
 		}
 		var nowWithAfterTolerance = now.minusSeconds(notOnOrAfterToleranceSec + 1); // tolerance is positive
-		var expiresOk = (expires != null) && nowWithAfterTolerance.isBefore(expires.getDateTime());
+		var expiresOk =
+				(expires != null) && (expires.getDateTime() != null) && nowWithAfterTolerance.isBefore(expires.getDateTime());
 		if (!expiresOk) {
 			log.error("Invalid {}.Expires={} in the past now={} notBeforeToleranceSec={}",
 					periodType, (expires != null) ? expires.getDateTime() : null, now, notBeforeToleranceSec);
@@ -317,7 +319,7 @@ public class WsTrustUtil {
 		if (requestHeaderAssertion == null || requestHeaderAssertion.getAuthnStatements().isEmpty()) {
 			return contextClasses;
 		}
-		var authnContext = requestHeaderAssertion.getAuthnStatements().get(0).getAuthnContext();
+		var authnContext = requestHeaderAssertion.getAuthnStatements().getFirst().getAuthnContext();
 		if (authnContext != null && authnContext.getAuthnContextClassRef() != null &&
 				authnContext.getAuthnContextClassRef().getURI() != null) {
 			var authnContextClassRef = authnContext.getAuthnContextClassRef().getURI();

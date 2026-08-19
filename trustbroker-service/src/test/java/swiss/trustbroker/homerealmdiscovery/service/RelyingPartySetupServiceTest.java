@@ -115,8 +115,8 @@ class RelyingPartySetupServiceTest {
 	void getIdmLookUp(String issuer, boolean expected) {
 		mockRelyingPartyConfiguration();
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(issuer, null);
-		var idmLookup = relyingPartySetupService.getIdmLookUp(relyingParty);
-		assertThat(idmLookup.isPresent(), is(expected));
+		var idmLookup = relyingParty.getIdmLookup();
+		assertThat(idmLookup != null, is(expected));
 	}
 
 	@Test
@@ -126,7 +126,7 @@ class RelyingPartySetupServiceTest {
 		var referer = "https://urn:test:TESTRP";
 		var result = relyingPartySetupService.getOrderedRelyingPartiesForSlo(issuer, referer);
 		assertThat(result.size(), is(1));
-		assertThat(result.get(0).getId(), is(issuer));
+		assertThat(result.getFirst().getId(), is(issuer));
 	}
 
 	@Test
@@ -137,7 +137,7 @@ class RelyingPartySetupServiceTest {
 		var result = relyingPartySetupService.getOrderedRelyingPartiesForSlo(issuer, referer);
 		assertThat(result.size(), is(1));
 		// the order is specified
-		assertThat(result.get(0).getId(), is(issuer));
+		assertThat(result.getFirst().getId(), is(issuer));
 	}
 
 	@Test
@@ -157,7 +157,7 @@ class RelyingPartySetupServiceTest {
 		var result = relyingPartySetupService.getOrderedRelyingPartiesForSlo(null, referer);
 		assertNotNull(result);
 		assertEquals(1, result.size());
-		assertEquals("https://referring-party.localdomain", result.get(0).getId());
+		assertEquals("https://referring-party.localdomain", result.getFirst().getId());
 	}
 
 	@Test
@@ -184,23 +184,22 @@ class RelyingPartySetupServiceTest {
 	@ParameterizedTest
 	@CsvSource(value = {
 			// Office 365 sharepoint plugin and old MSIE11
-			"User-Agent,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E),/skinnyHRD.html",
-			"User-Agent,Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko,/skinnyHRD.html",
-			"User-Agent,Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0,null",
+			"User-Agent,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E),true",
+			"User-Agent,Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko,true",
+			"User-Agent,Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0,false",
 			// robots
-			"X-Origin-Forwarded-For,192.168.12.111,/skinnyImgHRD.html",
-			"X-ORIGIN-FORWARDED-FOR,192.168.12.110,/skinnyImgHRD.html",
-			"X-Origin-Forwarded-FOR,192.168.12.113,/skinnyImgHRD.html",
-			"X-Origin-Forwarded-For,192.168.12.90,/skinnyImgHRD.html",
-			"X-Origin-Forwarded-For,192.168.11.100,null"
+			"X-Origin-Forwarded-For,192.168.12.111,true",
+			"X-ORIGIN-FORWARDED-FOR,192.168.12.110,true",
+			"X-Origin-Forwarded-FOR,192.168.12.113,true",
+			"X-Origin-Forwarded-For,192.168.12.90,true",
+			"X-Origin-Forwarded-For,192.168.11.100,false"
 	}, nullValues = "null")
-	void useSkinnyHrdForLegacyClients(String httpHeaderName, String httpHeaderValue, String expectedResult) {
+	void useSkinnyHrdForLegacyClients(String httpHeaderName, String httpHeaderValue, boolean expectedResult) {
 		mockRelyingPartyConfiguration();
 		when(trustBrokerProperties.getSkinnyHrdTriggers()).thenReturn(List.of(
-				RegexNameValue.builder().name("User-Agent").regex(".*Trident/7.*").value("/skinnyHRD.html").build(),
-				RegexNameValue.builder().name("X-MOS-Agent").regex("Silk-Performer").value("/skinnyImgHRD.html").build(),
-				RegexNameValue.builder()
-							  .name("X-Origin-Forwarded-For").regex("192\\.168\\.12\\.[0-9]*").value("/skinnyImgHRD.html").build()
+				RegexNameValue.builder().name("User-Agent").regex(".*Trident/7.*").build(),
+				RegexNameValue.builder().name("X-MOS-Agent").regex("Silk-Performer").build(),
+				RegexNameValue.builder().name("X-Origin-Forwarded-For").regex("192\\.168\\.12\\.[0-9]*").build()
 		));
 		var httpRequest = new MockHttpServletRequest();
 		httpRequest.addHeader(httpHeaderName, httpHeaderValue);
@@ -314,9 +313,6 @@ class RelyingPartySetupServiceTest {
 				{ null, 0l, 0l },
 				{ RelyingParty.builder().id(RP_ID).build(), 8l, 8l },
 				{ RelyingParty.builder().id(RP_ID)
-							  .securityPolicies(SecurityPolicies.builder().build())
-						.build(), 4l, 3600l },
-				{ RelyingParty.builder().id(RP_ID)
 							  .securityPolicies(SecurityPolicies.builder().notOnOrAfterSeconds(0).build())
 						.build(), 7l, 0l },
 				{ RelyingParty.builder().id(RP_ID)
@@ -339,16 +335,13 @@ class RelyingPartySetupServiceTest {
 				{ RelyingParty.builder().id(RP_ID).build(), -1l, -1l },
 				{ RelyingParty.builder().id(RP_ID)
 							  .securityPolicies(SecurityPolicies.builder().build())
-						.build(), 4l, 3600l },
+						.build(), 4l, 4l },
 				{ RelyingParty.builder().id(RP_ID)
 							  .securityPolicies(SecurityPolicies.builder().notOnOrAfterSeconds(12).build())
 						.build(), 4l, 12l },
 				{ RelyingParty.builder().id(RP_ID)
 							  .securityPolicies(SecurityPolicies.builder().notOnOrAfterSeconds(-1).build())
 						.build(), 4l, -1l },
-				{ RelyingParty.builder().id(RP_ID)
-							  .securityPolicies(SecurityPolicies.builder().audienceNotOnOrAfterSeconds(0).build())
-						.build(), 7l, 3600l },
 				{ RelyingParty.builder().id(RP_ID)
 							  .securityPolicies(SecurityPolicies.builder().audienceNotOnOrAfterSeconds(1).build())
 						.build(), 9l, 1l },

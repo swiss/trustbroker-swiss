@@ -100,16 +100,19 @@ public class HttpUtil {
 		return ProxySelector.of(InetSocketAddress.createUnresolved(proxyUri.getHost(), proxyUri.getPort()));
 	}
 
+	public static Optional<HttpResponse<String>> getHttpFormPostStringResonse(HttpClient httpClient, URI uri,
+			Map<String, String> params, Map<String, String> headers) {
+		return getHttpFormPostResponse(httpClient, uri, params, headers, HttpResponse.BodyHandlers.ofString());
+	}
+
 	public static Optional<String> getHttpFormPostString(HttpClient httpClient, URI uri,
 			Map<String, String> params, Map<String, String> headers) {
-		return getHttpFormPostResponse(httpClient, uri, params, headers, HttpResponse.BodyHandlers.ofString())
-				.map(HttpResponse::body);
+		return checkAndMapResponse(getHttpFormPostResponse(httpClient, uri, params, headers, HttpResponse.BodyHandlers.ofString()));
 	}
 
 	public static Optional<InputStream> getHttpFormPostStream(HttpClient httpClient, URI uri,
 			Map<String, String> params, Map<String, String> headers) {
-		return getHttpFormPostResponse(httpClient, uri, params, headers, HttpResponse.BodyHandlers.ofInputStream())
-				.map(HttpResponse::body);
+		return checkAndMapResponse(getHttpFormPostResponse(httpClient, uri, params, headers, HttpResponse.BodyHandlers.ofInputStream()));
 	}
 
 	private static <T> Optional<HttpResponse<T>> getHttpFormPostResponse(HttpClient httpClient, URI uri,
@@ -123,8 +126,7 @@ public class HttpUtil {
 	}
 
 	public static Optional<String> getHttpString(HttpClient httpClient, URI uri, Map<String, String> headers) {
-		return getHttpResponse(httpClient, uri,headers, HttpResponse.BodyHandlers.ofString())
-				.map(HttpResponse::body);
+		return checkAndMapResponse(getHttpResponse(httpClient, uri,headers, HttpResponse.BodyHandlers.ofString()));
 	}
 
 	public static Optional<HttpResponse<String>> getHttpStringResponse(
@@ -155,11 +157,11 @@ public class HttpUtil {
 	}
 
 	public static Optional<String> getHttpResponseString(HttpClient httpClient, URI uri) {
-		return getHttpResponse(httpClient, uri, HttpResponse.BodyHandlers.ofString()).map(HttpResponse::body);
+		return checkAndMapResponse(getHttpResponse(httpClient, uri, HttpResponse.BodyHandlers.ofString()));
 	}
 
 	public static Optional<InputStream> getHttpResponseStream(HttpClient httpClient, URI uri) {
-		return getHttpResponse(httpClient, uri, HttpResponse.BodyHandlers.ofInputStream()).map(HttpResponse::body);
+		return checkAndMapResponse(getHttpResponse(httpClient, uri, HttpResponse.BodyHandlers.ofInputStream()));
 	}
 
 	private static <T> Optional<HttpResponse<T>> getHttpResponse(HttpClient httpClient, URI uri,
@@ -173,16 +175,21 @@ public class HttpUtil {
 
 	public static Optional<String> postHttpResponseString(HttpClient httpClient, URI uri, String body,
 			Map<String, String> headers) {
+		return checkAndMapResponse(postHttpResponse(httpClient, uri, body, headers));
+	}
+
+	public static Optional<HttpResponse<String>> postHttpResponse(HttpClient httpClient, URI uri, String body,
+			Map<String, String> headers) {
 		return submitHttpResponse(httpClient, uri, HttpMethod.POST,
 				HttpRequest.BodyPublishers.ofString(body), headers,
-				HttpResponse.BodyHandlers.ofString()).map(HttpResponse::body);
+				HttpResponse.BodyHandlers.ofString());
 	}
 
 	public static Optional<String> patchHttpResponseString(HttpClient httpClient, URI uri, String body,
 			Map<String, String> headers) {
-		return submitHttpResponse(httpClient, uri, HttpMethod.PATCH,
+		return checkAndMapResponse(submitHttpResponse(httpClient, uri, HttpMethod.PATCH,
 				HttpRequest.BodyPublishers.ofString(body), headers,
-				HttpResponse.BodyHandlers.ofString()).map(HttpResponse::body);
+				HttpResponse.BodyHandlers.ofString()));
 	}
 
 	// POST, PATCH, PUT with body
@@ -206,7 +213,7 @@ public class HttpUtil {
 			var response = httpClient.send(request, bodyHandler); // could use stream here
 			if (response.statusCode() != HttpStatus.SC_OK) {
 				log.error("HTTP {} uri={} returned HTTP statusCode={}", method, uri, response.statusCode());
-				return Optional.empty();
+				return Optional.of(response);
 			}
 			return Optional.of(response);
 		}
@@ -219,6 +226,13 @@ public class HttpUtil {
 			log.error("HTTP {} uri={} failed with message={}", method, uri, ex.getMessage(), ex);
 			return Optional.empty();
 		}
+	}
+
+	private static <T> Optional<T> checkAndMapResponse(Optional<HttpResponse<T>> response) {
+		if (response.isPresent() && response.get().statusCode() != HttpStatus.SC_OK) {
+			return Optional.empty();
+		}
+		return response.map(HttpResponse::body);
 	}
 
 	// Apache HTTP client used by OpenSaml

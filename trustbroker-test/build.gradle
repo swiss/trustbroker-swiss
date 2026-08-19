@@ -19,3 +19,15 @@ dependencies {
 	// servlet api (would be nice to not have the whole tomcat)
 	implementation "org.apache.tomcat.embed:tomcat-embed-core"
 }
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
+}

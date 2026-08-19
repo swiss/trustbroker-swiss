@@ -43,6 +43,7 @@ import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.service.XmlConfigStatusService;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
+import swiss.trustbroker.util.DefaultUtil;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
@@ -127,7 +128,7 @@ public class AppConfigService {
 
 	static void checkRpSsoIntegrity(RelyingPartySetup relyingPartySetup, SsoGroupSetup ssoGroupSetup) {
 		for (RelyingParty rp : relyingPartySetup.getRelyingParties()) {
-			if (rp.isSsoEnabled()) {
+			if (rp.isSsoEnabled(true)) {
 				var ssoGroupName = rp.getSso().getGroupName();
 				if (StringUtils.isEmpty(ssoGroupName)) {
 					log.error("RelyingParty with rpId={} enables SSO without an SSO group", rp.getId());
@@ -186,6 +187,7 @@ public class AppConfigService {
 		checkAndLoadCpCertificates(claimsProviderSetup);
 		validateScripts(claimsProviderSetup);
 		filterInvalidClaimsParties(claimsProviderSetup);
+		DefaultUtil.applyCpDefaults(claimsProviderSetup);
 		relyingPartyDefinitions.setClaimsProviderSetup(claimsProviderSetup);
 
 		if (ssoGroupSetup != null) {
@@ -199,6 +201,7 @@ public class AppConfigService {
 		checkAndLoadRelyingPartyCertificates(relyingPartySetup);
 		checkRpSsoIntegrity(relyingPartySetup, ssoGroupSetup);
 		filterInvalidRelyingParties(relyingPartySetup);
+		DefaultUtil.applyRpDefaults(relyingPartySetup);
 		relyingPartyDefinitions.setRelyingPartySetup(relyingPartySetup);
 		relyingPartyDefinitions.loadOidcConfiguration(trustBrokerProperties.getOidc());
 		relyingPartyDefinitions.loadAccessRequestConfigurations();
@@ -326,7 +329,9 @@ public class AppConfigService {
 			log.debug("rpId={} has OIDC configured, add own signer={} to truststore", relyingParty.getId(),
 					selfSigner.getSignerCert());
 		}
-		if (relyingParty.isSamlEnabled(trustBrokerProperties.getSaml().isEnabled())
+		// SAML is also used internally for OIDC
+		if ((relyingParty.isSamlEnabled(trustBrokerProperties.getSaml().isEnabled()) ||
+				relyingParty.isOidcEnabled(trustBrokerProperties.getOidc().isEnabled()))
 				&& trustBrokerProperties.getGlobalRequestTrust() != null) {
 			var globalRequestTrust = trustBrokerProperties.getGlobalRequestTrust();
 			var globalRequestTrustCert = geGlobalCert(globalRequestTrust, "trustbroker.config.globalRequestTrust");
@@ -345,7 +350,7 @@ public class AppConfigService {
 					log.info("EncryptionTruststore has multiple certs for rpIssuerId={}. Picking first one.",
 							relyingParty.getId());
 				}
-				relyingParty.setRpEncryptionTrustCredential(truststoreCredentials.get(0));
+				relyingParty.setRpEncryptionTrustCredential(truststoreCredentials.getFirst());
 			}
 		}
 

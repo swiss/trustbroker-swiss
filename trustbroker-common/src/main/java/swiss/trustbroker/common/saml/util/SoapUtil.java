@@ -113,7 +113,7 @@ public class SoapUtil {
 					String.format("Unexpected request containing xmlObjects=%d != 1", xmlObjects.size()));
 
 		}
-		var xmlObject = xmlObjects.get(0);
+		var xmlObject = xmlObjects.getFirst();
 		if (!samlObjectClass.isAssignableFrom(xmlObject.getClass())) {
 			throw new TechnicalException(String.format("Unexpected request of type=%s expected=%s",
 					xmlObject.getClass().getName(), samlObjectClass.getName()));
@@ -129,7 +129,7 @@ public class SoapUtil {
 					baseObject.getClass().getSimpleName(), xmlObjects.size(), xmlObjectClass.getName()));
 
 		}
-		return xmlObjects.get(0);
+		return xmlObjects.getFirst();
 	}
 
 	public static void sendSoap11Response(HttpServletResponse response, SAMLObject samlResponse) {
@@ -194,10 +194,10 @@ public class SoapUtil {
 					}
 				}
 				catch (Exception ex) {
-					log.info("Could not validate signature of element={} : {} caused by {}",
+					log.debug("Could not validate signature of element={} : {} caused by {}",
 							element.getNodeName(), ex.getMessage(), ExceptionUtil.getRootMessage(ex));
 				}
-				failedCredentials.add(credential.getEntityId());
+				failedCredentials.add(SamlUtil.getKeyInfoHintFromCredential(credential));
 			}
 			log.info("Signature={} not valid for element={} with credentials={}", signatureNode.getNodeName(),
 					element.getNodeName(), failedCredentials);

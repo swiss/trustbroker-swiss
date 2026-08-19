@@ -20,7 +20,7 @@ import java.util.List;
 import lombok.Builder;
 
 /**
- * Holds information on an OIDC Authorization Code Flow Request for autiting.
+ * Holds information on an OIDC Authorization Code Flow Request for auditing.
  */
 @Builder
 public record AuthorizationCodeFlowRequest(

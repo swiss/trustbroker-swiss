@@ -26,8 +26,6 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,6 +46,8 @@ import swiss.trustbroker.federation.xmlconfig.IdmLookup;
 import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
 import swiss.trustbroker.saml.util.ClaimSourceUtil;
+import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 /**
  * This class implement the processing context which is the core of the XTB processing model according.
@@ -236,7 +236,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 
 	/**
 	 * Properties contain computed values that can be sent as RP attributes based on incoming CP attributes and userdetails.
-	 * They are selected by the <PropertiesSelection/> configuration.
+	 * They are selected by the <code>PropertiesSelection</code> configuration.
 	 */
 	@Builder.Default
 	@JsonProperty("properties")
@@ -369,7 +369,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * @since 1.11.0
 	 */
 	public void setAttributes(String name, String namespaceUri, List<String> values) {
-		if ((name == null && namespaceUri == null) || values == null || values.isEmpty()) {
+		if ((name == null && namespaceUri == null) || values == null) {
 			log.warn("CpResponse.setAttributes(name={}, namespaceUri={}, values={}) rejected", name, namespaceUri, values);
 			return;
 		}
@@ -389,7 +389,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * Set multi-value attribute with Definition key.
 	 */
 	public void setAttributes(Definition def, List<String> values) {
-		if (def == null || values == null || values.isEmpty()) {
+		if (def == null || values == null) {
 			log.warn("CpResponse.setAttributes(def={} values={}) rejected", def, values);
 			return;
 		}
@@ -553,7 +553,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * Script hook use: Set user claims with a list value and a FQ name.
 	 */
 	public void setUserDetails(String name, String fqName, List<String> values) {
-		if ((name == null && fqName == null) || values == null || values.isEmpty()) {
+		if ((name == null && fqName == null) || values == null) {
 			log.warn("CpResponse.setUserDetails(name={}, fqName={}, values={}) rejected", name, fqName, values);
 			return;
 		}
@@ -594,7 +594,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 		if (idmQueries.isEmpty()) {
 			throw new TechnicalException(String.format("Query with typeOrId=%s was not found", typeOrId));
 		}
-		idmLookup.getQueries().remove(idmQueries.get(0));
+		idmLookup.getQueries().remove(idmQueries.getFirst());
 	}
 
 	/**
@@ -647,7 +647,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * Script hook use: Add CP/IDP claims with a list value.using FQ name.
 	 */
 	public void setProperties(String name, String fqName, List<String> values) {
-		if ((name == null && fqName == null) || values == null || values.isEmpty()) {
+		if ((name == null && fqName == null) || values == null) {
 			log.warn("CpResponse.setProperties(name={}, fqName={}, values={}) rejected", name, fqName, values);
 			return;
 		}
@@ -720,7 +720,7 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	 * 	Script hook use: Add values to an already available list value or create.
 	 */
 	public void addProperties(String name, String fqName, List<String> values) {
-		if (name == null || values == null || values.isEmpty()) {
+		if (name == null || values == null) {
 			log.warn("CpResponse.addProperty(name={}, values={}) rejected", name, values);
 			return;
 		}
@@ -935,6 +935,15 @@ public class CpResponse extends ResponseStatus implements CpResponseData {
 	public String getSsoSubjectFromCpResponse(String ssoSubjectClaim) {
 		var ret = DefinitionUtil.findByNameOrNamespace(ssoSubjectClaim, ClaimSource.CP.name(), originalAttributes);
 		var attributeValues = ret.map(Map.Entry::getValue).orElse(null);
-		return attributeValues != null ? attributeValues.get(0) : null;
+		return attributeValues != null ? attributeValues.getFirst() : null;
+	}
+
+	public void cloneIdmLookup(IdmLookup originalIdmLookup) {
+		if (originalIdmLookup == null) {
+			log.debug("No IdmLookup");
+		}
+		else {
+			idmLookup = originalIdmLookup.shallowClone();
+		}
 	}
 }

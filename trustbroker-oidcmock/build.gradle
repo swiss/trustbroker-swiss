@@ -9,7 +9,7 @@ dependencies {
 
 	implementation "org.springframework.boot:spring-boot-starter-web"
 	implementation "org.springframework.boot:spring-boot-starter-security"
-	implementation "org.springframework.security:spring-security-oauth2-authorization-server"
+	implementation "org.springframework.boot:spring-boot-starter-oauth2-authorization-server"
 }
 
 springBoot {
@@ -40,11 +40,14 @@ publishing {
 		uberJar(MavenPublication) {
 			artifact bootJar
 		}
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
 	}
 }
 
 artifactoryPublish {
-	publications(publishing.publications.uberJar)
+	publications(publishing.publications.uberJar, publishing.publications.docJar)
 }
 
 tasks.jibDockerBuild.dependsOn assemble

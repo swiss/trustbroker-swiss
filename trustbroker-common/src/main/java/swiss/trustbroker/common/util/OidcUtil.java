@@ -86,8 +86,6 @@ public class OidcUtil {
 
 	public static final String OIDC_BEARER = "Bearer";
 
-	public static final String HTTP_BASIC = "Basic";
-
 	public static final String OIDC_BEARER_NULL = "Bearer null";
 
 	public static final String OIDC_AUDIENCE = JWTClaimNames.AUDIENCE; // token claim matching client_id
@@ -198,7 +196,7 @@ public class OidcUtil {
 			if (obj instanceof String str) {
 				ret = str;
 			} else if (obj instanceof List<?> list && !list.isEmpty()) {
-				ret = list.get(0).toString(); // just try the first one ok (we expect clients to be aligned for /userinfo in RP
+				ret = list.getFirst().toString(); // just try the first one ok (we expect clients to be aligned for /userinfo in RP
 			}
 		}
 		return ret;
@@ -235,7 +233,7 @@ public class OidcUtil {
 		if (toks[0].equalsIgnoreCase(OIDC_BEARER)) {
 			return getClaimFromJwtToken(toks[1], claimName);
 		}
-		if (toks[0].equalsIgnoreCase(HTTP_BASIC) && claimName.equals(OIDC_AUDIENCE)) {
+		if (toks[0].equalsIgnoreCase(WebUtil.HTTP_BASIC) && claimName.equals(OIDC_AUDIENCE)) {
 			return getUserFromBasicAuth(toks[1]);
 		}
 		log.debug("Ignoring unknown {}={} type", HttpHeaders.AUTHORIZATION, header);
@@ -539,6 +537,13 @@ public class OidcUtil {
 			isIdToken = "ID".equalsIgnoreCase(claim.toString());
 		}
 		return isIdToken;
+	}
+
+	// related OIDC specs:
+	// https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication
+	// https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1
+	public static String getBasicAuthorizationHeader(String clientId, String clientSecret) {
+		return WebUtil.getBasicAuthorizationHeader(WebUtil.urlEncodeValue(clientId), WebUtil.urlEncodeValue(clientSecret));
 	}
 
 }

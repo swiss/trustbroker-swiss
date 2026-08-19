@@ -225,57 +225,87 @@ public abstract class CounterParty implements PathReference, Serializable {
 	}
 
 	public boolean requireSignedAuthnRequest() {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedAuthnRequest,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedAuthnRequest,
 				() -> true);
 	}
 
 	public boolean requireSignedLogoutRequest() {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedLogoutRequest,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedLogoutRequest,
 				this::requireSignedAuthnRequest);
 	}
 
 	public boolean requireSignedLogoutNotificationRequest() {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedLogoutNotificationRequest,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedLogoutNotificationRequest,
 				() -> true);
 	}
 
 	public boolean requireSignedResponse(boolean defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedResponse,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedResponse,
 				() -> defaultValue);
 	}
 
 	public boolean requireEncryptedAssertion() {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireEncryptedAssertion,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireEncryptedAssertion,
 				() -> true);
 	}
 
 	public boolean requireSignedArtifactResponse(boolean defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedArtifactResponse,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedArtifactResponse,
 				() -> defaultValue);
 	}
 
 	public boolean doSignArtifactResolve(boolean defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getDoSignArtifactResolve,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getDoSignArtifactResolve,
 				() -> defaultValue);
 	}
 
 	public boolean validateHttpHeaders(boolean defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getValidateHttpHeaders,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getValidateHttpHeaders,
 				() -> defaultValue);
 	}
 
 	public boolean forceAuthn(boolean defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getForceAuthn,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getForceAuthn,
 				() -> defaultValue);
 	}
 
 	public boolean requireSignedAuthnRequestForSsoJoin() {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getRequireSignedAuthnRequestForSsoJoin,
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getRequireSignedAuthnRequestForSsoJoin,
 				this::requireSignedAuthnRequest);
 	}
 
+	public List<String> getAllowedSignatureAlgorithms(List<String> defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getAllowedSignatureAlgorithms,
+				() -> defaultValue);
+	}
+
+	public boolean wsTrustIssueRequireSignedAssertion(boolean defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getWsTrustIssueRequireSignedAssertion,
+				() -> defaultValue);
+	}
+
+	public boolean wsTrustIssueRequireSignedRequest(boolean defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getWsTrustIssueRequireSignedRequest,
+				() -> defaultValue);
+	}
+
+	public boolean wsTrustIssueRequireTimestamp(boolean defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getWsTrustIssueRequireTimestamp,
+				() -> defaultValue);
+	}
+
+	public long getWsTrustIssueNotBeforeToleranceSec(long defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getWsTrustIssueNotBeforeToleranceSec,
+				() -> defaultValue);
+	}
+
+	public long getWsTrustIssueNotOnOrAfterToleranceSec(long defaultValue) {
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getWsTrustIssueNotOnOrAfterToleranceSec,
+				() -> defaultValue);
+	}
+
 	public int getSsoMinQoaLevel(int defaultValue) {
-		return PropertyUtil.evaluatePropery(getSecurityPolicies(), SecurityPolicies::getSsoMinQoaLevel, () -> defaultValue);
+		return PropertyUtil.evaluateProperty(getSecurityPolicies(), SecurityPolicies::getSsoMinQoaLevel, () -> defaultValue);
 	}
 
 	public List<Definition> getAttributesDefinitions() {

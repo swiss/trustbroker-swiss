@@ -34,11 +34,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsUtils;
+import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.CorsPolicies;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.oidc.OidcFrameAncestorHandler;
 import swiss.trustbroker.oidc.session.HttpExchangeSupport;
 import swiss.trustbroker.script.service.ScriptService;
@@ -99,7 +101,7 @@ public class OidcTxFilter implements Filter {
 			}
 			// stateless configuration handling (support cors headers without preflight and handle issuer)
 			else if (ApiSupport.isOidcConfigPath(path) && properties.getOidc().isUseKeycloakIssuerId()) {
-				wrappedResponse.catchOutputStream();
+				wrappedResponse.captureOutputStream();
 				chain.doFilter(wrappedRequest, wrappedResponse);
 				handlePenTestRequest();
 				patchOpenIdConfiguration(path, wrappedResponse);
@@ -195,17 +197,21 @@ public class OidcTxFilter implements Filter {
 		// CORS headers need ACL checking, so we need the OIDC client to check HTTP origin against redirectUris.
 		// As the client_id is part of the SAML federation handling (broker protocol) we also handle CORS on /saml2 endpoint.
 		// Observed OIDC clients doing OPTIONS pre-flight requests on the openid-configuration so allow '*' there too.
-		var oidcClient = relyingPartyDefinitions.getOidcClientByPredicate(cl -> cl.isTrustedOrigin(origin));
-		if (oidcClient.isPresent() || ApiSupport.isOidcConfigPath(path)) {
+		var oidcClients = relyingPartyDefinitions.getOidcClientsByPredicate(cl -> cl.isTrustedOrigin(origin));
+		if (!oidcClients.isEmpty() || ApiSupport.isOidcConfigPath(path)) {
 			List<String> allowedOrigins = new ArrayList<>();
 			allowedOrigins.add(properties.getPerimeterUrl()); // validated origin plus SAML perimeter
-			if (oidcClient.isEmpty()) {
+			if (oidcClients.isEmpty()) {
 				log.warn("No OIDC client with matching ACUrl for origin=\"{}\" called on path=\"{}\" - origin not trusted",
 						StringUtil.clean(origin), StringUtil.clean(path));
 			}
 			else {
+				if (log.isDebugEnabled()) {
+					var clientIds = CollectionUtil.convertToSet(oidcClients, OidcClient::getId);
+					log.debug("Trusting origin=\"{}\" matching count={} oidcClients={}", origin, clientIds.size(), clientIds);
+				}
 				allowedOrigins.add(origin);
-				OidcTxUtil.validateKeycloakRealm(path, oidcClient.get(), origin);
+				OidcTxUtil.validateKeycloakRealm(path, oidcClients, origin);
 			}
 			var corsPolicies = CorsPolicies.builder()
 					.allowedOrigins(allowedOrigins)
@@ -220,20 +226,31 @@ public class OidcTxFilter implements Filter {
 	private void catchOutputStream(HttpServletRequest httpRequest, OidcTxResponseWrapper wrappedResponse) {
 		var path = httpRequest.getRequestURI();
 		// optimize (do not cache assets and other resources)
-		if (ApiSupport.isSamlPath(path) || ApiSupport.isOidcSessionPath(path)
-				|| WebSupport.penTestingModeEnabled(httpRequest, properties)) {
-			wrappedResponse.catchOutputStream();
-			var penTestMarker = properties.getPublicPenTestCookie();
-			if (penTestMarker != null) {
-				var scenario = WebUtil.getAny(penTestMarker, httpRequest);
-				HttpExchangeSupport.setRunningPenTestScenario(scenario);
+		var penTestingModeEnabled = WebSupport.penTestingModeEnabled(httpRequest, properties);
+		if (penTestingModeEnabled || ApiSupport.isSamlPath(path) || ApiSupport.isOidcSessionPath(path)) {
+			// on some on these paths capturing does not work as we use an internal forwarding
+			// which leads to Tomcat ignoring the deferred writing of the response:
+			if (ApiSupport.isSamlOrOidcStaticContentPath(path)) {
+				return;
 			}
+			wrappedResponse.captureOutputStream();
+			if (penTestingModeEnabled) {
+				setPenTestScenario(httpRequest);
+			}
+		}
+	}
+
+	private void setPenTestScenario(HttpServletRequest httpRequest) {
+		var penTestMarker = properties.getPublicPenTestCookie();
+		if (penTestMarker != null) {
+			var scenario = WebUtil.getAny(penTestMarker, httpRequest);
+			HttpExchangeSupport.setRunningPenTestScenario(scenario);
 		}
 	}
 
 	// flush buffered data after TX commit
 	private void flushOutputStream(OidcTxResponseWrapper wrappedResponse) throws IOException {
-		wrappedResponse.flushOutputStream();
+		wrappedResponse.flushCapturedOutputStream();
 	}
 
 	// Support OIDC clients connecting to Keycloak validating the issuer ID containing /realms/X
@@ -256,10 +273,10 @@ public class OidcTxFilter implements Filter {
 					.replace(ApiSupport.OIDC_REVOKE,
 							ApiSupport.PROTOCOL_OPENIDCONNECT + ApiSupport.OIDC_TOKEN + ApiSupport.OIDC_REVOKE)
 					.getBytes(StandardCharsets.UTF_8);
-			log.debug("Patching back .well-known response urls with realm={}", realmName);
+			log.debug("Patching back .well-known response URLs with realm={}", realmName);
 			// replace on output stream, discarding original body
 			response.setContentLengthLong(config.length);
-			response.flushOutputStream(config);
+			response.writeToRealOutputStream(config);
 		}
 	}
 

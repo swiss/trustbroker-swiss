@@ -48,12 +48,12 @@ public class SpringOpTraceInterceptor {
 			return getClass() + ":" + (String) joinPoint.proceed();
 		}
 
-		// if used in batch classes, we do not have a context from the web servlet filter
-		Throwable ex = null;
+		// if used in batch classes, we do not have a context from the web servlet filter, so we create an initial one
 		if (REQUEST_CONTEXT_FACTORY.getRequestContext() == null) {
 			createRequestContext(joinPoint);
 		}
 
+		Throwable ex = null;
 		try {
 			// ====>
 			var self = joinPoint.getTarget();
@@ -75,41 +75,20 @@ public class SpringOpTraceInterceptor {
 
 	// batch client not having an injection point yet
 	private void createRequestContext(ProceedingJoinPoint joinPoint) {
-		boolean isOpTraceDebugEnabled = OP.isDebugEnabled();
 		try {
 			final var objName = joinPoint.getTarget().getClass().getSimpleName();
 			final var signature = (MethodSignature) joinPoint.getSignature();
 			final var method = signature.getMethod().getName();
 			final var username = "TechTB"; // statically identify XTB on server side, check config for tech accounts
 			final var clientId = genClientId(username);
-			if (isOpTraceDebugEnabled) {
-				var opTraceParams = getParameters(signature);
-				OP.logInitialEnter(null, objName, method, username, opTraceParams, clientId);
-			}
-			else {
-				OP.logInitialEnter(null, objName, method, username, clientId);
-			}
+			final var traceId = TraceSupport.generateInitialTraceId();
+			REQUEST_CONTEXT_FACTORY.create(objName, method, traceId, username, clientId,null, null);
 		}
 		catch (Exception e) {
-			if (log.isInfoEnabled()) {
-				var traceEx = (log.isDebugEnabled() ? e : null);
-				log.info("Exception at business boundary to be handled by caller: {}: {}", e.getClass().getName(),
-						e.getMessage(), traceEx);
-			}
+			var traceEx = (log.isDebugEnabled() ? e : null);
+			log.error("Error in OpTrace! -> batch boundary not properly initialized: {}: {}",
+					e.getClass().getName(),	e.getMessage(), traceEx);
 		}
-	}
-
-	private static Object[][] getParameters(MethodSignature signature) {
-		var parameters = signature.getParameterNames();
-		if (parameters != null) {
-			var opTraceParams = new Object[parameters.length][2];
-			for (int i = 0; i < parameters.length; i++) {
-				opTraceParams[i][0] = "arg" + i;
-				opTraceParams[i][1] = parameters[i];
-			}
-			return opTraceParams;
-		}
-		return new Object[0][];
 	}
 
 	/**

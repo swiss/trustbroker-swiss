@@ -25,19 +25,16 @@ import swiss.trustbroker.util.WebSupport;
 @Slf4j
 public class OperationalUtil {
 
-	public static final String SKINNY_HRD_DEFAULT = "/skinnyColHRD.html";
-
 	private OperationalUtil() {}
 
 	// OCC workaround for E2E monitoring robot mainly
-	public static String useSkinnyUiForLegacyClients(RpRequest rpRequest, HttpServletRequest httpRequest,
+	public static boolean useSkinnyUiForLegacyClients(RpRequest rpRequest, HttpServletRequest httpRequest,
 			TrustBrokerProperties trustBrokerProperties) {
 		// by BeforeHrd script e.g. for SPS19 using old MSIE sub-system
 		if (rpRequest != null && rpRequest.isUseSkinnyHrdScreen()) {
-			return SKINNY_HRD_DEFAULT;
+			return true;
 		}
 		// by config from HTTP request e.g. for OCC E2E monitoring robot using old MSIE sub-system
-		String skinnyHrdHtml = null;
 		var skinnyUiTriggers = trustBrokerProperties.getSkinnyHrdTriggers();
 		if (skinnyUiTriggers != null) {
 			for (var skinnyUiTrigger : skinnyUiTriggers) {
@@ -45,17 +42,14 @@ public class OperationalUtil {
 				var regexp = skinnyUiTrigger.getPattern();
 				var headerValue = WebUtil.getHeader(header, httpRequest);
 				if (headerValue != null && regexp.matcher(headerValue).matches()) {
-					skinnyHrdHtml = skinnyUiTrigger.getValue(); // we assume a correct application.yml here
-					break;
+					// we do this in DEBUG because too many clients will use this UI per request (OCC monitor, Office365 users)
+					log.debug("Technical debt legacy using MSIE skinny HRD (no announcements support, no profile selection etc on {}",
+							WebSupport.getClientHint(httpRequest, trustBrokerProperties.getNetwork()));
+					return true;
 				}
 			}
 		}
-		if (skinnyHrdHtml != null) {
-			// we do this in DEBUG because too many clients will use this UI per request (OCC monitor, Office365 users)
-			log.debug("Technical debt legacy using MSIE skinny HRD (no announcements support, no profile selection etc on {}",
-					WebSupport.getClientHint(httpRequest, trustBrokerProperties.getNetwork()));
-		}
-		return skinnyHrdHtml;
+		return false;
 	}
 
 	// OCC workaround for E2E monitoring robot mainly and also for administrators
@@ -81,7 +75,7 @@ public class OperationalUtil {
 	public static boolean skipUserFeatures(RpRequest rpRequest, HttpServletRequest httpRequest,
 			TrustBrokerProperties trustBrokerProperties) {
 		return skipUiFeaturesForAdminAndMonitoringClients(httpRequest, trustBrokerProperties)
-				|| useSkinnyUiForLegacyClients(rpRequest, httpRequest, trustBrokerProperties) != null;
+				|| useSkinnyUiForLegacyClients(rpRequest, httpRequest, trustBrokerProperties);
 	}
 
 }

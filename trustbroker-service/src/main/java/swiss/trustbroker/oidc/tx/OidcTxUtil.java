@@ -15,10 +15,13 @@
 
 package swiss.trustbroker.oidc.tx;
 
+import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.oauth2.server.authorization.oidc.OidcClientMetadataClaimNames;
+import org.springframework.security.oauth2.server.authorization.OAuth2ClientMetadataClaimNames;
+import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
@@ -30,7 +33,7 @@ public class OidcTxUtil {
 
 	private static final Pattern CLIENT_ID_PATTERN = Pattern.compile(
 			ApiSupport.SPRING_OAUTH2_AUTHORIZE_CTXPATH
-					+ ".*[?&]" + OidcClientMetadataClaimNames.CLIENT_ID + "=(.*?)&");
+					+ ".*[?&]" + OAuth2ClientMetadataClaimNames.CLIENT_ID + "=(.*?)&");
 
 	private OidcTxUtil() {
 	}
@@ -62,11 +65,13 @@ public class OidcTxUtil {
 		return null;
 	}
 
-	static boolean validateKeycloakRealm(String path, OidcClient oidcClient, String origin) {
+	static boolean validateKeycloakRealm(String path, List<OidcClient> oidcClients, String origin) {
 		var realmName = getKeycloakRealm(path);
-		if (realmName != null && !realmName.equals(oidcClient.getRealm())) {
-			log.warn("oidcClientId={} with realm={} origin=\"{}\" called unexpected path=\"{}\"",
-					oidcClient.getId(), oidcClient.getRealm(), StringUtil.clean(origin), StringUtil.clean(path));
+		if (realmName != null && oidcClients.stream().noneMatch(oidcClient -> realmName.equals(oidcClient.getRealm()))) {
+			var clientIds = CollectionUtil.convertToSet(oidcClients, OidcClient::getId);
+			var realms = oidcClients.stream().map(OidcClient::getRealm).collect(Collectors.toSet());
+			log.warn("oidcClientIds={} with realms={} origin=\"{}\" called unexpected path=\"{}\"",
+					clientIds, realms, StringUtil.clean(origin), StringUtil.clean(path));
 			return false;
 		}
 		return true;

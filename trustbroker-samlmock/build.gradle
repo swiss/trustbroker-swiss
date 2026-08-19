@@ -101,11 +101,14 @@ publishing {
 		uberJar(MavenPublication) {
 			artifact bootJar
 		}
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
 	}
 }
 
 artifactoryPublish {
-	publications(publishing.publications.uberJar)
+	publications(publishing.publications.uberJar, publishing.publications.docJar)
 }
 
 tasks.jibDockerBuild.dependsOn assemble

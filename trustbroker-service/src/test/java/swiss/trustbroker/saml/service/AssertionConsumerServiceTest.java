@@ -148,7 +148,7 @@ class AssertionConsumerServiceTest {
 
 	@BeforeEach
 	void setupTest() {
-		doReturn(new NetworkConfig()).when(trustBrokerProperties).getNetwork();
+		doReturn(givenNetworkConfig()).when(trustBrokerProperties).getNetwork();
 		doReturn(new SamlProperties()).when(trustBrokerProperties).getSaml();
 		doAnswer(invocation -> invocation.getArgument(1)).when(hrdService).adaptClaimsProviderMappings(any(), any());
 	}
@@ -271,7 +271,12 @@ class AssertionConsumerServiceTest {
 		cp.setAuthnRequestIssuerId(rpIssuerId);
 		var state = mockState(RELAY_STATE);
 		state.setIssuer(TEST_CP);
+		state.getSpStateData().setIssuer(rpIssuerId);
 		mockSecurityChecks(false, false, false, true);
+		var rp = RelyingParty.builder()
+							 .id(rpIssuerId)
+							 .build();
+		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(eq(rpIssuerId), any())).thenReturn(rp);
 		when(trustBrokerProperties.getSaml()).thenReturn(new SamlProperties());
 		var responseData = ResponseData.of(response, RELAY_STATE, SignatureContext.forArtifactBinding());
 		assertDoesNotThrow(() -> assertionConsumerService.handleSuccessCpResponse(responseData));
@@ -290,7 +295,7 @@ class AssertionConsumerServiceTest {
 	}
 
 	@Test
-	void handleFailedsCpResponseMissingResponse() {
+	void handleFailedCpResponseMissingResponse() {
 		ResponseData<Response> responseData = ResponseData.of(null, RELAY_STATE, null);
 		var ex = assertThrows(RequestDeniedException.class,
 				() -> assertionConsumerService.handleFailedCpResponse(responseData));
@@ -478,8 +483,8 @@ class AssertionConsumerServiceTest {
 	@ParameterizedTest
 	@MethodSource
 	void filterDisplayedClaimsProviders(List<Pair<ClaimsProvider, UiDisableReason>> claimsProviders,
-			List<Pair<ClaimsProvider, UiDisableReason>> expectedResult) {
-		var result = AssertionConsumerService.filterDisplayedClaimsProviders("requestId1", claimsProviders);
+			List<Pair<ClaimsProvider, UiDisableReason>> expectedResult, boolean displayAll) {
+		var result = AssertionConsumerService.filterDisplayedClaimsProviders("requestId1", claimsProviders, displayAll);
 		assertThat(result, is(expectedResult));
 	}
 
@@ -492,28 +497,40 @@ class AssertionConsumerServiceTest {
 		var cpMinus2 = givenClaimsProvider("cp-2", -2);
 
 		return new Object[][] {
-				{ Collections.emptyList(), Collections.emptyList() },
+				{ Collections.emptyList(), Collections.emptyList(), false },
 				{ List.of(Pair.of(cp2, UiDisableReason.INSUFFICIENT), Pair.of(cpMinus2, null), Pair.of(cpNull, null),
 						Pair.of(cp0, null), Pair.of(cp1, null), Pair.of(cpMinus1, null)),
-					List.of(Pair.of(cp2, UiDisableReason.INSUFFICIENT), Pair.of(cpNull, null), Pair.of(cp1, null)) },
+						List.of(Pair.of(cp2, UiDisableReason.INSUFFICIENT), Pair.of(cpNull, null), Pair.of(cp1, null)),
+						false
+				},
 				// all
 				// null/positive
 				// highest negative/zero that is enabled
 				{ List.of(Pair.of(cpMinus2, null), Pair.of(cpMinus1, null)),
-						List.of(Pair.of(cpMinus1, null)) },
+						List.of(Pair.of(cpMinus1, null)),
+						false
+				},
 				{ List.of(Pair.of(cpMinus2, null), Pair.of(cpMinus1, null), Pair.of(cp0, UiDisableReason.INSUFFICIENT)),
-						List.of(Pair.of(cpMinus1, null)) },
+						List.of(Pair.of(cpMinus1, null)),
+						false
+				},
 				{ List.of(Pair.of(cpMinus2, null), Pair.of(cp0, null), Pair.of(cpMinus1, null)),
-						List.of(Pair.of(cp0, null)) },
+						List.of(Pair.of(cp0, null)),
+						false
+				},
 				// all hidden and disabled
 				{ List.of(Pair.of(cp0, UiDisableReason.INSUFFICIENT), Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)),
-						List.of(Pair.of(cp0, UiDisableReason.INSUFFICIENT), Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)) },
+						List.of(Pair.of(cp0, UiDisableReason.INSUFFICIENT), Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)),
+						false
+				},
 				// single CP
-				{ List.of(Pair.of(cp1, null)), List.of(Pair.of(cp1, null)) },
-				{ List.of(Pair.of(cp1, UiDisableReason.INSUFFICIENT)), List.of(Pair.of(cp1, UiDisableReason.INSUFFICIENT)) },
-				{ List.of(Pair.of(cpNull, null)), List.of(Pair.of(cpNull, null)) },
-				{ List.of(Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)), List.of(Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)) },
-				{ List.of(Pair.of(cpMinus2, null)), List.of(Pair.of(cpMinus2, null)) }
+				{ List.of(Pair.of(cp1, null)), List.of(Pair.of(cp1, null)), false },
+				{ List.of(Pair.of(cp1, UiDisableReason.INSUFFICIENT)), List.of(Pair.of(cp1, UiDisableReason.INSUFFICIENT)), false },
+				{ List.of(Pair.of(cpNull, null)), List.of(Pair.of(cpNull, null)), false },
+				{ List.of(Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)), List.of(Pair.of(cpMinus2, UiDisableReason.UNAVAILABLE)), false },
+				{ List.of(Pair.of(cpMinus2, null)), List.of(Pair.of(cpMinus2, null)), false },
+				// all CPs including invisible ones
+				{ List.of(Pair.of(cpMinus1, null)), List.of(Pair.of(cpMinus1, null)), true },
 		};
 	}
 
@@ -606,4 +623,10 @@ class AssertionConsumerServiceTest {
 		doReturn(secChecks).when(trustBrokerProperties).getSecurity();
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

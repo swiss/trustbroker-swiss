@@ -40,10 +40,13 @@ public class SshTransportConfig implements TransportConfigCallback {
 
 	private final File sshConfig; // required to locate config and/or known_hosts to skip or verify git server public keys
 
+	private int transportTimeoutSec = 15;
+
 	public SshTransportConfig(String sshKey) {
 		var keyFile = new File(sshKey);
 		var keyDir = keyFile.getParentFile();
 		var userDir = getUserHome();
+		this.transportTimeoutSec = BootstrapProperties.getGitTransportTimeout();
 		this.sshDir = keyDir.canWrite() ? keyDir : new File(userDir, SSH_DIR);
 		this.sshConfig = new File(sshDir, SSH_CONFIG);
 		checkAndBootstrapSshConfig();
@@ -100,6 +103,7 @@ public class SshTransportConfig implements TransportConfigCallback {
 	public void configure(Transport transport) {
 		if (transport instanceof SshTransport sshTransport) {
 			sshTransport.setSshSessionFactory(buildSshSessionFactory());
+			sshTransport.setTimeout(transportTimeoutSec);
 		}
 	}
 

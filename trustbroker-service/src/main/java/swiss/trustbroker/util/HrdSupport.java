@@ -54,7 +54,7 @@ public class HrdSupport {
 				|| WebSupport.isClientOnIntranet(request, properties.getNetwork());
 	}
 
-	private static boolean hasAutoLoginDisabled(HttpServletRequest request, TrustBrokerProperties properties) {
+	static boolean hasAutoLoginDisabled(HttpServletRequest request, TrustBrokerProperties properties) {
 		var autLoginCookie = properties.getPublicAutoLoginCookie();
 		if (StringUtils.isNotEmpty(autLoginCookie)) {
 			var cookieValue = WebUtil.getCookie(autLoginCookie, request);
@@ -63,6 +63,14 @@ public class HrdSupport {
 		return false;
 	}
 
+	public static boolean hasTestLoginEnabled(HttpServletRequest request, TrustBrokerProperties properties) {
+		var testLoginCookie = properties.getPublicTestCookie();
+		if (StringUtils.isNotEmpty(testLoginCookie)) {
+			var cookieValue = WebUtil.getCookie(testLoginCookie, request);
+			return "TRUE".equalsIgnoreCase(cookieValue); // true displays also invisible IDPs on HRD
+		}
+		return false;
+	}
 
 	// Claims provider hints are used to do autoLogin routing to a preferred IDP without displaying an HRD screen
 	public static String getClaimsProviderHint(HttpServletRequest request, TrustBrokerProperties properties) {
@@ -262,7 +270,7 @@ public class HrdSupport {
 		var selectedCp = cpMappings.stream().filter(cpm -> cpm.isMatchingHrdHint(cpSelectionHint)).toList();
 		if (!selectedCp.isEmpty()) {
 			var newList = new ArrayList<ClaimsProvider>(); // eliminate output duplicates
-			newList.add(selectedCp.get(0));
+			newList.add(selectedCp.getFirst());
 			log.debug("HRD reduced by hint={} ({}): {}", cpSelectionHint, newList.size(), newList);
 			return newList;
 		}

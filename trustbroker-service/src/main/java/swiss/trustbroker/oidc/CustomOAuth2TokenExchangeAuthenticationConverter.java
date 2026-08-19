@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -45,6 +45,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.web.OAuth2TokenEndpointFilter;
 import org.springframework.security.web.authentication.AuthenticationConverter;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
@@ -62,7 +63,7 @@ import org.springframework.util.StringUtils;
  * @author Steve Riesenberg
  * @see AuthenticationConverter
  * @see OAuth2TokenExchangeAuthenticationToken
- * @see OAuth2TokenEndpointFilter
+ * @see org.springframework.security.oauth2.server.authorization.web.OAuth2TokenEndpointFilter
  * @see <a target="_blank" href="https://tools.ietf.org/html/rfc7009#section-2.1">Section 2.1 Revocation Request</a>
  * @since 1.3
  */
@@ -186,7 +187,7 @@ public class CustomOAuth2TokenExchangeAuthenticationConverter implements Authent
 					&& !key.equals(OAuth2ParameterNames.SUBJECT_TOKEN_TYPE)
 					&& !key.equals(OAuth2ParameterNames.ACTOR_TOKEN)
 					&& !key.equals(OAuth2ParameterNames.ACTOR_TOKEN_TYPE) && !key.equals(OAuth2ParameterNames.SCOPE)) {
-				additionalParameters.put(key, (value.size() == 1) ? value.get(0) : value.toArray(new String[0]));
+				additionalParameters.put(key, (value.size() == 1) ? value.getFirst() : value.toArray(new String[0]));
 			}
 		});
 

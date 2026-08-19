@@ -180,7 +180,7 @@ class ApiSupportTest {
 	}
 
 	@Test
-	void testGetAccessRequestInPogressUrl() {
+	void testGetAccessRequestInProgressUrl() {
 		assertThat(apiSupport.getAccessRequestInProgressUrl(REQUEST_ID),
 				is(BASE_URL + ApiSupport.FRONTEND_CONTEXT + ApiSupport.ACCESS_REQUEST_PAGE + '/' + REQUEST_ID + ApiSupport.PROGRESS_POSTFIX));
 	}
@@ -323,7 +323,7 @@ class ApiSupportTest {
 	void testContinueToHrd() {
 		var sessionId = "authnReq12";
 		var result = apiSupport.getContinueToHrdApi(sessionId);
-		assertThat(result, is(BASE_URL + ApiSupport.API_CONTEXT + ApiSupport.HRD_API +
+		assertThat(result, is(BASE_URL + ApiSupport.HRD_URL +
 						'/' + ApiSupport.encodeUrlParameter(sessionId) + ApiSupport.CONTINUE_POSTFIX));
 	}
 
@@ -356,7 +356,6 @@ class ApiSupportTest {
 			"/,false",
 			ApiSupport.API_CONTEXT + ",false",
 			ApiSupport.FRONTEND_CONTEXT + ",true",
-			"/skinnyColHRD.html,true",
 			ApiSupport.FRONTEND_CONTEXT + "/bar" + ",true"
 	}, nullValues = "null")
 	void testIsFrontendPath(String path, boolean expected) {

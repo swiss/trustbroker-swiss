@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import com.nimbusds.jwt.JWTClaimsSet;
+import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -223,6 +224,15 @@ class OidcUtilTest {
 				}""";
 		var token = Base64Util.urlEncode(tokenHeader) + '.' + Base64Util.urlEncode(tokenPayload) + '.';
 		assertThrows(RequestDeniedException.class, () -> OidcUtil.verifyJwtToken(token, kid -> Optional.empty(), "clientId"));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"https://trustbroker.swiss,secret:1,Basic aHR0cHMlM0ElMkYlMkZ0cnVzdGJyb2tlci5zd2lzczpzZWNyZXQlM0Ex",
+			"client,1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890,Basic Y2xpZW50OjEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTA="
+	})
+	void testGetBasicAuthorizationHeader(String clientId, String secret, String expected) {
+		assertThat(OidcUtil.getBasicAuthorizationHeader(clientId, secret), CoreMatchers.is(expected));
 	}
 
 }

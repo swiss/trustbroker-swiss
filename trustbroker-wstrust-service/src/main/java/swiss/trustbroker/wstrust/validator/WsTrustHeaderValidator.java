@@ -23,7 +23,6 @@ import org.opensaml.soap.wsaddressing.Address;
 import org.opensaml.soap.wstrust.WSTrustConstants;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.util.StringUtil;
-import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.wstrust.dto.SoapMessageHeader;
 import swiss.trustbroker.wstrust.util.WsTrustUtil;
 
@@ -100,15 +99,29 @@ public class WsTrustHeaderValidator {
 		return toHost.equals(issuerHost);
 	}
 
-	public static void validateTimestamp(SoapMessageHeader requestHeader, Instant now, SecurityChecks securityChecks) {
+	public static void validateTimestamp(SoapMessageHeader requestHeader, Instant now,
+			long notNotBeforeToleranceSec, long notOnOrAfterToleranceSec,
+			boolean requireTimestamp, String rpIssuerId, String cpIssuerId) {
 		ensurePresent(requestHeader);
 		var timestamp = requestHeader.getRequestTimestamp();
 		if (timestamp == null) {
-			throw new RequestDeniedException("SOAP request header Timestamp missing");
+			if (requireTimestamp) {
+				throw new RequestDeniedException(String.format(
+						"SOAP request header Timestamp missing for rpIssuerId=%s cpIssuerId=%s", rpIssuerId, cpIssuerId));
+			}
+			else {
+				log.warn("SOAP request header Timestamp missing for rpIssuerId={} cpIssuerId={}", rpIssuerId, cpIssuerId);
+				return;
+			}
 		}
 		if (!WsTrustUtil.validatePeriod("Timestamp", timestamp.getCreated(), timestamp.getExpires(),
-				now, securityChecks.getNotBeforeToleranceSec(), securityChecks.getNotOnOrAfterToleranceSec())) {
-			throw new RequestDeniedException("SOAP request header Timestamp invalid"); // details logged in validatePeriod
+				now, notNotBeforeToleranceSec, notOnOrAfterToleranceSec)) {
+			// details logged in validatePeriod
+			if (requireTimestamp) {
+				throw new RequestDeniedException(String.format(
+						"SOAP request header Timestamp invalid for rpIssuerId=%s cpIssuerId=%s", rpIssuerId, cpIssuerId));
+			}
+			log.warn("SOAP request header Timestamp invalid for rpIssuerId={} cpIssuerId={}", rpIssuerId, cpIssuerId);
 		}
 	}
 

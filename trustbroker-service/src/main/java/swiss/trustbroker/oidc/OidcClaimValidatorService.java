@@ -31,8 +31,11 @@ import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
+import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.federation.xmlconfig.Qoa;
 import swiss.trustbroker.federation.xmlconfig.QoaComparison;
+import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.mapping.util.QoaMappingUtil;
 
@@ -67,7 +70,7 @@ public class OidcClaimValidatorService {
 							OidcUtil.OIDC_ISSUER, issuer, OidcUtil.TOKEN_RESPONSE_ID_TOKEN,
 							claimsParty.getId(), client.getId(), expectedIssuer, expectedIssuerSource));
 		}
-		validateSubAudAzp(claims, claimsParty.getId(), client, OidcUtil.TOKEN_RESPONSE_ID_TOKEN);
+		validateSubAudAzp(claims, claimsParty.getId(), client, OidcUtil.TOKEN_RESPONSE_ID_TOKEN, true);
 		var now =  clock.millis();
 		var expirationTime = claims.getExpirationTime();
 		if (!validNotOnOrAfter(expirationTime, now)) {
@@ -114,7 +117,7 @@ public class OidcClaimValidatorService {
 		}
 	}
 
-	public static void validateSubAudAzp(JWTClaimsSet claims, String counterPartyId, OidcClient client, String tokenType) {
+	public static void validateSubAudAzp(JWTClaimsSet claims, String counterPartyId, OidcClient client, String tokenType, boolean enforceAud) {
 		if (claims == null) {
 			throw new RequestDeniedException(
 					String.format("Missing claims OIDC %s from cpIssuerId=%s for client=%s ",
@@ -128,7 +131,13 @@ public class OidcClaimValidatorService {
 							counterPartyId, client.getId()));
 		}
 		var audience = claims.getAudience();
-		if ((audience == null || audience.isEmpty()) || !audience.contains(client.getId())) {
+		if ((audience == null || audience.isEmpty()) && enforceAud) {
+			throw new RequestDeniedException(
+					String.format("Missing audience %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
+							OidcUtil.OIDC_AUDIENCE, audience, tokenType,
+							counterPartyId, client.getId()));
+		}
+		if ((audience != null && !audience.isEmpty()) && !audience.contains(client.getId())) {
 			throw new RequestDeniedException(
 					String.format("Wrong audience %s=%s in OIDC %s from cpIssuerId=%s expected clientId=%s",
 							OidcUtil.OIDC_AUDIENCE, audience, tokenType,
@@ -143,33 +152,48 @@ public class OidcClaimValidatorService {
 		}
 	}
 
-	public static List<String> validateAcrs(JWTClaimsSet claims, ClaimsParty claimsParty, OidcClient client, TrustBrokerProperties trustBrokerProperties) {
+	public static List<String> validateAcrs(JWTClaimsSet claims, ClaimsParty claimsParty, RelyingParty relyingParty, OidcClient rpOidcClient,
+	                                        TrustBrokerProperties trustBrokerProperties) {
+		var cpOidcClient = claimsParty.getSingleOidcClient();
+		var cpQoa = cpOidcClient.getQoa() != null ? cpOidcClient.getQoa() : claimsParty.getQoa();
+		var rpQoa = rpOidcClient.getQoa() != null ? rpOidcClient.getQoa() : relyingParty.getQoa();
 		var acrs = claims.getClaim(OidcUtil.OIDC_ACR);
-		if (acrs == null) {
-			return Collections.emptyList();
-		}
-
 		List<String> acrStringList = getAcrStringList(acrs);
 
-		var cpQoa = client.getQoa() != null ? client.getQoa() : claimsParty.getQoa();
-		if (cpQoa == null) {
-			log.debug("Missing Qoa config for issuer={} - skipping Qoa validation", claimsParty.getId());
+		if (cpQoa == null && rpQoa == null) {
+			log.debug("Missing Qoa config for cp={} rp={} - skipping Qoa validation", claimsParty.getId(), relyingParty.getQoa());
 			return acrStringList;
 		}
-		var configQoa = new QoaConfig(cpQoa, claimsParty.getId());
-		QoaComparison comparison = configQoa.config().getComparison() != null ? configQoa.config().getComparison() : QoaComparison.EXACT;
-		var expectedClasses = cpQoa.getClasses().stream()
-								   .map(AcClass::getContextClass)
-								   .toList();
 
-		for (String acr : acrStringList) {
-			QoaMappingUtil.validateContextClass(comparison, expectedClasses, configQoa, acr, configQoa, claimsParty.getId(), trustBrokerProperties.getQoaMap(), !cpQoa.getEnforce());
-		}
-
+		validateQoa(claimsParty, trustBrokerProperties, cpQoa, acrStringList);
+		validateQoa(relyingParty, trustBrokerProperties, rpQoa, acrStringList);
 		return acrStringList;
 	}
 
-	private static List<String> getAcrStringList(Object acrs) {
+	static void validateQoa(CounterParty counterParty, TrustBrokerProperties trustBrokerProperties, Qoa qoa, List<String> acrStringList) {
+		if (qoa == null) {
+			return;
+		}
+		var configQoa = new QoaConfig(qoa, counterParty.getId());
+		var comparison = configQoa.config().getComparison() != null ? configQoa.config().getComparison() : QoaComparison.EXACT;
+		var expectedClasses = qoa.getClasses().stream()
+		                         .map(AcClass::getContextClass)
+		                         .toList();
+
+
+		if (acrStringList.isEmpty() && configQoa.hasConfig() && configQoa.config().enforce()) {
+			QoaMappingUtil.missingQoaException(comparison, expectedClasses, configQoa);
+		}
+
+		for (String acr : acrStringList) {
+			QoaMappingUtil.validateContextClass(comparison, expectedClasses, configQoa, acr, configQoa, counterParty.getId(), trustBrokerProperties.getQoaMap(), !qoa.enforce());
+		}
+	}
+
+	static List<String> getAcrStringList(Object acrs) {
+		if (acrs == null) {
+			return Collections.emptyList();
+		}
 		List<String> acrStringList = new ArrayList<>();
 		if (acrs instanceof Collection<?> acrList) {
 			acrStringList = ((Collection<?>) acrList).stream()

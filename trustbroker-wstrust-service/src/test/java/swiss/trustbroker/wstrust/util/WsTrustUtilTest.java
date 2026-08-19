@@ -44,7 +44,7 @@ class WsTrustUtilTest {
 	@ParameterizedTest
 	@MethodSource
 	void isNetworkAllowed(String network, List<String> allowedNetworks, boolean enforce, boolean expected) {
-		var config = new NetworkConfig();
+		var config = givenNetworkConfig();
 		var request = new MockHttpServletRequest();
 		if (network != null) {
 			request.addHeader(config.getNetworkHeader(), network);
@@ -53,7 +53,7 @@ class WsTrustUtilTest {
 	}
 
 	static Object[][] isNetworkAllowed() {
-		var config = new NetworkConfig();
+		var config = givenNetworkConfig();
 		return new Object[][] {
 				{ null, null, false, true },
 				{ null, null, true, true },
@@ -107,5 +107,12 @@ class WsTrustUtilTest {
 	void getAuthnContextClasses() {
 		var assertion = WsTrustTestUtil.givenAssertion();
 		assertThat(WsTrustUtil.getAuthnContextClasses(assertion), is(List.of(WsTrustTestUtil.CONTEXT_CLASS)));
+	}
+
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+							.intranetNetworkName("INTRANET")
+							.internetNetworkName("INTERNET")
+		                    .build();
 	}
 }

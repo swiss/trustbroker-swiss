@@ -288,7 +288,7 @@ public class OidcProperties {
 	private String defaultUsePepQoaPolicy;
 
 	/**
-	 * Use Keycloak issuer ID. Support cors headers without preflight and handle Issuer.
+	 * Use Keycloak issuer ID. Support CORS headers without preflight and handle Issuer.
 	 * <br/>
 	 * Default: true
 	 */

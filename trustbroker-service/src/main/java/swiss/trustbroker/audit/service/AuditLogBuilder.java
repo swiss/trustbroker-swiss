@@ -106,7 +106,7 @@ public class AuditLogBuilder {
 		var valueBuilder = new StringBuilder();
 		// flatten singleton list
 		if (attributeValues.size() == 1) {
-			appendValue(valueBuilder, attributeValues.get(0));
+			appendValue(valueBuilder, attributeValues.getFirst());
 		}
 		else {
 			var separator = "[";

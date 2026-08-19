@@ -57,7 +57,7 @@ class SamlUtilTest {
 		var relayState = SamlUtil.generateRelayState();
 		assertThat(relayState, is(notNullValue()));
 		assertThat(relayState, startsWith("S2-" + TraceSupport.getOwnTraceParent().replace(".", "-")));
-		assertThat(relayState.length(), is(77));
+		assertThat(relayState.length(), is(69));
 	}
 
 	@Test

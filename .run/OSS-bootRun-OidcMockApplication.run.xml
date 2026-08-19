@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="OSS-bootRun-OidcMockApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="trustbroker-swiss.trustbroker-oidcmock.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="swiss.trustbroker.oidcmock.OidcMockApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

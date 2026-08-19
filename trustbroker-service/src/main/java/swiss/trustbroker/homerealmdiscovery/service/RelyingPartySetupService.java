@@ -48,7 +48,6 @@ import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderMappings;
 import swiss.trustbroker.federation.xmlconfig.CounterParty;
 import swiss.trustbroker.federation.xmlconfig.HomeName;
-import swiss.trustbroker.federation.xmlconfig.IdmLookup;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.SecurityPolicies;
 import swiss.trustbroker.federation.xmlconfig.SsoGroup;
@@ -89,7 +88,7 @@ public class RelyingPartySetupService {
 		List<RelyingParty> relyingParties = new ArrayList<>();
 		getAllRelyingPartiesByReferer(relyingParties, refererUrl, true);
 		if (!relyingParties.isEmpty()) {
-			var relyingParty = Optional.of(relyingParties.get(0));
+			var relyingParty = Optional.of(relyingParties.getFirst());
 			if (relyingParties.size() > 1 && log.isDebugEnabled()) {
 				log.debug("Found multiple RP setups using issuerId={} referrer={}: {}",
 						relyingParty.get().getId(), refererUrl, CollectionUtil.toLogString(relyingParties));
@@ -153,7 +152,7 @@ public class RelyingPartySetupService {
 			}
 		}
 		else if (uniqueAcsUrl) {
-			addNonDuplicateRp(relyingParties, relyingPartiesByAcsUrl.get(0), refererId, "ACS URL by referer");
+			addNonDuplicateRp(relyingParties, relyingPartiesByAcsUrl.getFirst(), refererId, "ACS URL by referer");
 		}
 		else {
 			for (var relyingParty : relyingPartiesByAcsUrl) {
@@ -364,14 +363,6 @@ public class RelyingPartySetupService {
 		return claimsParty;
 	}
 
-	public Optional<IdmLookup> getIdmLookUp(RelyingParty relyingParty) {
-		var idmLookup = relyingParty.getIdmLookup();
-		if (idmLookup == null) {
-			log.info("RelyingParty id='{}' has no IDMLookup", relyingParty.getId());
-		}
-		return Optional.ofNullable(idmLookup);
-	}
-
 	public List<Credential> getAllCpDecryptionCredentials() {
 		if (relyingPartiesMapping.getClaimsProviderSetup() == null) {
 			log.warn("RelyingPartiesMapping.ClaimsProviderSetup not initialized, CP side decryption data missing");
@@ -452,7 +443,7 @@ public class RelyingPartySetupService {
 	public long getTokenLifetime(RelyingParty relyingParty) {
 		// Conditions and SubjectConfirmation timestamp per RP (cannot be set differently, WSTrust uses the global properties)
 		var secPol = getSecurityPolicies(relyingParty);
-		return PropertyUtil.evaluatePropery(
+		return PropertyUtil.evaluateProperty(
 				secPol, SecurityPolicies::getNotOnOrAfterSeconds,
 				() -> trustBrokerProperties.getSecurity().getTokenLifetimeSec() // not null
 		).longValue();

@@ -114,8 +114,8 @@ class RelyingPartyDefinitionsTest {
 		var rp41 = givenRelyingParty(rp41Id, null, intranetNetwork, CP_PUBLIC);
 		var hrdAlias = "public";
 		var hrdName = "hrdCp";
-		rp41.getClaimsProviderMappings().getClaimsProviderList().get(0).setHrdHintAlias(hrdAlias);
-		rp41.getClaimsProviderMappings().getClaimsProviderList().get(0).setName(hrdName);
+		rp41.getClaimsProviderMappings().getClaimsProviderList().getFirst().setHrdHintAlias(hrdAlias);
+		rp41.getClaimsProviderMappings().getClaimsProviderList().getFirst().setName(hrdName);
 
 		// copy of clients federated with different SetupRP
 		var cl1 = OidcClient.builder().id(clientId1).build();
@@ -312,7 +312,7 @@ class RelyingPartyDefinitionsTest {
 		ret.setMobileIdpId(CP_MOBILE);
 		ret.setHrdHintTestParameter(HRD_HINT);
 		ret.setPublicAutoLoginCookie(AUTOLOGIN_COOKIE);
-		var network = new NetworkConfig();
+		var network = givenNetworkConfig();
 		ret.setNetwork(network);
 		network.setMobileGatewayIpRegex(MOB_GW_IP);
 		return ret;
@@ -338,4 +338,10 @@ class RelyingPartyDefinitionsTest {
 		assertFalse(relyingPartyDefinitions.isRpDisabled(relyingParty, request, networkConfig));
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

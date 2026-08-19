@@ -15,10 +15,9 @@
 
 package swiss.trustbroker.oidc.jackson;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.security.jackson2.SecurityJackson2Modules;
-import org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module;
-import swiss.trustbroker.util.LongMixin;
+import org.springframework.security.jackson.SecurityJacksonModules;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 // Do not make this a component (will affect whole framework)
 public class ObjectMapperFactory {
@@ -26,17 +25,18 @@ public class ObjectMapperFactory {
 	private ObjectMapperFactory() {
 	}
 
-	public static ObjectMapper springSecObjectMapper() {
+	// Internal use only when we read object trees from token database
+	public static JsonMapper springSecObjectMapper() {
+		var validatorBuilder = BasicPolymorphicTypeValidator.builder()
+		                                                    .allowIfSubType("java.lang")
+		                                                    .allowIfSubType("java.util");
 		var classLoader = ObjectMapperFactory.class.getClassLoader();
-		var securityModules = SecurityJackson2Modules.getModules(classLoader);
-		var mapper = new ObjectMapper();
-		mapper.registerModules(securityModules);
-		mapper.registerModule(new AuthorizationPrincipalModule());
-		mapper.registerModule(new OAuth2AuthorizationServerJackson2Module());
-		mapper.registerModules(securityModules);
-		// https://github.com/spring-projects/spring-session/issues/2305
-		mapper.addMixIn(Long.class, LongMixin.class);
-		return mapper;
+		var securityModules = SecurityJacksonModules.getModules(classLoader, validatorBuilder);
+		var typeValidator = validatorBuilder.build();
+		return JsonMapper.builder()
+		                 .polymorphicTypeValidator(typeValidator)
+		                 .addModules(securityModules)
+		                 .build();
 	}
 
 }

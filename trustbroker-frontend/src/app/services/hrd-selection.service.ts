@@ -14,47 +14,22 @@
  */
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { ApiService } from './api.service';
-import { ValidationService } from './validation-service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
 import { IdpObject } from '../model/IdpObject';
 
 @Injectable({ providedIn: 'root' })
 export class HrdSelectionService {
 	private readonly apiService = inject(ApiService);
 	private readonly destroyRef = inject(DestroyRef);
-	private readonly router = inject(Router);
-	private readonly validation = inject(ValidationService);
 
 	public selectIdp(authnRequestId: string, { urn }: IdpObject): void {
 		this.apiService
 			.selectIdp(authnRequestId, urn)
 			.pipe(takeUntilDestroyed(this.destroyRef))
 			.subscribe({
-				next: response => {
-					const location = response.headers.get('location');
-					if (location) {
-						// writing the body of the redirect result to the document does not work
-						window.location.href = location;
-						return;
-					}
-					// document.write for error page does not work here
-					const url = response.url!.replace(/^.*(\/failure\/.*$)/, '$1');
-					if (url !== response.url) {
-						void this.router.navigate([url]);
-						return;
-					}
-					window.document.write(response.body!);
-					if (document.forms.length > 0) {
-						document.forms[0].submit();
-					} else {
-						// not a SAML form, e.g. AccessRequest
-						// NOSONAR
-						// console.info('[HrdCardsComponent] Do not have a form to submit');
-					}
-				},
+				next: response => this.apiService.handleFormResponse(response),
 				error: errorResponse => {
-					console.error('an error occured', errorResponse);
+					console.error('an error occurred', errorResponse);
 				}
 			});
 	}

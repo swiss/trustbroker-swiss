@@ -16,18 +16,20 @@
 package swiss.trustbroker.waf;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.List;
 
 import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import swiss.trustbroker.common.config.RegexNameValue;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
@@ -35,6 +37,10 @@ import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.util.ApiSupport;
 
 class AccessFilterTest {
+
+	private static final String PERIMETER_URL = "https://localhost/custom/perimeter";
+
+	private static final String OIDC_PERIMETER_URL = "https://localhost/custom/oidc";
 
 	private TrustBrokerProperties trustBrokerProperties;
 
@@ -47,11 +53,11 @@ class AccessFilterTest {
 		trustBrokerProperties.setOidc(new OidcProperties());
 		// see WebSupport.getOwnPerimeterUris for what can be customized:
 		trustBrokerProperties.getOidc().setSessionIFrameEndpoint("https://localhost/session/i.frame");
-		trustBrokerProperties.getOidc().setPerimeterUrl("https://localhost/custom/oidc");
+		trustBrokerProperties.getOidc().setPerimeterUrl(OIDC_PERIMETER_URL);
 		trustBrokerProperties.setSaml(new SamlProperties());
 		trustBrokerProperties.getSaml().setConsumerUrl("https://localhost/custom/consumer");
-		trustBrokerProperties.setPerimeterUrl("https://localhost/custom/perimeter");
-		trustBrokerProperties.setSkinnyHrdTriggers(List.of(new RegexNameValue("", "", "/skinnyColHRD.html")));
+		trustBrokerProperties.setPerimeterUrl(PERIMETER_URL);
+		trustBrokerProperties.setBlockedHeaderNames(List.of("X-Injected-Script", "X-Custom-Exploit"));
 		accessFilter = new AccessFilter(trustBrokerProperties);
 	}
 
@@ -68,7 +74,7 @@ class AccessFilterTest {
 			"/device/issuer/id,404",
 			"/profile/id,404",
 			// APIs (/adfs/ls included below)
-			"/api/v1/hrd/translations/de,200",
+			"/api/v1/hrd/translations/de,404", // internal API
 			"/adfs/ls,200",
 			"/adfs/services/trust,200",
 			"/api/v1/metadata,200",
@@ -82,15 +88,13 @@ class AccessFilterTest {
 			// Search engines
 			"/robots.txt,200",
 			// Spring actuators
-			"/actuator/health,200",
-			"/actuator/info,200",
-			"/api/v1/config,200",
+			"/actuator/health,404",
+			"/actuator/info,404",
+			"/api/v1/config,404",
 			// assets referenced by UI
 			"/assets/images/logo.svg,200",
 			"/assets/images/favicon.ico,200",
 			"/index.html,200",
-			"/skinnyColHRD.html,200",
-			"/skinnyHRD.html,404",
 			"/other.html,404",
 			"/favicon.ico,200",
 			"/runtime.a26ed6ea895c0fcf5af2.js,200",
@@ -128,33 +132,41 @@ class AccessFilterTest {
 			"/php.ini,404",
 			"/../../../../../windows/win.ini,404"
 	})
-	void testAccess(String path, int status) throws Exception {
+	void testAccess(String path, int expectedStatus) throws Exception {
 		var request = new MockHttpServletRequest();
 		request.setRequestURI(path);
 		var response = new MockHttpServletResponse();
 		var chain = new MockFilterChain();
 		accessFilter.doFilter(request, response, chain);
-		assertThat("Access on path " +path, response.getStatus(), is(status));
+		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		validateChainCall(path, expectedStatus, chain, request);
 	}
 
 	@ParameterizedTest
 	@CsvSource(value = {
 			// test all cases with one URL
 			ApiSupport.CONFIG_STATUS_API + ",INTERNET,true,404",
+			ApiSupport.CONFIG_STATUS_API + ",null,true,404",
 			ApiSupport.CONFIG_STATUS_API + ",INTRANET,true,200",
-			ApiSupport.CONFIG_STATUS_API + ",INTRANET,false,200",
-			ApiSupport.CONFIG_STATUS_API + ",INTERNET,false,200",
+			ApiSupport.CONFIG_STATUS_API + ",INTRANET,false,404",
+			ApiSupport.CONFIG_STATUS_API + ",INTERNET,false,404",
 			// test just enabled network config for others
 			ApiSupport.CONFIG_SCHEMAS_API + "/RelyingParty.xsd,INTERNET,true,404",
+			ApiSupport.CONFIG_SCHEMAS_API + "/RelyingParty.xsd,null,true,404",
 			ApiSupport.CONFIG_SCHEMAS_API + "/RelyingParty.xsd,INTRANET,true,200",
 			ApiSupport.RECONFIG_URL + ",INTERNET,true,404",
+			ApiSupport.RECONFIG_URL + ",null,true,404",
 			ApiSupport.RECONFIG_URL + ",INTRANET,true,200",
+			// spring actuators
 			"/actuator/health,INTERNET,true,404",
+			"/actuator/health/readiness,INTERNET,true,404",
+			"/actuator/health/liveness,null,true,404",
 			"/actuator/health,INTRANET,true,200",
-			"/actuator/info,INTERNET,true,404",
-			"/actuator/info,INTRANET,true,200"
-	})
-	void testInternalAccess(String path, String headerValue, boolean networkConfig, int status) throws Exception {
+			"/actuator/info,INTRANET,true,200",
+			// security corner cases
+			"/api/v1/config/%73tatus" + ",INTERNET,true,404" // prevent bypassing isIntranet decision via URL encoding
+	}, nullValues = "null")
+	void testInternalAccess(String path, String headerValue, boolean networkConfig, int expectedStatus) throws Exception {
 		var headerName = "X-Network";
 		if (networkConfig) {
 			trustBrokerProperties.getNetwork().setNetworkHeader(headerName);
@@ -163,11 +175,111 @@ class AccessFilterTest {
 		}
 		var request = new MockHttpServletRequest();
 		request.setRequestURI(path);
-		request.addHeader(headerName, headerValue);
+		if (headerValue != null) {
+			request.addHeader(headerName, headerValue);
+		}
 		var response = new MockHttpServletResponse();
 		var chain = new MockFilterChain();
 		accessFilter.doFilter(request, response, chain);
-		assertThat("Access on path " +path, response.getStatus(), is(status));
+		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		validateChainCall(path, expectedStatus, chain, request);
 	}
 
+	@ParameterizedTest
+	@CsvSource(value = {
+			// internal APIs blocked
+			ApiSupport.CONFIG_FRONTEND_API + ",null,404",
+			ApiSupport.SSO_PARTICIPANTS_URL + ",https://other.localdomain,404",
+			ApiSupport.ACCESS_REQUEST_INITIATE_URL + ",http://localhost,404",
+			ApiSupport.ANNOUNCEMENTS_URL + "/rp1,http://localhost,404",
+			ApiSupport.ASSETS_URL + "/image.jpg,https://localhost:8443,404",
+			// internal APIs allowed
+			ApiSupport.CONFIG_FRONTEND_API + "," + PERIMETER_URL + ",200",
+			ApiSupport.TRANSLATIONS_URL + "/de," + OIDC_PERIMETER_URL + ",200",
+			ApiSupport.ANNOUNCEMENTS_URL + "/rp1," + OIDC_PERIMETER_URL + ",200",
+			ApiSupport.SSO_PARTICIPANTS_URL + "," + PERIMETER_URL + ",200",
+			ApiSupport.HRD_URL + "/profiles," + PERIMETER_URL + ",200",
+			ApiSupport.ACCESS_REQUEST_INITIATE_URL + "," + PERIMETER_URL + ",200",
+			ApiSupport.ACCESS_REQUEST_TRIGGER_URL + "," + PERIMETER_URL + ",200",
+			// external APIs allowed
+			ApiSupport.ACCESS_REQUEST_TRIGGER_URL + "," + PERIMETER_URL + ",200",
+			ApiSupport.ACCESS_REQUEST_TRIGGER_URL + ",null,200",
+			ApiSupport.ACCESS_REQUEST_TRIGGER_URL + ",https://other.localdomain,200",
+			ApiSupport.ACCESS_REQUEST_COMPLETE_URL + "/session1," + PERIMETER_URL + ",200",
+			ApiSupport.ACCESS_REQUEST_COMPLETE_URL + "/session1,null,200",
+			ApiSupport.ACCESS_REQUEST_COMPLETE_URL + "/session1,http://localhost,200",
+	}, nullValues = "null")
+	void testApiAccess(String path, String referer, int expectedStatus) throws Exception {
+		var request = new MockHttpServletRequest();
+		request.setRequestURI(path);
+		if (referer != null) {
+			request.addHeader(HttpHeaders.REFERER, referer);
+		}
+		var response = new MockHttpServletResponse();
+		var chain = new MockFilterChain();
+		accessFilter.doFilter(request, response, chain);
+		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		validateChainCall(path, expectedStatus, chain, request);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			// no parameter present -> allowed (empty paramName is sentinel: skip addParameter)
+			"'','',200",
+			// unrelated parameter present -> allowed
+			"SAMLRequest,payload,200",
+			// default blocked parameter @class with a value -> blocked
+			"@class,java.lang.String,404",
+			// @class present even with empty value -> blocked (non-null getParameter result)
+			"@class,'',404"
+	})
+	void testBlockedRequestParameter(String paramName, String paramValue, int expectedStatus) throws Exception {
+		var request = new MockHttpServletRequest();
+		request.setRequestURI("/app");
+		if (!paramName.isEmpty()) {
+			request.addParameter(paramName, paramValue);
+		}
+		var response = new MockHttpServletResponse();
+		var chain = new MockFilterChain();
+		accessFilter.doFilter(request, response, chain);
+		assertThat("Request parameter check for paramName='" + paramName + "'",
+				response.getStatus(), is(expectedStatus));
+		validateChainCall("/app", expectedStatus, chain, request);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			// no header present -> allowed (empty headerName is sentinel: skip addHeader)
+			"'','',200",
+			// unrelated header present -> allowed
+			"Accept,application/json,200",
+			// first blocked header with a value -> blocked
+			"X-Injected-Script,malicious.js,404",
+			// second blocked header with a value -> blocked
+			"X-Custom-Exploit,payload,404",
+			// first blocked header even with empty value -> blocked (non-null getHeader result)
+			"X-Injected-Script,'',404"
+	})
+	void testBlockedRequestHeader(String headerName, String headerValue, int expectedStatus) throws Exception {
+		var request = new MockHttpServletRequest();
+		request.setRequestURI("/app");
+		if (!headerName.isEmpty()) {
+			request.addHeader(headerName, headerValue);
+		}
+		var response = new MockHttpServletResponse();
+		var chain = new MockFilterChain();
+		accessFilter.doFilter(request, response, chain);
+		assertThat("Request header check for headerName='" + headerName + "'",
+				response.getStatus(), is(expectedStatus));
+		validateChainCall("/app", expectedStatus, chain, request);
+	}
+
+	private static void validateChainCall(String path, int status, MockFilterChain chain, MockHttpServletRequest request) {
+		if (status == HttpServletResponse.SC_OK) {
+			assertThat("Access on path " + path, chain.getRequest(), is(request));
+		}
+		else {
+			assertThat("Access on path " + path, chain.getRequest(), is(nullValue()));
+		}
+	}
 }

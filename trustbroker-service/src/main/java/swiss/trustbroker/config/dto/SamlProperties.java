@@ -58,7 +58,7 @@ public class SamlProperties {
 	 *     <li><code>/api/v1/saml</code></li>
 	 *     <li><code>/adfs/ls</code></li>
 	 *     <li><code>/adfs/ls/</code></li>
-	 *     <li><code>/trustbroker/adfs/ls/</code></li> (deprecated)
+	 *     <li><code>/trustbroker/adfs/ls/</code> (deprecated)</li>
 	 * </ul>
 	 */
 	private String consumerUrl;

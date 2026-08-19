@@ -37,7 +37,7 @@ public class RandomProvider {
 	public static RandomIdentifierGenerationStrategy randomIdGenerator() {
 		try {
 			// thread-safe: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/security/SecureRandom.html
-			var random = SecureRandom.getInstance("SHA1PRNG");
+			var random = SecureRandom.getInstance("DRBG");
 			// URL safe base64 in case it is ever an issue, no chunking with new lines:
 			// thread-safe: https://commons.apache.org/proper/commons-codec/apidocs/org/apache/commons/codec/binary/Base64.html
 			var coder = new Base64(0, null, true);

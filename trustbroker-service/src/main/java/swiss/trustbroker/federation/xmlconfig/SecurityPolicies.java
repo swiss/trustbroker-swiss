@@ -16,11 +16,12 @@
 package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
-import java.util.Objects;
+import java.util.List;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
+import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,8 +53,8 @@ public class SecurityPolicies implements Serializable {
 	 * Default: true
 	 */
 	@XmlAttribute(name = "requireSignedAuthnRequest")
-	@Builder.Default
-	private Boolean requireSignedAuthnRequest = Boolean.TRUE;
+	@Default(value = "true")
+	private Boolean requireSignedAuthnRequest;
 
 	/**
 	 * Allow to disable signature check for incoming LogoutRequests. If not set, falls back to <code>requireSignedAuthnRequest</code>.
@@ -71,8 +72,8 @@ public class SecurityPolicies implements Serializable {
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "requireSignedLogoutNotificationRequest")
-	@Builder.Default
-	private Boolean requireSignedLogoutNotificationRequest = Boolean.TRUE;
+	@Default(value = "true")
+	private Boolean requireSignedLogoutNotificationRequest;
 
 	/**
 	 * Flag allows to enforce signed SAML responses from CP required for maximum security to assert integrity of the incoming
@@ -92,14 +93,15 @@ public class SecurityPolicies implements Serializable {
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "requireEncryptedAssertion")
-	@Builder.Default
-	private Boolean requireEncryptedAssertion = Boolean.TRUE;
+	@Default(value = "true")
+	private Boolean requireEncryptedAssertion;
 
 	/**
 	 * Flag allows to enforce signed SAML artifact responses from CP required for maximum security to assert integrity of the
 	 * incoming artifact response message.
 	 * <br/>
 	 * Overrides global SecurityChecks
+	 *
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "requireSignedArtifactResponse")
@@ -109,6 +111,7 @@ public class SecurityPolicies implements Serializable {
 	 * Flag allows to sign outbound SAML artifact resolve messages for maximum security.
 	 * <br/>
 	 * Overrides global SecurityChecks
+	 *
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "doSignArtifactResolve")
@@ -116,12 +119,20 @@ public class SecurityPolicies implements Serializable {
 
 	/**
 	 * Overrides global SecurityChecks
- 	 */
+	 */
 	@XmlAttribute(name = "requireAudienceRestriction")
 	private Boolean requireAudienceRestriction;
 
 	/**
+	 * Overrides global SecurityChecks
+	 * @since 1.15.0
+	 */
+	@XmlAttribute(name = "requireAudienceRestrictionForBearerSubjectConfirmation")
+	private Boolean requireAudienceRestrictionForBearerSubjectConfirmation;
+
+	/**
 	 * Require signed SAML AuthnRequests to join an SSO session. If not set, falls back to <code>requireSignedAuthnRequest</code>.
+	 *
 	 * @since 1.11.0
 	 */
 	@XmlAttribute(name = "requireSignedAuthnRequestForSsoJoin")
@@ -130,13 +141,13 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * Overrides the global <code>tokenLifetimeSec</code> for CP response AuthnInstant checks.
 	 * <br/>
-	 * Defaults to 60 minutes, override if needed.
+	 * Default: 2600
 	 * This is quite long time to transfer a SAML token from the issuer to its consumer to establish a relation between a user and
 	 * the consuming RP. Tje problem is that some components cache the token and transfer it later.
 	 */
 	@XmlAttribute(name = "notOnOrAfterSeconds")
-	@Builder.Default
-	private Integer notOnOrAfterSeconds = 3600;
+	@Default(value = "3600")
+	private Integer notOnOrAfterSeconds;
 
 	/**
 	 * Overrides the global <code>notOnOrAfterSeconds</code> for conditions <code>notOnOrAfter</code> if greater than zero.
@@ -157,12 +168,13 @@ public class SecurityPolicies implements Serializable {
 	 * Default: true
 	 */
 	@XmlAttribute(name = "validateXmlSchema")
-	@Builder.Default
-	private Boolean validateXmlSchema = Boolean.TRUE;
+	@Default(value = "true")
+	private Boolean validateXmlSchema;
 
 	/**
 	 * Validate HTTP request headers. Currently <code>referer</code> and <code>origin</code> can be validated against the
 	 * AcWhitelist of an RP.
+	 *
 	 * @since 1.12.0
 	 */
 	@XmlAttribute(name = "validateHttpHeaders")
@@ -191,6 +203,7 @@ public class SecurityPolicies implements Serializable {
 	 * Require signed assertion in WS-Trust ISSUE.
 	 * <br/>
 	 * Default: fallback to default (global default is true)
+	 *
 	 * @since 1.13.0
 	 * @deprecated Transition feature
 	 */
@@ -202,16 +215,42 @@ public class SecurityPolicies implements Serializable {
 	 * Require signed request in WS-Trust ISSUE.
 	 * <br/>
 	 * Default: fallback to default
+	 *
 	 * @since 1.13.0
 	 */
 	@XmlAttribute(name = "wsTrustIssueRequireSignedRequest")
 	private Boolean wsTrustIssueRequireSignedRequest;
 
-	public boolean isWsTrustIssueRequireSignedAssertion(boolean globalDefault) {
-		return Objects.requireNonNullElse(wsTrustIssueRequireSignedAssertion, globalDefault);
-	}
+	/**
+	 * WS-Trust ISSUE requires timestamp.
+	 * <br/>
+	 * Default: true
+	 * @since 1.15.0
+	 */
+	@Default(value = "true")
+	@XmlAttribute(name = "wsTrustIssueRequireTimestamp")
+	private Boolean wsTrustIssueRequireTimestamp;
 
-	public boolean isWsTrustIssueRequireSignedRequest(boolean globalDefault) {
-		return Objects.requireNonNullElse(wsTrustIssueRequireSignedRequest, globalDefault);
-	}
+	/**
+	 * WS-Trust ISSUE timestamp not before tolerance override.
+	 * @since 1.15.0
+	 */
+	@XmlAttribute(name = "wsTrustIssueNotBeforeToleranceSec")
+	private Long wsTrustIssueNotBeforeToleranceSec;
+
+	/**
+	 * WS-Trust ISSUE timestamp not on or after tolerance override.
+	 * @since 1.15.0
+	 */
+	@XmlAttribute(name = "wsTrustIssueNotOnOrAfterToleranceSec")
+	private Long wsTrustIssueNotOnOrAfterToleranceSec;
+
+	/**
+	 * List of allowed message signature algorithms. (Empty list means no restriction.)
+	 * <br/>
+	 * Default: Global default
+	 * @since 1.15.0
+	 */
+	@XmlElement(name = "AllowedSignatureAlgorithms")
+	private List<String> allowedSignatureAlgorithms;
 }

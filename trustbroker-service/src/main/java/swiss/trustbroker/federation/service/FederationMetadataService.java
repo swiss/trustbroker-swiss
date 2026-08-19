@@ -37,12 +37,10 @@ import org.opensaml.saml.saml2.metadata.SingleLogoutService;
 import org.opensaml.saml.saml2.metadata.SingleSignOnService;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.security.credential.UsageType;
-import org.opensaml.xmlsec.signature.KeyInfo;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
-import org.w3c.dom.Element;
 import swiss.trustbroker.common.config.KeystoreProperties;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
@@ -50,6 +48,7 @@ import swiss.trustbroker.common.saml.util.CredentialReader;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlFactory;
 import swiss.trustbroker.common.saml.util.SamlUtil;
+import swiss.trustbroker.common.saml.util.SkinnySamlUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.util.ApiSupport;
@@ -116,10 +115,9 @@ public class FederationMetadataService {
 
 	public String getFederationMetadata(boolean idpSide, boolean spSide) {
 		try {
-			EntityDescriptor entityDescriptor = generateMetadata(idpSide, spSide);
-			Element domDescriptor = SamlUtil.marshallMessage(entityDescriptor);
-			SamlUtil.removeNewLinesFromCertificates(domDescriptor);
-			return SerializeSupport.prettyPrintXML(domDescriptor);
+			var entityDescriptor = generateMetadata(idpSide, spSide);
+			var domDescriptor = SamlUtil.marshallMessage(entityDescriptor);
+			return SerializeSupport.nodeToString(domDescriptor);
 		}
 		catch (MessageEncodingException e) {
 			throw new TechnicalException(String.format("Could not encode federation metadata ex=%s", e.getMessage()));
@@ -127,8 +125,8 @@ public class FederationMetadataService {
 	}
 
 	public EntityDescriptor generateMetadata(boolean idpSide, boolean spSide) {
-		EntityDescriptor descriptor = OpenSamlUtil.buildSamlObject(EntityDescriptor.class);
-		UUID uuid = UUID.randomUUID();
+		var descriptor = OpenSamlUtil.buildSamlObject(EntityDescriptor.class);
+		var uuid = UUID.randomUUID();
 		descriptor.setID("_" + uuid);
 		descriptor.setEntityID(trustBrokerProperties.getIssuer());
 
@@ -152,6 +150,10 @@ public class FederationMetadataService {
 		var signature = SamlFactory.prepareSignableObject(
 				descriptor, signer, SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256, null, null);
 		SamlUtil.signSamlObject(descriptor, signature);
+
+		// remove whitespace in Signature certs -> does not affect signature value
+		SkinnySamlUtil.eliminateCertWhitespace(descriptor.getSignature().getDOM());
+
 		return descriptor;
 	}
 
@@ -177,7 +179,7 @@ public class FederationMetadataService {
 							 .add(getArtifactResolutionService());
 			}
 		}
-		for (String nameIdFormat : samlConfig.getIdpNameFormats()) {
+		for (var nameIdFormat : samlConfig.getIdpNameFormats()) {
 			idpDescriptor.getNameIDFormats()
 						 .add(getNameIdFormat(nameIdFormat));
 		}
@@ -197,7 +199,7 @@ public class FederationMetadataService {
 	}
 
 	private static NameIDFormat getNameIdFormat(String nameIdFormat) {
-		NameIDFormat nameIDFormat = OpenSamlUtil.buildSamlObject(NameIDFormat.class);
+		var nameIDFormat = OpenSamlUtil.buildSamlObject(NameIDFormat.class);
 		nameIDFormat.setURI(nameIdFormat);
 		return nameIDFormat;
 	}
@@ -233,29 +235,30 @@ public class FederationMetadataService {
 	}
 
 	private static KeyDescriptor getKeyDescriptor(Credential credential, UsageType usageType) {
-		KeyDescriptor keyDescriptor = OpenSamlUtil.buildSamlObject(KeyDescriptor.class);
-		KeyInfo keyInfo = SamlFactory.createKeyInfo(credential);
+		var keyDescriptor = OpenSamlUtil.buildSamlObject(KeyDescriptor.class);
+		var keyInfo = SamlFactory.createKeyInfo(credential);
+		SkinnySamlUtil.eliminateCertWhitespace(keyInfo); // before signing
 		keyDescriptor.setUse(usageType);
 		keyDescriptor.setKeyInfo(keyInfo);
 		return keyDescriptor;
 	}
 
 	private static SingleSignOnService getSingleSignOnService(String location, String binding) {
-		SingleSignOnService sso = OpenSamlUtil.buildSamlObject(SingleSignOnService.class);
+		var sso = OpenSamlUtil.buildSamlObject(SingleSignOnService.class);
 		sso.setLocation(location);
 		sso.setBinding(binding);
 		return sso;
 	}
 
 	private static SingleLogoutService getSingleLogoutService(String location, String binding) {
-		SingleLogoutService sso = OpenSamlUtil.buildSamlObject(SingleLogoutService.class);
+		var sso = OpenSamlUtil.buildSamlObject(SingleLogoutService.class);
 		sso.setLocation(location);
 		sso.setBinding(binding);
 		return sso;
 	}
 
 	private static AssertionConsumerService getAssertionConsumerService(String location, String binding, int index) {
-		AssertionConsumerService assertionConsumerService = OpenSamlUtil.buildSamlObject(AssertionConsumerService.class);
+		var assertionConsumerService = OpenSamlUtil.buildSamlObject(AssertionConsumerService.class);
 		assertionConsumerService.setLocation(location);
 		assertionConsumerService.setBinding(binding);
 		assertionConsumerService.setIndex(index);
@@ -266,16 +269,16 @@ public class FederationMetadataService {
 		if (trustBrokerProperties.getWstrust() == null || !trustBrokerProperties.getWstrust().isEnabled()) {
 			return null;
 		}
-		AuthnAuthorityDescriptor authnAuthorityDescriptor = OpenSamlUtil.buildSamlObject(AuthnAuthorityDescriptor.class);
+		var authnAuthorityDescriptor = OpenSamlUtil.buildSamlObject(AuthnAuthorityDescriptor.class);
 		authnAuthorityDescriptor.addSupportedProtocol(SAMLConstants.SAML20P_NS);
 		authnAuthorityDescriptor.getAuthnQueryServices().add(getAuthnQueryService());
 		return authnAuthorityDescriptor;
 	}
 
 	private AuthnQueryService getAuthnQueryService() {
-		AuthnQueryService authnQueryService = OpenSamlUtil.buildSamlObject(AuthnQueryService.class);
+		var authnQueryService = OpenSamlUtil.buildSamlObject(AuthnQueryService.class);
 		authnQueryService.setBinding(SAMLConstants.SAML2_SOAP11_BINDING_URI);
-		String perimeterUrl = trustBrokerProperties.getPerimeterUrl();
+		var perimeterUrl = trustBrokerProperties.getPerimeterUrl();
 		authnQueryService.setLocation(perimeterUrl + ApiSupport.ADFS_WS_TRUST_COMPAT_URL);
 		return authnQueryService;
 	}

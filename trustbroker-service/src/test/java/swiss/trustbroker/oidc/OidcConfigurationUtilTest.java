@@ -25,14 +25,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
@@ -116,7 +123,7 @@ class OidcConfigurationUtilTest {
 		// role (aggregate)
 		addMultiValueToClaim(claimMap, "role", List.of("newRole", ROLES.get(1)), Multivalued.ORIGINAL);
 		var attrRoles = (List<?>) claimMap.get("role");
-		assertThat(attrRoles, containsInAnyOrder("newRole", ROLES.get(0), ROLES.get(1), ROLES.get(2)));
+		assertThat(attrRoles, containsInAnyOrder("newRole", ROLES.getFirst(), ROLES.get(1), ROLES.get(2)));
 		// role (override)
 		addMultiValueToClaim(claimMap, "role", List.of("newRole2", "newRole3"), Multivalued.ORIGINAL);
 		assertTrue(((List<?>) claimMap.get("role")).contains("newRole2"));
@@ -148,9 +155,9 @@ class OidcConfigurationUtilTest {
 		assertEquals(3, listValue.size());
 
 		// de-duplication test
-		var dedupListValue = OidcConfigurationUtil.getOidcAttributeValues(attributes, "role", List.of("value", ROLES.get(0)));
+		var dedupListValue = OidcConfigurationUtil.getOidcAttributeValues(attributes, "role", List.of("value", ROLES.getFirst()));
 		assertEquals(4, dedupListValue.size());
-		assertThat(dedupListValue, containsInAnyOrder("value", ROLES.get(0), ROLES.get(1), ROLES.get(2)));
+		assertThat(dedupListValue, containsInAnyOrder("value", ROLES.getFirst(), ROLES.get(1), ROLES.get(2)));
 	}
 
 	@Test
@@ -187,7 +194,7 @@ class OidcConfigurationUtilTest {
 		OidcConfigurationUtil.addClaimsToMap(claimMap, def, values, "oidcClientId", false);
 		assertTrue(claimMap.containsKey(oidcNames));
 		assertTrue(claimMap.get(oidcNames) instanceof List<?>);
-		assertTrue(((List<?>) claimMap.get(oidcNames)).contains(values.get(0)));
+		assertTrue(((List<?>) claimMap.get(oidcNames)).contains(values.getFirst()));
 	}
 
 	private void addSingleValue(Map<String, Object> claimMap, String oidcNames, List<Object> values, Multivalued multivalued) {
@@ -203,7 +210,7 @@ class OidcConfigurationUtilTest {
 		OidcConfigurationUtil.addClaimsToMap(claimMap, def, values, "oidcClientId", true);
 		assertTrue(claimMap.containsKey(oidcNames));
 		assertTrue(claimMap.get(oidcNames) instanceof List<?>);
-		assertTrue(((List<?>) claimMap.get(oidcNames)).contains(values.get(0)));
+		assertTrue(((List<?>) claimMap.get(oidcNames)).contains(values.getFirst()));
 	}
 
 	private void addSingeValueOrError(Map<String, Object> claimMap, String oidcNames, List<Object> values,
@@ -406,6 +413,40 @@ class OidcConfigurationUtilTest {
 		assertThat(result.getTokenSettings(), is(givenTokenSettings()));
 	}
 
+	@ParameterizedTest
+	@CsvSource(value = {
+			"null,false",
+			"'A', true",
+			"STRING_VALUE,true"
+	}, nullValues = "null")
+	void testAddOptionalClaimStringTest(Object claimValue, boolean shouldAdd) {
+		OidcProviderConfiguration.Builder builder = mock(OidcProviderConfiguration.Builder.class);
+		when(builder.claim(any(), any())).thenReturn(builder);
+
+		OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(builder, "test", claimValue);
+
+		if (shouldAdd) {
+			verify(builder).claim("test", claimValue);
+		}
+		else {
+			verify(builder, never()).claim(any(), any());
+		}
+	}
+
+	@Test
+	void testAddOptionalClaimListTest() {
+		OidcProviderConfiguration.Builder builder = mock(OidcProviderConfiguration.Builder.class);
+		when(builder.claim(any(), any())).thenReturn(builder);
+
+		List<Object> claimValue = Collections.emptyList();
+		OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(builder, "test", claimValue);
+		verify(builder, never()).claim("test", claimValue);
+
+		claimValue = List.of("value");
+		OidcConfigurationUtil.addOptionalClaimToProviderConfiguration(builder, "test", claimValue);
+		verify(builder).claim("test", claimValue);
+	}
+
 	private static OidcClient givenOidcClient(boolean withDefaults) {
 		var builder = OidcClient.builder()
 				.id("client1")
@@ -556,40 +597,48 @@ class OidcConfigurationUtilTest {
 		var client = OidcClient.builder().build();
 		var authorizationGrantTypes = AuthorizationGrantTypes.builder().build();
 		var scopes = Scopes.builder().scopeList(List.of(OidcScopes.OPENID)).build();
+		Set<String> authorizedScopes = Set.of(OidcScopes.PROFILE);
 
 		// null grant types
 		client.setAuthorizationGrantTypes(null);
 		client.setScopes(scopes);
-		assertFalse(OidcConfigurationUtil.canIssueIdToken(client));
+		assertFalse(OidcConfigurationUtil.canIssueIdToken(client, authorizedScopes));
 
 		// null scopes
 		client.setAuthorizationGrantTypes(new AuthorizationGrantTypes(List.of()));
 		client.setScopes(null);
-		assertFalse(OidcConfigurationUtil.canIssueIdToken(client));
+		assertFalse(OidcConfigurationUtil.canIssueIdToken(client, authorizedScopes));
 
 		// only non-AUTHORIZATION_CODE grant type
 		authorizationGrantTypes.setGrantTypes(List.of(AuthorizationGrantType.CLIENT_CREDENTIALS));
 		client.setAuthorizationGrantTypes(authorizationGrantTypes);
 		client.setScopes(scopes);
-		assertFalse(OidcConfigurationUtil.canIssueIdToken(client));
+		assertFalse(OidcConfigurationUtil.canIssueIdToken(client, null));
+
+		// authorizedScopes does not contain openid
+		authorizationGrantTypes.setGrantTypes(List.of(AuthorizationGrantType.CLIENT_CREDENTIALS));
+		client.setAuthorizationGrantTypes(authorizationGrantTypes);
+		client.setScopes(scopes);
+		assertFalse(OidcConfigurationUtil.canIssueIdToken(client, null));
 
 		// AUTHORIZATION_CODE present but no openid scope
+		authorizedScopes = Set.of(OidcScopes.OPENID);
 		authorizationGrantTypes.setGrantTypes(List.of(AuthorizationGrantType.AUTHORIZATION_CODE));
 		client.setAuthorizationGrantTypes(authorizationGrantTypes);
 		scopes.setScopeList(List.of("email", "profile"));
 		client.setScopes(scopes);
-		assertFalse(OidcConfigurationUtil.canIssueIdToken(client));
+		assertFalse(OidcConfigurationUtil.canIssueIdToken(client, authorizedScopes));
 
 		// AUTHORIZATION_CODE + openid scope
 		scopes.setScopeList(List.of(OidcScopes.OPENID, "email"));
 		client.setScopes(scopes);
-		assertTrue(OidcConfigurationUtil.canIssueIdToken(client));
+		assertTrue(OidcConfigurationUtil.canIssueIdToken(client, authorizedScopes));
 
 		// multiple grant types including AUTHORIZATION_CODE + openid scope
 		authorizationGrantTypes.setGrantTypes(List.of(AuthorizationGrantType.REFRESH_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE));
 		client.setAuthorizationGrantTypes(authorizationGrantTypes);
 		scopes.setScopeList(List.of(OidcScopes.OPENID));
 		client.setScopes(scopes);
-		assertTrue(OidcConfigurationUtil.canIssueIdToken(client));
+		assertTrue(OidcConfigurationUtil.canIssueIdToken(client, authorizedScopes));
 	}
 }

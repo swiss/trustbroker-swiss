@@ -92,7 +92,7 @@ class RelyingPartySetupUtilTest {
 		assertThat(mappingList, is(notNullValue()));
 		assertThat(mappingList.size(), is(7));
 		// SetupRP with alias copied
-		assertMapping(mappingList.get(0), "P1enabled", null, null, "alias1", null);
+		assertMapping(mappingList.getFirst(), "P1enabled", null, null, "alias1", null);
 		// ProfileRP merged
 		assertMapping(mappingList.get(1), "P3network", true, "N3", null,  300);
 		// SetupRP copied
@@ -231,7 +231,7 @@ class RelyingPartySetupUtilTest {
 		RelyingPartySetupUtil.mergeAccessRequest(rp, profile);
 
 		assertThat(rp.getAccessRequest().getAuthorizedApplications().getAuthorizedApplicationList().size(), is(1));
-		assertThat(rp.getAccessRequest().getAuthorizedApplications().getAuthorizedApplicationList().get(0),
+		assertThat(rp.getAccessRequest().getAuthorizedApplications().getAuthorizedApplicationList().getFirst(),
 				sameInstance(templateApp));
 		assertThat(rp.getAccessRequest().enabled(), is(profile.getAccessRequest().enabled()));
 	}
@@ -281,7 +281,7 @@ class RelyingPartySetupUtilTest {
 		var apps = rp.getAccessRequest().getAuthorizedApplications();
 		assertThat(apps.getAuthorizedApplicationList().size(), is(2));
 
-		var mergedApp1 = apps.getAuthorizedApplicationList().get(0);
+		var mergedApp1 = apps.getAuthorizedApplicationList().getFirst();
 		assertThat(mergedApp1.getName(), is(app1Name));
 		assertThat(mergedApp1.getMode(), is(mode));
 		assertThat(mergedApp1.getServiceUrl(), is(url1));

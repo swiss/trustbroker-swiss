@@ -15,8 +15,8 @@
 
 package swiss.trustbroker.federation.xmlconfig;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 
 import lombok.Data;
 import swiss.trustbroker.common.exception.TechnicalException;
@@ -27,7 +27,7 @@ import swiss.trustbroker.common.exception.TechnicalException;
 @Data
 public class ValidationStatus {
 
-	private final List<String> errors = new ArrayList<>();
+	private final Collection<String> errors = new LinkedHashSet<>();
 
 	public void addError(String error) {
 		if (error == null) {

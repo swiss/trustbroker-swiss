@@ -58,6 +58,8 @@ class HrdSupportTest {
 
 	private static final String AUTOLOGIN_COOKIE = "TEST_autoLogin";
 
+	private static final String TESTLOGIN_COOKIE = "TEST_testLogin";
+
 	private static final String HINT_TEST_PARAMETER = "test_select_cp";
 
 	private static final String HINT_PARAMETER = "select_cp";
@@ -119,8 +121,8 @@ class HrdSupportTest {
 	void testReduceClaimsProviderMappings() {
 		var request = new MockHttpServletRequest();
 		var mappings = givenClaimsProviderMappings();
-		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "MISS", null, CP_MOBILE_ID, mappings, givenProperties(),
-				hrdService);
+		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "MISS", null, CP_MOBILE_ID,
+				mappings, givenProperties(), hrdService);
 		assertThat(reduced.size(), equalTo(1)); // all CPs are returned
 	}
 
@@ -157,7 +159,7 @@ class HrdSupportTest {
 		var expectedCp = "CP1";
 		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "RP1", null, null, mappings, givenProperties(), hrdService);
 		assertThat(reduced.size(), equalTo(1));
-		assertThat(reduced.get(0).getId(), equalTo(expectedCp));
+		assertThat(reduced.getFirst().getId(), equalTo(expectedCp));
 	}
 
 	@Test
@@ -167,7 +169,7 @@ class HrdSupportTest {
 		var expectedCp = "CP2";
 		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "RP1", null, expectedCp, mappings, givenProperties(), hrdService);
 		assertThat(reduced.size(), equalTo(1));
-		assertThat(reduced.get(0).getId(), equalTo(expectedCp));
+		assertThat(reduced.getFirst().getId(), equalTo(expectedCp));
 	}
 
 	@Test
@@ -177,7 +179,7 @@ class HrdSupportTest {
 		var expectedCp = "CP2";
 		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "RP1", "RP2", null, mappings, givenProperties(), hrdService);
 		assertThat(reduced.size(), equalTo(1));
-		assertThat(reduced.get(0).getId(), equalTo(expectedCp));
+		assertThat(reduced.getFirst().getId(), equalTo(expectedCp));
 	}
 
 	@Test
@@ -185,7 +187,7 @@ class HrdSupportTest {
 		var request = new MockHttpServletRequest();
 		var mappings = givenClaimsProviderMappings();
 		var reduced = HrdSupport.reduceClaimsProviderMappings(request, "MISS", null, null, mappings, givenProperties(), hrdService);
-		assertThat(reduced.size(), equalTo(2)); // all CPs matched
+		assertThat(reduced.size(), equalTo(3)); // all CPs without an alias matched including order=-1
 	}
 
 	@Test
@@ -196,9 +198,7 @@ class HrdSupportTest {
 		trustBrokerProperties.setOidc(oidcProperties);
 
 		boolean result = HrdSupport.isXtbDestination(trustBrokerProperties, null);
-
 		assertFalse(result, "Result should be false when the destination is null.");
-
 		assertFalse(HrdSupport.isXtbDestination(trustBrokerProperties, "invalid-url"));
 	}
 
@@ -210,11 +210,9 @@ class HrdSupportTest {
 		trustBrokerProperties.setOidc(oidcProperties);
 
 		boolean result = HrdSupport.isXtbDestination(trustBrokerProperties, "https://example.com");
-
 		assertFalse(result, "Result should be false when the OIDC perimeter URL is null.");
 
 		trustBrokerProperties.getOidc().setPerimeterUrl("invalid-url");
-
 		assertFalse(HrdSupport.isXtbDestination(trustBrokerProperties, "https://example.com"));
 	}
 
@@ -226,37 +224,62 @@ class HrdSupportTest {
 		trustBrokerProperties.setOidc(oidcProperties);
 
 		boolean resultTrue = HrdSupport.isXtbDestination(trustBrokerProperties, "https://example.com/some-path");
-
 		assertTrue(resultTrue, "Result should be true when the hosts of the destination and perimeter URL match.");
 
 		boolean resultFalse = HrdSupport.isXtbDestination(trustBrokerProperties, "https://different.com");
 		assertFalse(resultFalse, "Result should be false when the hosts of the destination and perimeter URL do not match.");
 	}
 
+	@Test
+	void testAutoLoginCookieConfig() {
+		var request = new MockHttpServletRequest();
+		var properties = givenProperties();
+		assertThat(HrdSupport.hasAutoLoginDisabled(request, properties), is(false));
+		request.setCookies(new Cookie(AUTOLOGIN_COOKIE, "true"));
+		assertThat(HrdSupport.hasAutoLoginDisabled(request, properties), is(false));
+		request.setCookies(new Cookie(AUTOLOGIN_COOKIE, "false"));
+		assertThat(HrdSupport.hasAutoLoginDisabled(request, properties), is(true));
+	}
+
+	@Test
+	void testTestCookieConfig() {
+		var request = new MockHttpServletRequest();
+		var properties = givenProperties();
+		assertThat(HrdSupport.hasTestLoginEnabled(request, properties), is(false));
+		request.setCookies(new Cookie(TESTLOGIN_COOKIE, "false"));
+		assertThat(HrdSupport.hasTestLoginEnabled(request, properties), is(false));
+		request.setCookies(new Cookie(TESTLOGIN_COOKIE, "true"));
+		assertThat(HrdSupport.hasTestLoginEnabled(request, properties), is(true));
+	}
+
 	private static List<ClaimsProvider> givenClaimsProviderMappings() {
 		var ret = new ArrayList<ClaimsProvider>();
+		var order = 0;
 		for (int count = 0; count < 5; count++) {
 			ret.add(ClaimsProvider.builder()
-					.id("CP" + count)
-					.clientNetworks("INTRANET,INTERNET")
-					.relyingPartyAlias("RP" + count)
-					.build());
+			                      .id("CP" + count)
+			                      .clientNetworks("INTRANET,INTERNET")
+			                      .relyingPartyAlias("RP" + count)
+			                      .order(++order)
+			                      .build());
 		}
 		// no aliases, so HRD screen should show these 2
 		ret.add(ClaimsProvider.builder()
-				.id(CP_ENTERPRISE_ID)
-				.clientNetworks("INTRANET")
-				.build());
+		                      .id(CP_ENTERPRISE_ID)
+		                      .clientNetworks("INTRANET")
+		                      .order(++order)
+		                      .build());
 		ret.add(ClaimsProvider.builder()
-				.id(CP_PUBLIC_ID)
-				.clientNetworks("INTERNET")
-				.build());
+		                      .id(CP_PUBLIC_ID)
+		                      .clientNetworks("INTERNET")
+		                      .order(++order)
+		                      .build());
 		// gateway IP overrides everything else so '*' leads to just eliminate it from HRD screen because it's not working anyway
 		ret.add(ClaimsProvider.builder()
-				.id(CP_MOBILE_ID)
-				.clientNetworks("INTRANET,INTERNET")
-				.relyingPartyAlias("RP-ID-123-UNUSED")
-				.build());
+		                      .id(CP_MOBILE_ID)
+		                      .clientNetworks("INTRANET,INTERNET")
+		                      .order(-1)
+		                      .build());
 		return ret;
 	}
 
@@ -267,12 +290,19 @@ class HrdSupportTest {
 		ret.setEnterpriseIdpId(CP_ENTERPRISE_ID);
 		ret.setMobileIdpId(CP_MOBILE_ID);
 		ret.setPublicAutoLoginCookie(AUTOLOGIN_COOKIE);
+		ret.setPublicTestCookie(TESTLOGIN_COOKIE);
 		ret.setHrdHintParameter(HINT_PARAMETER);
 		ret.setHrdHintTestParameter(HINT_TEST_PARAMETER);
-		var network = new NetworkConfig();
+		var network = givenNetworkConfig();
 		ret.setNetwork(network);
 		network.setMobileGatewayIpRegex(GW_MOBILE_IP_REGEX);
 		return ret;
 	}
 
+	private static NetworkConfig givenNetworkConfig() {
+		return NetworkConfig.builder()
+		                    .intranetNetworkName("INTRANET")
+		                    .internetNetworkName("INTERNET")
+		                    .build();
+	}
 }

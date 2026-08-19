@@ -29,9 +29,12 @@ import org.opensaml.soap.wsaddressing.ReplyTo;
 import org.opensaml.soap.wsaddressing.To;
 import org.opensaml.soap.wsfed.EndPointReference;
 import org.opensaml.soap.wspolicy.AppliesTo;
+import org.opensaml.soap.wssecurity.Timestamp;
+import org.opensaml.soap.wstrust.KeyType;
 import org.opensaml.soap.wstrust.RenewTarget;
 import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.opensaml.soap.wstrust.RequestType;
+import org.opensaml.soap.wstrust.TokenType;
 import org.opensaml.soap.wstrust.WSTrustConstants;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlFactory;
@@ -40,7 +43,7 @@ import swiss.trustbroker.wstrust.dto.SoapMessageHeader;
 
 public class WsTrustTestUtil {
 
-	public static final String TEST_TO = WsTrustTestUtil.class.getName();
+	public static final String TEST_TO = "WsTrustTestTo";
 
 	public static final String SSO_SESSION_ID = SsoSessionIdPolicy.SSO_PREFIX + "1";
 
@@ -60,58 +63,59 @@ public class WsTrustTestUtil {
 
 	public static final String CONTEXT_CLASS = "qoa1";
 
-	private static To givenTo(String toValue) {
+	public static To givenTo(String toValue) {
 		To to = (To) XMLObjectSupport.buildXMLObject(To.ELEMENT_NAME);
 		to.setURI(toValue);
 		return to;
 	}
 
-	private static Address givenWsaAddress(String addressValue) {
+	public static Address givenWsaAddress(String addressValue) {
 		Address address = (Address) XMLObjectSupport.buildXMLObject(Address.ELEMENT_NAME);
 		address.setURI(addressValue);
 		return address;
 	}
 
-	private static org.opensaml.soap.wsfed.Address givenWsFedAddress(String addressValue) {
+	public static org.opensaml.soap.wsfed.Address givenWsFedAddress(String addressValue) {
 		org.opensaml.soap.wsfed.Address address = (org.opensaml.soap.wsfed.Address)
 				XMLObjectSupport.buildXMLObject(org.opensaml.soap.wsfed.Address.DEFAULT_ELEMENT_NAME);
 		address.setValue(addressValue);
 		return address;
 	}
 
-	private static ReplyTo givenReplyTo() {
+	public static ReplyTo givenReplyTo() {
 		return (ReplyTo) XMLObjectSupport.buildXMLObject(ReplyTo.ELEMENT_NAME);
 	}
 
-	private static MessageID givenMessageId(String messageIdValue) {
+	public static MessageID givenMessageId(String messageIdValue) {
 		MessageID messageID = (MessageID) XMLObjectSupport.buildXMLObject(MessageID.ELEMENT_NAME);
 		messageID.setURI(messageIdValue);
 		return messageID;
 	}
 
-	private static Action givenAction(String actionValue) {
+	public static Action givenAction(String actionValue) {
 		Action action = (Action) XMLObjectSupport.buildXMLObject(Action.ELEMENT_NAME);
 		action.setURI(actionValue);
 		return action;
 	}
 
 	public static SoapMessageHeader givenRequestHeader() {
-		return givenRequestHeader(null);
+		return givenRequestHeader(null, null, null);
 	}
 
-	public static SoapMessageHeader givenRequestHeader(Assertion assertion) {
+	public static SoapMessageHeader givenRequestHeader(Assertion assertion, Instant created, Instant expires) {
 		SoapMessageHeader requestHeader = new SoapMessageHeader();
 		requestHeader.setAction(givenAction(WSTrustConstants.WSA_ACTION_RST_ISSUE));
 		requestHeader.setMessageId(givenMessageId(UUID.randomUUID().toString()));
 		requestHeader.setReplyTo(givenReplyToAddress(givenReplyTo(), givenWsaAddress(Address.ANONYMOUS)));
 		requestHeader.setTo(givenTo(TEST_TO));
+		requestHeader.setRequestTimestamp(givenTimestamp(created, expires));
 		if (assertion != null) {
 			requestHeader.setAssertion(assertion);
 		}
 		return requestHeader;
 	}
 
-	private static ReplyTo givenReplyToAddress(ReplyTo replyTo, Address address) {
+	public static ReplyTo givenReplyToAddress(ReplyTo replyTo, Address address) {
 		if (replyTo == null) {
 			return null;
 		}
@@ -131,40 +135,68 @@ public class WsTrustTestUtil {
 		return request;
 	}
 
-	private static RequestType givenType(String type) {
+	public static RequestType givenType(String type) {
 		RequestType requestType = (RequestType) XMLObjectSupport.buildXMLObject(RequestType.ELEMENT_NAME);
 		requestType.setURI(type);
 		return requestType;
 	}
 
-	private static AppliesTo givenAppliesTo(String address, boolean wsa) {
+	public static KeyType givenKeyType(String type) {
+		KeyType keyType = (KeyType) XMLObjectSupport.buildXMLObject(KeyType.ELEMENT_NAME);
+		keyType.setURI(type);
+		return keyType;
+	}
+
+	public static AppliesTo givenAppliesTo(String address, boolean wsa) {
 		AppliesTo appliesTo = (AppliesTo) XMLObjectSupport.buildXMLObject(AppliesTo.ELEMENT_NAME);
 		var endpointReference = wsa ? givenWsaEndpointReference(address) : givenWsFedEndpointReference(address);
 		appliesTo.getUnknownXMLObjects().add(endpointReference);
 		return appliesTo;
 	}
 
-	private static EndPointReference givenWsFedEndpointReference(String address) {
+	public static EndPointReference givenWsFedEndpointReference(String address) {
 		EndPointReference endpointReference = (EndPointReference) XMLObjectSupport.buildXMLObject(EndPointReference.DEFAULT_ELEMENT_NAME);
 		endpointReference.setAddress(givenWsFedAddress(address));
 		return endpointReference;
 	}
 
-	private static EndpointReference givenWsaEndpointReference(String address) {
+	public static EndpointReference givenWsaEndpointReference(String address) {
 		EndpointReference endpointReference = (EndpointReference) XMLObjectSupport.buildXMLObject(EndpointReference.ELEMENT_NAME);
 		endpointReference.setAddress(givenWsaAddress(address));
 		return endpointReference;
 	}
 
+	public static Timestamp givenTimestamp(Instant created, Instant expires) {
+		if (created == null && expires == null) {
+			return null;
+		}
+		return WsTrustUtil.createTimestamp(created, expires);
+	}
+
+	public static RequestType givenInvalidRequestType(String requestValue) {
+		RequestType requestType = (RequestType) XMLObjectSupport.buildXMLObject(RequestType.ELEMENT_NAME);
+		requestType.setURI(requestValue);
+		return requestType;
+	}
+
+	public static TokenType givenTokenType(String tokenTypeValue) {
+		TokenType tokenType = (TokenType) XMLObjectSupport.buildXMLObject(TokenType.ELEMENT_NAME);
+		tokenType.setURI(tokenTypeValue);
+		return tokenType;
+	}
+
 	public static Assertion givenAssertion() {
+		return givenAssertion(RP_ISSUER_ID);
+	}
+
+	public static Assertion givenAssertion(String audience) {
 		var assertion = (Assertion) XMLObjectSupport.buildXMLObject(Assertion.DEFAULT_ELEMENT_NAME);
 		assertion.setID(ASSERTION_ID);
 		assertion.setIssuer(SamlFactory.createIssuer(XTB_ISSUER_ID));
 		assertion.setSubject(SamlFactory.createSubject(
 				SamlFactory.createNameId(NAME_ID, null, null), "req1", RP_ISSUER_ID, SUBJECT_VALID_SECS, NOW)
 		);
-		var conditions = SamlFactory.createConditions(
-				RP_ISSUER_ID, CONDITION_VALID_SECS, NOW);
+		var conditions = SamlFactory.createConditions(audience, CONDITION_VALID_SECS, NOW);
 		assertion.setConditions(conditions);
 		assertion.setIssueInstant(NOW);
 		var authnStatement = OpenSamlUtil.buildSamlObject(AuthnStatement.class);
@@ -186,8 +218,34 @@ public class WsTrustTestUtil {
 
 	public static RequestSecurityToken givenIssueRstRequest() {
 		var rst = (RequestSecurityToken) XMLObjectSupport.buildXMLObject(RequestSecurityToken.ELEMENT_NAME);
-		rst.getUnknownXMLObjects().add(givenType(WSTrustConstants.WSA_ACTION_RST_RENEW));
+		rst.getUnknownXMLObjects().add(givenType(WSTrustConstants.WSA_ACTION_RST_ISSUE));
 		rst.getUnknownXMLObjects().add(givenWsFedEndpointReference(RP_ISSUER_ID));
+		rst.getUnknownXMLObjects().add(givenKeyType(KeyType.BEARER));
 		return rst;
+	}
+
+	public static RequestSecurityToken givenRstRequest(KeyType keyType, TokenType tokenType, RequestType requestType) {
+		RequestSecurityToken requestSecurityToken =
+				(RequestSecurityToken) XMLObjectSupport.buildXMLObject(RequestSecurityToken.ELEMENT_NAME);
+
+		if (keyType != null) {
+			requestSecurityToken.getUnknownXMLObjects().add(keyType);
+		}
+
+		if (tokenType != null) {
+			requestSecurityToken.getUnknownXMLObjects().add(tokenType);
+		}
+
+		if (requestType != null) {
+			requestSecurityToken.getUnknownXMLObjects().add(requestType);
+		}
+
+		return requestSecurityToken;
+	}
+
+	public static Address givenAddress(String issuerId) {
+		Address address = (Address) XMLObjectSupport.buildXMLObject(Address.ELEMENT_NAME);
+		address.setURI(issuerId);
+		return address;
 	}
 }

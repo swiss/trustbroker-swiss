@@ -19,7 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 import swiss.trustbroker.audit.dto.AuditDto;
 import swiss.trustbroker.config.TrustBrokerProperties;
@@ -32,7 +32,7 @@ import swiss.trustbroker.config.dto.OpsAuditConfig;
  */
 @Component
 @Slf4j
-@ConditionalOnProperty(value = "trustbroker.config.audit.ops.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnBooleanProperty(value = "trustbroker.config.audit.ops.enabled")
 public class OpsAuditLogger extends BaseAuditLogger {
 
 	@AllArgsConstructor

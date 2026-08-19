@@ -15,8 +15,8 @@ The setup will provide these endpoints:
 | Container | Endpoints | Remarks
 
 | ``postgresql`` providing session and token storage.
-| docker exec -it postgresql psql --host=localhost --port=5432 --dbname=TBSS16 --username=root --password
-| Investigate storage: show databases; use TBSS16; show tables; desc TB_AUTH_SESSION_CACHE;
+| docker exec -it postgresql psql --host=localhost --port=5432 --dbname=tbss16 --username=root --password
+| Investigate storage: SET search_path TO tbss16; \dt; \d tb_auth_session_cache;
 
 | ``mariadb`` providing session and token storage as alternative to postgresql.
 | docker exec -it mariadb mysql --protocol=tcp --host=localhost --port=3306 --database=TBSS16 --user=root --password=secret

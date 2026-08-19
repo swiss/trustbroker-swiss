@@ -333,7 +333,7 @@ class OpenSamlUtilTest {
 			</saml2p:AuthnRequest>
 			""";
 
-	private static final String TEST_ENTITY_DESCRIPTOR = """
+	public static final String TEST_ENTITY_DESCRIPTOR = """
 			<EntityDescriptor
 				xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
 				entityID="loadbalancer-9.siroe.com">
@@ -413,7 +413,7 @@ class OpenSamlUtilTest {
 
 	private static final String TEST_DESTINATION_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;myDestination";
 
-	private static final String TEST_ARP_URL = "https://localhost/saml/arp";
+	public static final String TEST_ARP_URL = "https://localhost/saml/arp";
 
 	@Autowired
 	private VelocityEngine velocityEngine;
@@ -456,9 +456,10 @@ class OpenSamlUtilTest {
 			"<parent></TestTag></parent>",
 			"<parent></any-ns:TestTag></parent>",
 			"<parent><ns:TestTag xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\"/>abc</parent>",
-			"<parent><ns:TestTag  a-b:c_d=\"foo\" \rxyz  =\t\"bar\"   >",
+			"<parent><ns:TestTag  a-b:c_d=\"foo\" \\rxyz  =\t\"bar\"   >",
 	})
 	void testGetXmlTagPattern(String xml) {
+		xml = xml.replace("\\r", "\r"); // \r is treated as record separator in CsvSource - unescape
 		var pattern = OpenSamlUtil.getXmlTagPattern("TestTag");
 		assertTrue(pattern.matcher(xml).find());
 	}

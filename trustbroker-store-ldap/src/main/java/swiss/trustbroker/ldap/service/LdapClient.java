@@ -31,6 +31,7 @@ import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.ldap.support.LdapEncoder;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.api.idm.dto.IdmRequest;
+import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
 import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.common.config.ExternalStores;
@@ -38,6 +39,7 @@ import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.tracing.Traced;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.ldap.model.LdapAttributeMapper;
+import swiss.trustbroker.saml.dto.ClaimSource;
 
 @Service
 @Slf4j
@@ -56,9 +58,9 @@ public class LdapClient {
 	@Timed("ldap")
 	@Traced
 	public List<Map<String, List<String>>> search(RelyingPartyConfig relyingPartyConfig, CpResponseData cpResponse, IdmRequest idmQuery,
-												  List<Map<String, List<String>>> attributes) {
+	                                              List<Map<String, List<String>>> attributes, IdmResult result) {
 		final var appFilter = idmQuery.getAppFilter();
-		final var formattedQuery = queryFilterFormatter(appFilter, cpResponse, relyingPartyConfig.getId(), attributes);
+		final var formattedQuery = queryFilterFormatter(appFilter, cpResponse, relyingPartyConfig.getId(), attributes, result);
 		final var base = getQueryBase(idmQuery.getSubResource(), relyingPartyConfig);
 		log.info("IDM call ({}): issuer={} relyingPartyIssuerId={} base={} query={} ",
 				ExternalStores.LDAP, cpResponse.getIssuerId(), relyingPartyConfig.getId(), base, formattedQuery);
@@ -75,7 +77,8 @@ public class LdapClient {
 		return subResource;
 	}
 
-	String queryFilterFormatter(String appFilter, CpResponseData cpResponse, String rpId, List<Map<String, List<String>>>  attributes) {
+	String queryFilterFormatter(String appFilter, CpResponseData cpResponse, String rpId, List<Map<String, List<String>>> attributes,
+	                            IdmResult result) {
 		if (appFilter == null || appFilter.isEmpty()) {
 			throw new TechnicalException(String.format(
 					"AppFilter is null or empty for rp=%s HINT: configure IDMLookup.IDMQuery.AppFilter", rpId));
@@ -99,7 +102,7 @@ public class LdapClient {
 				log.error("Placeholder is null in appFilter={}", appFilter);
 				continue;
 			}
-			var placeholderValues = getPlaceholderValues(placeholder, cpResponse, attributes);
+			var placeholderValues = getPlaceholderValues(placeholder, cpResponse, attributes, result);
 			var placeholderValue = getEncodedPlaceHolderValue(placeholder, placeholderValues, ldapUndefined);
 			params.put(placeholder, placeholderValue);
 		}
@@ -107,7 +110,7 @@ public class LdapClient {
 		return StringSubstitutor.replace(appFilter, params, "${", "}");
 	}
 
-	private static String getEncodedPlaceHolderValue(String placeholder, List<String> placeholderValues, String ldapUndefined) {
+	static String getEncodedPlaceHolderValue(String placeholder, List<String> placeholderValues, String ldapUndefined) {
 		var placeholderValue = new StringBuilder();
 
 		if (placeholder.startsWith(LIST_PLACEHOLDER)) {
@@ -117,7 +120,7 @@ public class LdapClient {
 				placeholderValue.append('(').append(claimName).append("=").append(encodedValue).append(')');
 			}
 		}
-		else if (placeholderValues.size() == 1) {
+		else if (!placeholderValues.isEmpty()) {
 			if (placeholderValues.getFirst() == null) {
 				return ldapUndefined;
 			}
@@ -132,12 +135,12 @@ public class LdapClient {
 	private static String getListPlaceholderClaim(String placeholder) {
 		String[] elements = placeholder.split(COLON);
 		if (elements.length != 4) {
-			throw new TechnicalException("Invalid placeholder format: " + placeholder);
+			throw new TechnicalException("Expected LIST placeholder format: " + placeholder);
 		}
 		return elements[3];
 	}
 
-	List<String> getPlaceholderValues(String placeholder, CpResponseData cpResponse, List<Map<String, List<String>>> attributeNameListMap) {
+	List<String> getPlaceholderValues(String placeholder, CpResponseData cpResponse, List<Map<String, List<String>>> attributeNameListMap, IdmResult result) {
 		if (placeholder == null) {
 			return Collections.emptyList();
 		}
@@ -145,11 +148,11 @@ public class LdapClient {
 		if (SUBJECT_NAME_ID.equals(placeholder)) {
 			placeholderValues.add(cpResponse.getNameId());
 		}
-		else if (isListPlaceholder(placeholder)) {
-			return getListValues(placeholder, cpResponse, attributeNameListMap);
+		else if (isIdmClaim(placeholder)) {
+			return getUserDetails(placeholder, attributeNameListMap, result);
 		}
-		else if (isChainedQuery(placeholder)) {
-			placeholderValues.add(getUserDetail(placeholder, cpResponse));
+		else if (isPropertiesClaim(placeholder)) {
+			return getProperties(placeholder, result);
 		}
 		else {
 			placeholderValues.add(cpResponse.getAttribute(placeholder));
@@ -157,32 +160,21 @@ public class LdapClient {
 		return placeholderValues;
 	}
 
-	private List<String> getListValues(String placeholder, CpResponseData cpResponse, List<Map<String, List<String>>>  attributeNameListMap) {
-		// Example: placeholder in form of `LIST:IDM:<query_name>:<definition_name>`
-		String[] elements = placeholder.split(COLON);
-		if (elements.length != 4) {
-			throw new TechnicalException("Invalid placeholder format: " + placeholder);
-		}
+	private List<String> getProperties(String placeholder, IdmResult result) {
+		// Example: placeholder in form of `LIST:PROPS:<definition_name>` or `PROPS:<definition_name>`
+		final var lastColonIndex = placeholder.lastIndexOf(COLON);
+		final var claimName = placeholder.substring(lastColonIndex + 1);
 		List<String> placeholderValues = new ArrayList<>();
-		var claimName = elements[3];
-		var source = elements[1] + COLON + elements[2];
-		var values = getClaimValue(cpResponse, attributeNameListMap, claimName, source);
-		if (values == null) {
+		if (result == null || result.getProperties() == null || result.getProperties().isEmpty()) {
 			placeholderValues.add(trustBrokerProperties.getLdap().getUndefined());
 			return placeholderValues;
 		}
-		for (String claimValue : values) {
-			placeholderValues.add(claimValue != null ? claimValue : trustBrokerProperties.getLdap().getUndefined());
-		}
-		return !placeholderValues.isEmpty() ? placeholderValues : List.of(trustBrokerProperties.getLdap().getUndefined());
-	}
-
-	private static List<String> getClaimValue(CpResponseData cpResponse, List<Map<String, List<String>>> attributes, String claimName, String source) {
-		var values = cpResponse.getUserDetails(claimName, source);
-		if (values == null &&  source.contains(ExternalStores.LDAP.name())) {
-			values = getAttributeFromListMap(claimName, attributes);
-		}
-		return values;
+		result.getUserDetails().forEach((key, value) -> {
+			if (key != null && (claimName.equals(key.getName()) || claimName.equals(key.getNamespaceUri()))) {
+				placeholderValues.addAll(value);
+			}
+		});
+		return placeholderValues;
 	}
 
 	private static List<String> getAttributeFromListMap(String claimName, List<Map<String, List<String>>> attributes) {
@@ -190,26 +182,68 @@ public class LdapClient {
 		for (var map : attributes) {
 			if (map.containsKey(claimName)) {
 				attributeValues.addAll(map.get(claimName));
-				return attributeValues;
 			}
 		}
 		return attributeValues;
 	}
 
-	private boolean isListPlaceholder(String placeholder) {
-		return placeholder != null && placeholder.startsWith(LIST_PLACEHOLDER);
+	boolean isIdmClaim(String placeholder) {
+		return isClaimSource(placeholder, ClaimSource.IDM);
 	}
 
-	boolean isChainedQuery(String placeholder) {
-		return placeholder.lastIndexOf(COLON) != -1;
+	boolean isPropertiesClaim(String placeholder) {
+		return isClaimSource(placeholder, ClaimSource.PROPS);
 	}
 
-	private String getUserDetail(String placeholder, CpResponseData cpResponse) {
-		// Example: placeholder in form of `IDM:<query_name>:<definition_name>`
+	private boolean isClaimSource(String placeholder, ClaimSource source) {
+		var lastSeparator = placeholder.lastIndexOf(COLON);
+		if (lastSeparator == -1) {
+			return false;
+		}
+		var sourceIndex = placeholder.indexOf(source.name());
+		return sourceIndex != -1 && sourceIndex < lastSeparator;
+	}
+
+	private List<String> getUserDetails(String placeholder, List<Map<String, List<String>>> attributeNameListMap, IdmResult result) {
+		// Example: placeholder in form of `LIST:IDM:<query_name>:<definition_name>` or `IDM:<query_name>:<definition_name>`
 		final var lastColonIndex = placeholder.lastIndexOf(COLON);
 		final var claimName = placeholder.substring(lastColonIndex + 1);
 		final var source = placeholder.substring(0, lastColonIndex);
-		return cpResponse.getUserDetail(claimName, source);
+		List<String> placeholderValues = new ArrayList<>();
+		List<String> list = new ArrayList<>();
+		if (source.contains(ExternalStores.LDAP.name())) {
+			list = getAttributeFromListMap(claimName, attributeNameListMap);
+			if (list.isEmpty()) {
+				placeholderValues.add(trustBrokerProperties.getLdap().getUndefined());
+				return placeholderValues;
+			}
+
+		}
+		else {
+			if (result == null || result.getUserDetails() == null || result.getUserDetails().isEmpty()) {
+				placeholderValues.add(trustBrokerProperties.getLdap().getUndefined());
+				return placeholderValues;
+			}
+			List<String> userDetails = new ArrayList<>();
+			final var idmSource = source.contains(LIST_PLACEHOLDER) && source.split(COLON).length > 1 ? source.split(COLON)[1] : source;
+			result.getUserDetails().forEach((key, value) -> {
+				if (key != null) {
+					boolean sameName = claimName.equals(key.getName()) || claimName.equals(key.getNamespaceUri());
+					boolean sameSource = key.getSource() != null && key.getSource().equals(idmSource);
+					if (sameName && sameSource) {
+						userDetails.addAll(value);
+					}
+				}
+			});
+			if (!userDetails.isEmpty()) {
+				list = userDetails;
+			}
+		}
+		list = list.stream().distinct().toList();
+		for (String claimValue : list) {
+			placeholderValues.add(claimValue != null ? claimValue : trustBrokerProperties.getLdap().getUndefined());
+		}
+		return !placeholderValues.isEmpty() ? placeholderValues : List.of(trustBrokerProperties.getLdap().getUndefined());
 	}
 
 }

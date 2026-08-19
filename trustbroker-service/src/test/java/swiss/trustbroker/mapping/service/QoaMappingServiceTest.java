@@ -514,7 +514,7 @@ class QoaMappingServiceTest {
 				}
 		);
 		var classes = givenRpAcClasses();
-		classes.get(0).setReplaceInbound(Boolean.FALSE);
+		classes.getFirst().setReplaceInbound(Boolean.FALSE);
 		return new Object[][]{
 				{Qoa.builder().classes(classesWithReplaceTrue).build(), 3},
 				{Qoa.builder().classes(classesWithReplaceFalse).build(), 0},

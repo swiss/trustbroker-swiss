@@ -123,7 +123,9 @@ public class OidcExceptionHelper {
 			Predicate<String> urlValidator) {
 		var clientId = OidcSessionSupport.getOidcClientId(request, null);
 		if (authException == null) {
-			log.info("Missing OIDC exception - redirect to OIDC clientId={} not possible", clientId);
+			if (clientId != null) {
+				log.info("No OIDC AuthenticationException to redirect to oidcClientId={}", clientId);
+			}
 			return null;
 		}
 		// validation failure through throwError of this class or OAuth2AuthorizationCodeRequestAuthenticationProvider

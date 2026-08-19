@@ -169,7 +169,7 @@ public class SamlMockMessageService {
 		var encodedArtifactMessage = SamlIoUtil.encodeSamlArtifactData(velocityEngine,
 				artifactCacheService.getArtifactMap(), request, buildArtifactResolutionParameters(), relayState);
 		rpRequest.setSamlArtifactRequest(encodedArtifactMessage);
-		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1;
+		var sigAlg = SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256;
 		rpRequest.setSigAlg(sigAlg);
 		var signature = SamlIoUtil.buildEncodedSamlRedirectSignature(request, fileService.getAuthnRequestCredential(),
 				sigAlg, relayState, encodedRedirectMessage);
@@ -433,9 +433,9 @@ public class SamlMockMessageService {
 		if (assertion.getAuthnStatements().isEmpty()) {
 			return;
 		}
-		assertion.getAuthnStatements().get(0).setAuthnInstant(Instant.now());
-		if (assertion.getAuthnStatements().get(0).getSessionNotOnOrAfter() != null) {
-			assertion.getAuthnStatements().get(0)
+		assertion.getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
+		if (assertion.getAuthnStatements().getFirst().getSessionNotOnOrAfter() != null) {
+			assertion.getAuthnStatements().getFirst()
 					 .setSessionNotOnOrAfter(Instant.now().plusSeconds(MAX_ASSERTION_VALIDITY_SEC));
 		}
 	}
@@ -458,7 +458,7 @@ public class SamlMockMessageService {
 		var subject = assertion.getSubject();
 		List<SubjectConfirmation> subjectConfirmations = subject != null ? subject.getSubjectConfirmations() : Collections.emptyList();
 		if (!CollectionUtils.isEmpty(subjectConfirmations)) {
-			var subjectConfirmationData = subjectConfirmations.get(0).getSubjectConfirmationData();
+			var subjectConfirmationData = subjectConfirmations.getFirst().getSubjectConfirmationData();
 			if (subjectConfirmationData != null) {
 				if (subjectConfirmationData.getNotBefore() != null) {
 					subjectConfirmationData.setNotBefore(Instant.now());
@@ -481,17 +481,17 @@ public class SamlMockMessageService {
 		if (CollectionUtils.isEmpty(assertions)) {
 			return;
 		}
-		var conditions = assertions.get(0)
+		var conditions = assertions.getFirst()
 								   .getConditions();
 		if (conditions == null) {
 			return;
 		}
 		List<AudienceRestriction> audienceRestrictions = conditions.getAudienceRestrictions();
 		if (!CollectionUtils.isEmpty(audienceRestrictions)) {
-			List<Audience> audiences = audienceRestrictions.get(0)
+			List<Audience> audiences = audienceRestrictions.getFirst()
 														   .getAudiences();
 			if (!audiences.isEmpty() && audienceUri != null) {
-				log.info("Updating subjectConfirmationData.AudienceURI from '{}' to '{}'", audiences.get(0).getURI(),
+				log.info("Updating subjectConfirmationData.AudienceURI from '{}' to '{}'", audiences.getFirst().getURI(),
 						audienceUri);
 				audiences.clear();
 				var audience = OpenSamlUtil.buildSamlObject(Audience.class);
@@ -574,7 +574,8 @@ public class SamlMockMessageService {
 																	 .credential(credential)
 																	 .build());
 			return OpenSamlUtil.decodeSamlArtifactMessage(request, properties.getArtifactResolutionIssuer(),
-					peer, signatureParameters, SignatureValidationParameters.of(false, Collections.emptyList()),
+					peer, signatureParameters, SignatureValidationParameters.of(false, Collections.emptyList(),
+							Collections.emptyList(), false),
 					Optional.empty());
 		}
 		if (OpenSamlUtil.isSamlRedirectRequest(request)) {

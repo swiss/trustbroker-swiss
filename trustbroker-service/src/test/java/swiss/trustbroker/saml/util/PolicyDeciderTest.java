@@ -30,6 +30,7 @@ class PolicyDeciderTest {
 	@Test
 	void isSchemaValidationEnabledTest(){
 		SecurityPolicies policies = new SecurityPolicies();
+		policies.setValidateXmlSchema(true);
 
 		SecurityChecks security = new SecurityChecks();
 		security.setValidateXmlSchema(true);

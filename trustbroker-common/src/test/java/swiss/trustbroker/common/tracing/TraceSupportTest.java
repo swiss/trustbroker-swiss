@@ -49,9 +49,7 @@ class TraceSupportTest {
 			"000102030405060708090a0b0c0d0e0f,false" // not a traceparent
 	})
 	void checkAcc(String id, boolean match) {
-		var request = new MockHttpServletRequest();
-		request.addHeader(TraceSupport.W3C_TRACEPARENT, id);
-		TraceSupport.setMdcTraceContext(request);
+		traceParentInit(id);
 		var expectedCallerId = match ?
 				String.join(".", id.split("-")[1], id.split("-")[2]) :
 				TraceSupport.getCallerTraceParent();
@@ -66,8 +64,7 @@ class TraceSupportTest {
 	void testTraceIdForSamlMessages() {
 		var id = TraceSupport.getOwnTraceParentForSaml();
 		assertThat(id, is(notNullValue()));
-		assertThat(id.length(), is(77)); // not more than 80 but long enough for 12h to not collide
-		assertThat(id, is(notNullValue()));
+		assertThat(id.length(), is(69)); // not more than 80 but long enough for 12h to not collide
 		assertThat(id, startsWith("S2-"));
 		assertThat(id.split("-").length, is(4));
 	}
@@ -112,6 +109,20 @@ class TraceSupportTest {
 		assertWireTrace(rpId.substring(3, 52).replace("-", "."));
 	}
 
+	@Test
+	void testMatchOwnTraceParentForSaml() {
+		traceParentInit("00-32111111111111111111111111111111-1622222222222222-01");
+		var id1 = TraceSupport.getOwnTraceParentForSaml("BSESSSION_COOKIE_32");
+		traceParentInit("00-32111111111111111111111111111111-1633333333333333-01");
+		var id2 = TraceSupport.getOwnTraceParentForSaml("BSESSSION_COOKIE_32");
+		assertThat(id1, is(notNullValue()));
+		assertThat(id1.length(), is(72)); // not more than 80 but long enough for 12h to not collide
+		assertThat(id1, startsWith("S2-"));
+		assertThat(id1.split("-").length, is(4));
+		assertThat(id1, not(is(id2)));
+		assertThat(TraceSupport.matchOwnTraceParentForSaml(id1, id2), is(true));
+	}
+
 	private void assertWireTrace(String callerTraceId) {
 		assertThat(callerTraceId.length(), is(49));
 		var toksWire = callerTraceId.split("\\.");
@@ -129,6 +140,12 @@ class TraceSupportTest {
 		assertThat(toksConv[0], is(toksMdc[0]));
 		assertThat(toksConv[1], is(toksMdc[1]));
 		// traceId changed, parentId the same
+	}
+
+	private void traceParentInit(String id) {
+		var request = new MockHttpServletRequest();
+		request.addHeader(TraceSupport.W3C_TRACEPARENT, id);
+		TraceSupport.setMdcTraceContext(request);
 	}
 
 }

@@ -171,7 +171,7 @@ public class OidcValidator {
 			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
 		}
 		if (now - iat > (maxAgeSex * 1000L)) {
-			var message = String.format("token is too old for client=%s iat=%s. Allowed tolerance seconds=%s",
+			var message = String.format("Token is too old for client=%s iat=%s. Allowed tolerance seconds=%s",
 					clientId, tokenIat, maxAgeSex);
 			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
 		}
